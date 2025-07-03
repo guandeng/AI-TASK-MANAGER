@@ -31,7 +31,7 @@ function getGeminiOptions() {
 // Configure Google Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const geminiModel = genAI.getGenerativeModel({
-  model: "gemini-2.5-pro-exp-03-25",
+  model: "gemini-2.5-flash",
   generationConfig: {
     temperature: CONFIG.temperature,
   },

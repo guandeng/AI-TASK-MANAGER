@@ -31,7 +31,7 @@ function getGeminiOptions() {
 // Configure Google Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const geminiModel = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash",
+  model: CONFIG.geminiModel,
   generationConfig: {
     temperature: CONFIG.temperature,
   },
@@ -606,7 +606,7 @@ async function generateSubtasksWithPerplexity(task, numSubtasks = null, nextSubt
     log('info', `Researching context for task ${task.id}: ${task.title}`);
     const perplexityClient = getPerplexityClient();
 
-    const PERPLEXITY_MODEL = process.env.PERPLEXITY_MODEL || 'sonar-pro';
+    const PERPLEXITY_MODEL = CONFIG.perplexityModel;
     const researchLoadingIndicator = startLoadingIndicator('Researching best practices with Perplexity AI...');
 
     // Include business knowledge in research query if available

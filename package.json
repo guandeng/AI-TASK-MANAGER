@@ -18,7 +18,11 @@
     "prepublishOnly": "npm run prepare-package",
     "prepare": "chmod +x bin/task-manager.js bin/task-manager-init.js scripts/server/express-server.js",
     "changeset": "changeset",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "dev": "node scripts/dev.js",
+    "list": "node scripts/dev.js list",
+    "generate": "node scripts/dev.js generate",
+    "parse-prd": "node scripts/dev.js parse-prd"
   },
   "keywords": [
     "claude",

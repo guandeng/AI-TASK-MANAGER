@@ -9,15 +9,24 @@ import chalk from 'chalk';
 
 // Configuration and constants
 const CONFIG = {
+  // AI Model Configuration
   model: process.env.MODEL || 'gemini-2.0-pro',
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+  perplexityModel: process.env.PERPLEXITY_MODEL || 'llama-3.1-sonar-small-128k-online',
+
+  // AI Parameters
   maxTokens: parseInt(process.env.MAX_TOKENS || '8192'),
   temperature: parseFloat(process.env.TEMPERATURE || '0.7'),
+
+  // General Configuration
   debug: process.env.DEBUG === "true",
   logLevel: process.env.LOG_LEVEL || "info",
   defaultSubtasks: parseInt(process.env.DEFAULT_SUBTASKS || "3"),
   defaultPriority: process.env.DEFAULT_PRIORITY || "medium",
   projectName: process.env.PROJECT_NAME || "Task Master",
   projectVersion: "1.5.0", // Hardcoded version - ALWAYS use this value, ignore environment variable
+
+  // API Configuration
   geminiBaseUrl: process.env.GEMINI_BASE_URL || undefined,  // Custom Gemini API base URL
   useChinese: process.env.USE_CHINESE === "true" // Whether to use Chinese translations
 };

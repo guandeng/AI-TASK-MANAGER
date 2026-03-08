@@ -9,6 +9,8 @@ import chalk from 'chalk';
 import boxen from 'boxen';
 import Table from 'cli-table3';
 import readline from 'readline';
+import dotenv from 'dotenv';
+dotenv.config();
 
 import {
   CONFIG,
@@ -22,22 +24,14 @@ import {
   truncate
 } from './utils.js';
 
-import {
-  displayBanner,
-  getStatusWithColor,
-  formatDependenciesWithStatus,
-  getComplexityWithColor,
-  startLoadingIndicator,
-  stopLoadingIndicator,
-  createProgressBar
-} from './ui.js';
+import { displayBanner, getStatusWithColor, formatDependenciesWithStatus, getComplexityWithColor, startLoadingIndicator, stopLoadingIndicator, createProgressBar } from './ui.js';
 
 import {
   callGemini,
   generateSubtasks,
   generateSubtasksWithPerplexity,
   generateComplexityAnalysisPrompt,
-  handleGeminiError
+  handleAIError
 } from './ai-services.js';
 
 import {
@@ -288,14 +282,16 @@ Return only the updated tasks as a valid JSON array.`
         const jsonText = responseText.substring(jsonStart, jsonEnd + 1);
         updatedTasks = JSON.parse(jsonText);
       } else {
-        // Call Gemini to update the tasks with non-streaming
-        log('info', 'Using Gemini AI for task updates');
+        // Call AI to update the tasks with non-streaming
+        const provider = CONFIG.aiProvider;
+        const providerName = provider === 'qwen' ? '千问' : 'Gemini';
+        log('info', `Using ${providerName} AI for task updates`);
 
         // Regular dots animation to show progress
         let dotCount = 0;
         const animationInterval = setInterval(() => {
           readline.cursorTo(process.stdout, 0);
-          process.stdout.write(`Waiting for response from Gemini${'.'.repeat(dotCount)}`);
+          process.stdout.write(`Waiting for response from ${providerName}${'.'.repeat(dotCount)}`);
           dotCount = (dotCount + 1) % 4;
         }, 500);
 
@@ -311,26 +307,54 @@ ${prompt}
 
 Return only the updated tasks as a valid JSON array.`;
 
-          // Use non-streaming API call
-          const { geminiModel } = await import('./ai-services.js');
-          const result = await geminiModel.generateContent(fullPrompt);
-          clearInterval(animationInterval);
+          if (provider === 'qwen') {
+            // Use Qwen (OpenAI-compatible) API
+            const { getQwenClient } = await import('./ai-services.js');
+            const qwenClient = getQwenClient();
+            const result = await qwenClient.chat.completions.create({
+              model: CONFIG.qwenModel,
+              messages: [
+                { role: 'user', content: fullPrompt }
+              ],
+              temperature: CONFIG.temperature,
+              max_tokens: CONFIG.maxTokens
+            });
+            clearInterval(animationInterval);
+            const responseText = result.choices[0].message.content;
 
-          // Get text from response
-          const responseText = result.response.text();
+            // Extract JSON from response
+            const jsonStart = responseText.indexOf('[');
+            const jsonEnd = responseText.lastIndexOf(']');
 
-          log('info', "Completed non-streaming response from Gemini API!");
+            if (jsonStart === -1 || jsonEnd === -1) {
+              throw new Error("Could not find valid JSON array in response");
+            }
 
-          // Extract JSON from response
-          const jsonStart = responseText.indexOf('[');
-          const jsonEnd = responseText.lastIndexOf(']');
+            const jsonText = responseText.substring(jsonStart, jsonEnd + 1);
+            updatedTasks = JSON.parse(jsonText);
+          } else {
+            // Use Gemini API
+            const { getGeminiModel } = await import('./ai-services.js');
+            const model = getGeminiModel();
+            const result = await model.generateContent(fullPrompt);
+            clearInterval(animationInterval);
 
-          if (jsonStart === -1 || jsonEnd === -1) {
-            throw new Error("Could not find valid JSON array in Gemini's response");
+            // Get text from response
+            const responseText = result.response.text();
+
+            log('info', `Completed response from ${providerName} API!`);
+
+            // Extract JSON from response
+            const jsonStart = responseText.indexOf('[');
+            const jsonEnd = responseText.lastIndexOf(']');
+
+            if (jsonStart === -1 || jsonEnd === -1) {
+              throw new Error("Could not find valid JSON array in response");
+            }
+
+            const jsonText = responseText.substring(jsonStart, jsonEnd + 1);
+            updatedTasks = JSON.parse(jsonText);
           }
-
-          const jsonText = responseText.substring(jsonStart, jsonEnd + 1);
-          updatedTasks = JSON.parse(jsonText);
         } catch (error) {
           clearInterval(animationInterval);
           throw error;
@@ -1643,7 +1667,7 @@ async function addTask(tasksPath, prompt, dependencies = [], priority = 'medium'
   }
 
   // Find the highest task ID to determine the next ID
-  const highestId = Math.max(...data.tasks.map(t => t.id));
+  const highestId = data.tasks.length > 0 ? Math.max(...data.tasks.map(t => t.id)) : 0;
   const newTaskId = highestId + 1;
 
   console.log(boxen(
@@ -1700,35 +1724,54 @@ async function addTask(tasksPath, prompt, dependencies = [], priority = 'medium'
   IMPORTANT: Return ONLY the JSON object, nothing else.`;
 
   // Start the loading indicator
-  const loadingIndicator = startLoadingIndicator('Generating new task with Gemini AI...');
+  const loadingIndicator = startLoadingIndicator(`Generating new task with ${CONFIG.aiProvider === 'qwen' ? '千问' : 'Gemini'} AI...`);
 
   let fullResponse = '';
   let streamingInterval = null;
 
   try {
-    // Call Gemini with non-streaming API
-    const { geminiModel } = await import('./ai-services.js');
+    // Import AI services
+    const { getGeminiModel, getQwenClient } = await import('./ai-services.js');
 
     // Combine system prompt and user content
     const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+
+    const provider = CONFIG.aiProvider;
+    const providerName = provider === 'qwen' ? '千问' : 'Gemini';
 
     // Use dots animation to show progress
     let dotCount = 0;
     const animationInterval = setInterval(() => {
       readline.cursorTo(process.stdout, 0);
-      process.stdout.write(`Waiting for response from Gemini${'.'.repeat(dotCount)}`);
+      process.stdout.write(`Waiting for response from ${providerName}${'.'.repeat(dotCount)}`);
       dotCount = (dotCount + 1) % 4;
     }, 500);
 
     try {
-      // Use non-streaming API call
-      const result = await geminiModel.generateContent(fullPrompt);
-      clearInterval(animationInterval);
+      if (provider === 'qwen') {
+        // Use Qwen (OpenAI-compatible) API
+        const qwenClient = getQwenClient();
+        const result = await qwenClient.chat.completions.create({
+          model: CONFIG.qwenModel,
+          messages: [
+            { role: 'user', content: fullPrompt }
+          ],
+          temperature: CONFIG.temperature,
+          max_tokens: CONFIG.maxTokens
+        });
+        clearInterval(animationInterval);
+        fullResponse = result.choices[0].message.content;
+        log('info', `Completed response from ${providerName} API!`);
+      } else {
+        // Use Gemini API
+        const model = getGeminiModel();
+        const result = await model.generateContent(fullPrompt);
+        clearInterval(animationInterval);
+        fullResponse = result.response.text();
+        log('info', `Completed response from ${providerName} API!`);
+      }
 
-      // Get text from response
-      fullResponse = result.response.text();
-
-      log('info', "Completed response from Gemini API!");
+      log('info', `Completed response from ${providerName} API!`);
     } catch (error) {
       clearInterval(animationInterval);
       throw error;
@@ -1899,20 +1942,23 @@ DO NOT include any text before or after the JSON array. No explanations, no mark
           console.log(chalk.gray('Perplexity error:'), perplexityError.message);
 
           // Continue to Gemini as fallback
-          await useGeminiForComplexityAnalysis();
+          await useAIForComplexityAnalysis();
         }
       } else {
         // Use Gemini directly if research flag is not set
-        await useGeminiForComplexityAnalysis();
+        await useAIForComplexityAnalysis();
       }
 
-      // Helper function to use Gemini for complexity analysis
-      async function useGeminiForComplexityAnalysis() {
+      // Helper function to use AI for complexity analysis
+      async function useAIForComplexityAnalysis() {
+        const provider = CONFIG.aiProvider;
+        const providerName = provider === 'qwen' ? '千问' : 'Gemini';
+
         // Regular dots animation to show progress
         let dotCount = 0;
         const animationInterval = setInterval(() => {
           readline.cursorTo(process.stdout, 0);
-          process.stdout.write(`Waiting for response from Gemini${'.'.repeat(dotCount)}`);
+          process.stdout.write(`Waiting for response from ${providerName}${'.'.repeat(dotCount)}`);
           dotCount = (dotCount + 1) % 4;
         }, 500);
 
@@ -1921,14 +1967,28 @@ DO NOT include any text before or after the JSON array. No explanations, no mark
           const systemInstruction = "You are an expert software architect and project manager analyzing task complexity. Respond only with valid JSON.";
           const fullPrompt = `${systemInstruction}\n\n${prompt}`;
 
-          // Use non-streaming API call
-          const { geminiModel } = await import('./ai-services.js');
-          const result = await geminiModel.generateContent(fullPrompt);
+          if (provider === 'qwen') {
+            // Use Qwen (OpenAI-compatible) API
+            const { getQwenClient } = await import('./ai-services.js');
+            const qwenClient = getQwenClient();
+            const result = await qwenClient.chat.completions.create({
+              model: CONFIG.qwenModel,
+              messages: [
+                { role: 'user', content: fullPrompt }
+              ],
+              temperature: CONFIG.temperature,
+              max_tokens: CONFIG.maxTokens
+            });
+            fullResponse = result.choices[0].message.content;
+          } else {
+            // Use Gemini API
+            const { getGeminiModel } = await import('./ai-services.js');
+            const model = getGeminiModel();
+            const result = await model.generateContent(fullPrompt);
+            fullResponse = result.response.text();
+          }
 
-          // Get text from response
-          fullResponse = result.response.text();
-
-          console.log(chalk.green("Completed response from Gemini API!"));
+          console.log(chalk.green(`Completed response from ${providerName} API!`));
         } finally {
           clearInterval(animationInterval);
           stopLoadingIndicator(loadingIndicator);
@@ -2617,7 +2677,7 @@ async function removeSubtask(tasksPath, subtaskId, convertToTask = false, genera
       log('info', `Converting subtask ${subtaskId} to a standalone task...`);
 
       // Find the highest task ID to determine the next ID
-      const highestId = Math.max(...data.tasks.map(t => t.id));
+      const highestId = data.tasks.length > 0 ? Math.max(...data.tasks.map(t => t.id)) : 0;
       const newTaskId = highestId + 1;
 
       // Create the new task from the subtask

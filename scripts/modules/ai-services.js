@@ -28,14 +28,51 @@ function getGeminiOptions() {
   return {};
 }
 
-// Configure Google Gemini client
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const geminiModel = genAI.getGenerativeModel({
-  model: CONFIG.geminiModel,
-  generationConfig: {
-    temperature: CONFIG.temperature,
-  },
-}, {...getGeminiOptions(), apiVersion: 'v1beta', timeout: 3000000});
+// Configure Google Gemini client (lazy initialization)
+let genAI = null;
+let geminiModel = null;
+
+function getGeminiModel() {
+  if (!geminiModel) {
+    if (!process.env.GOOGLE_API_KEY) {
+      throw new Error("GOOGLE_API_KEY environment variable is missing.");
+    }
+    genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    geminiModel = genAI.getGenerativeModel({
+      model: CONFIG.geminiModel,
+      generationConfig: {
+        temperature: CONFIG.temperature,
+      },
+    }, {...getGeminiOptions(), apiVersion: 'v1beta', timeout: 3000000});
+  }
+  return geminiModel;
+}
+
+// Configure Qwen (阿里云千问) client (lazy initialization)
+let qwenClient = null;
+
+function getQwenClient() {
+  if (!qwenClient) {
+    const apiKey = CONFIG.qwenApiKey;
+    if (!apiKey) {
+      throw new Error("QWEN_API_KEY 或 DASHSCOPE_API_KEY environment variable is missing. 请在.env文件中配置千问API密钥。");
+    }
+    qwenClient = new OpenAI({
+      apiKey: apiKey,
+      baseURL: CONFIG.qwenBaseUrl,
+    });
+    console.log(`使用千问 API: ${CONFIG.qwenBaseUrl}, 模型: ${CONFIG.qwenModel}`);
+  }
+  return qwenClient;
+}
+
+// Get the appropriate AI client based on provider
+function getAIClient() {
+  if (CONFIG.aiProvider === 'qwen') {
+    return { type: 'qwen', client: getQwenClient() };
+  }
+  return { type: 'gemini', client: getGeminiModel() };
+}
 
 // Lazy-loaded Perplexity client
 let perplexity = null;
@@ -58,31 +95,34 @@ function getPerplexityClient() {
 }
 
 /**
- * Handle Gemini API errors with user-friendly messages
- * @param {Error} error - The error from Gemini API
+ * Handle AI API errors with user-friendly messages
+ * @param {Error} error - The error from AI API
+ * @param {string} provider - The AI provider ('gemini' or 'qwen')
  * @returns {string} User-friendly error message
  */
-function handleGeminiError(error) {
-  // Check for specific Gemini error types
+function handleAIError(error, provider = 'gemini') {
+  const providerName = provider === 'qwen' ? '千问' : 'Gemini';
+
+  // Check for specific error types
   if (error.details) {
     switch (error.details.code) {
       case 'RESOURCE_EXHAUSTED':
-        return 'Gemini quota has been exhausted. Please check your API quota and try again later.';
+        return `${providerName} quota has been exhausted. Please check your API quota and try again later.`;
       case 'PERMISSION_DENIED':
-        return 'Permission denied accessing Gemini API. Please check your API key and permissions.';
+        return `Permission denied accessing ${providerName} API. Please check your API key and permissions.`;
       case 'INVALID_ARGUMENT':
         return 'There was an issue with the request format. If this persists, please report it as a bug.';
       default:
-        return `Gemini API error: ${error.message}`;
+        return `${providerName} API error: ${error.message}`;
     }
   }
 
   // Check for network/timeout errors
   if (error.message?.toLowerCase().includes('timeout')) {
-    return 'The request to Gemini timed out. Please try again.';
+    return `The request to ${providerName} timed out. Please try again.`;
   }
   if (error.message?.toLowerCase().includes('network')) {
-    return 'There was a network error connecting to Gemini. Please check your internet connection and try again.';
+    return `There was a network error connecting to ${providerName}. Please check your internet connection and try again.`;
   }
 
   // Check for rate limit error (429)
@@ -91,22 +131,23 @@ function handleGeminiError(error) {
   }
 
   // Default error message
-  return `Error communicating with Gemini: ${error.message}`;
+  return `Error communicating with ${providerName}: ${error.message}`;
 }
 
 /**
- * Call Gemini to generate tasks from a PRD
+ * Call AI to generate tasks from a PRD
  * @param {string} prdContent - PRD content
  * @param {string} prdPath - Path to the PRD file
  * @param {number|null} numTasks - Number of tasks to generate, or null to let AI decide
  * @param {number} retryCount - Retry count
  * @param {string} knowledgeBase - Optional business knowledge context
- * @returns {Object} Gemini's response
+ * @returns {Object} AI's response
  */
 async function callGemini(prdContent, prdPath, numTasks, retryCount = 0, knowledgeBase = null) {
-  try {
-    log('info', 'Calling Gemini...');
+  const provider = CONFIG.aiProvider;
+  log('info', `Calling ${provider === 'qwen' ? '千问' : 'Gemini'}...`);
 
+  try {
     // Build the standard task structure
     let taskStructure = `{
   "id": number,
@@ -181,7 +222,7 @@ Important: Your response must be valid JSON only, with no additional explanation
     return await handleRequest(prdContent, prdPath, numTasks, CONFIG.maxTokens, systemPrompt, knowledgeBase);
   } catch (error) {
     // Get user-friendly error message
-    const userMessage = handleGeminiError(error);
+    const userMessage = handleAIError(error, provider);
     log('error', userMessage);
 
     // Check if we should retry
@@ -218,7 +259,7 @@ Important: Your response must be valid JSON only, with no additional explanation
 }
 
 /**
- * Handle request to Gemini
+ * Handle request to AI (Gemini or Qwen)
  * @param {string} prdContent - PRD content
  * @param {string} prdPath - Path to the PRD file
  * @param {number|null} numTasks - Number of tasks to generate, or null to let AI decide
@@ -226,9 +267,12 @@ Important: Your response must be valid JSON only, with no additional explanation
  * @param {string} systemPrompt - System prompt
  * @param {string} knowledgeBase - Optional business knowledge context
  * @param {number} retryCount - Current retry count
- * @returns {Object} Gemini's response
+ * @returns {Object} AI's response
  */
 async function handleRequest(prdContent, prdPath, numTasks, maxTokens, systemPrompt, knowledgeBase = null, retryCount = 0) {
+  const provider = CONFIG.aiProvider;
+  const providerName = provider === 'qwen' ? '千问' : 'Gemini';
+
   const loadingIndicator = startLoadingIndicator(numTasks === null ?
     'Analyzing PRD complexity and generating tasks...' :
     'Generating tasks from PRD...');
@@ -240,10 +284,10 @@ async function handleRequest(prdContent, prdPath, numTasks, maxTokens, systemPro
 
     if (knowledgeBase) {
       fullPrompt = `${systemPrompt}\n\n${knowledgeBase}\n\nHere's the Product Requirements Document (PRD) to break down ${numTasks === null ? 'into appropriate tasks' : `into ${numTasks} tasks`}:\n\n${prdContent}`;
-      log('info', 'Sending request to Gemini with business knowledge context...');
+      log('info', `Sending request to ${providerName} with business knowledge context...`);
     } else {
       fullPrompt = `${systemPrompt}\n\nHere's the Product Requirements Document (PRD) to break down ${numTasks === null ? 'into appropriate tasks' : `into ${numTasks} tasks`}:\n\n${prdContent}`;
-      log('info', 'Sending request to Gemini...');
+      log('info', `Sending request to ${providerName}...`);
     }
 
     // Regular dots animation to show progress
@@ -251,26 +295,40 @@ async function handleRequest(prdContent, prdPath, numTasks, maxTokens, systemPro
     const readline = await import('readline');
     const animationInterval = setInterval(() => {
       readline.cursorTo(process.stdout, 0);
-      process.stdout.write(`Waiting for response from Gemini${'.'.repeat(dotCount)}`);
+      process.stdout.write(`Waiting for response from ${providerName}${'.'.repeat(dotCount)}`);
       dotCount = (dotCount + 1) % 4;
     }, 500);
 
-    // Make non-streaming request
-    const result = await geminiModel.generateContent(fullPrompt);
-    clearInterval(animationInterval);
-
-    // Get the text from response
-    responseText = result.response.text();
+    if (provider === 'qwen') {
+      // Use Qwen (OpenAI-compatible) API
+      const qwenClient = getQwenClient();
+      const result = await qwenClient.chat.completions.create({
+        model: CONFIG.qwenModel,
+        messages: [
+          { role: 'user', content: fullPrompt }
+        ],
+        temperature: CONFIG.temperature,
+        max_tokens: maxTokens
+      });
+      clearInterval(animationInterval);
+      responseText = result.choices[0].message.content;
+    } else {
+      // Use Gemini API
+      const model = getGeminiModel();
+      const result = await model.generateContent(fullPrompt);
+      clearInterval(animationInterval);
+      responseText = result.response.text();
+    }
 
     stopLoadingIndicator(loadingIndicator);
-    log('info', "Completed non-streaming response from Gemini API!");
+    log('info', `Completed response from ${providerName} API!`);
 
     return processClaudeResponse(responseText, numTasks, 0, prdContent, prdPath);
   } catch (error) {
     stopLoadingIndicator(loadingIndicator);
 
     // Get user-friendly error message
-    const userMessage = handleGeminiError(error);
+    const userMessage = handleAIError(error, provider);
     log('error', userMessage);
 
     // Check if we should retry
@@ -514,6 +572,9 @@ ${jsonStructureExample}
 Note on dependencies: Subtasks can depend on other subtasks with lower IDs. Use an empty array if there are no dependencies.`;
 
     try {
+      const provider = CONFIG.aiProvider;
+      const providerName = provider === 'qwen' ? '千问' : 'Gemini';
+
       // Regular dots animation to show progress
       let dotCount = 0;
       const readline = await import('readline');
@@ -523,7 +584,7 @@ Note on dependencies: Subtasks can depend on other subtasks with lower IDs. Use 
         dotCount = (dotCount + 1) % 4;
       }, 500);
 
-      // Combine system prompt, knowledge base (if any), and user prompt for Gemini
+      // Combine system prompt, knowledge base (if any), and user prompt
       let fullPrompt = '';
       if (knowledgeBase) {
         log('info', 'Including business knowledge context in subtask generation');
@@ -532,16 +593,30 @@ Note on dependencies: Subtasks can depend on other subtasks with lower IDs. Use 
         fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
       }
 
-      // Use non-streaming API call
-      const result = await geminiModel.generateContent(fullPrompt);
-      clearInterval(animationInterval);
-
-      // Get text from response
-      responseText = result.response.text();
+      if (provider === 'qwen') {
+        // Use Qwen (OpenAI-compatible) API
+        const qwenClient = getQwenClient();
+        const result = await qwenClient.chat.completions.create({
+          model: CONFIG.qwenModel,
+          messages: [
+            { role: 'user', content: fullPrompt }
+          ],
+          temperature: CONFIG.temperature,
+          max_tokens: CONFIG.maxTokens
+        });
+        clearInterval(animationInterval);
+        responseText = result.choices[0].message.content;
+      } else {
+        // Use Gemini API
+        const model = getGeminiModel();
+        const result = await model.generateContent(fullPrompt);
+        clearInterval(animationInterval);
+        responseText = result.response.text();
+      }
 
       stopLoadingIndicator(loadingIndicator);
 
-      log('info', `Completed generating subtasks for task ${task.id}`);
+      log('info', `Completed generating subtasks for task ${task.id} using ${providerName}`);
 
       // Pass 0 as expectedCount when numSubtasks is null (AI determines count)
       const expectedCount = numSubtasks || 0;
@@ -550,7 +625,7 @@ Note on dependencies: Subtasks can depend on other subtasks with lower IDs. Use 
       stopLoadingIndicator(loadingIndicator);
 
       // Get user-friendly error message
-      const userMessage = handleGeminiError(error);
+      const userMessage = handleAIError(error, CONFIG.aiProvider);
       log('error', userMessage);
 
       // Check if we should retry
@@ -770,6 +845,9 @@ ${jsonStructureExample}
 Note on dependencies: Subtasks can depend on other subtasks with lower IDs. Use an empty array if there are no dependencies.`;
 
     try {
+      const provider = CONFIG.aiProvider;
+      const providerName = provider === 'qwen' ? '千问' : 'Gemini';
+
       // Regular dots animation to show progress
       let dotCount = 0;
       const readline = await import('readline');
@@ -779,19 +857,33 @@ Note on dependencies: Subtasks can depend on other subtasks with lower IDs. Use 
         dotCount = (dotCount + 1) % 4;
       }, 500);
 
-      // Combine system prompt and user prompt for Gemini
+      // Combine system prompt and user prompt
       const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
-      // Use non-streaming API call
-      const result = await geminiModel.generateContent(fullPrompt);
-      clearInterval(animationInterval);
-
-      // Get text from response
-      responseText = result.response.text();
+      if (provider === 'qwen') {
+        // Use Qwen (OpenAI-compatible) API
+        const qwenClient = getQwenClient();
+        const result = await qwenClient.chat.completions.create({
+          model: CONFIG.qwenModel,
+          messages: [
+            { role: 'user', content: fullPrompt }
+          ],
+          temperature: CONFIG.temperature,
+          max_tokens: CONFIG.maxTokens
+        });
+        clearInterval(animationInterval);
+        responseText = result.choices[0].message.content;
+      } else {
+        // Use Gemini API
+        const model = getGeminiModel();
+        const result = await model.generateContent(fullPrompt);
+        clearInterval(animationInterval);
+        responseText = result.response.text();
+      }
 
       stopLoadingIndicator(loadingIndicator);
 
-      log('info', `Completed generating research-backed subtasks for task ${task.id}`);
+      log('info', `Completed generating research-backed subtasks for task ${task.id} using ${providerName}`);
 
       // Pass 0 as expectedCount when numSubtasks is null (AI determines count)
       const expectedCount = numSubtasks || 0;
@@ -800,10 +892,10 @@ Note on dependencies: Subtasks can depend on other subtasks with lower IDs. Use 
       stopLoadingIndicator(loadingIndicator);
 
       // Get user-friendly error message
-      const userMessage = handleGeminiError(error);
+      const userMessage = handleAIError(error, CONFIG.aiProvider);
       log('error', userMessage);
 
-      // Check if we should retry Gemini
+      // Check if we should retry
       const shouldRetry = retryCount < 5 && (
         error.details?.code === 'RESOURCE_EXHAUSTED' ||
         error.message?.toLowerCase().includes('timeout') ||
@@ -1001,6 +1093,8 @@ IMPORTANT: Make sure to include an analysis for EVERY task listed above, with th
 // Export AI service functions
 export {
   getPerplexityClient,
+  getQwenClient,
+  getGeminiModel,
   callGemini,
   handleRequest,
   processClaudeResponse,
@@ -1008,6 +1102,8 @@ export {
   generateSubtasksWithPerplexity,
   parseSubtasksFromText,
   generateComplexityAnalysisPrompt,
-  handleGeminiError,
-  geminiModel
+  handleAIError
 };
+
+// Alias for backward compatibility
+export { handleAIError as handleGeminiError };

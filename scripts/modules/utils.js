@@ -14,6 +14,11 @@ const CONFIG = {
   geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
   perplexityModel: process.env.PERPLEXITY_MODEL || 'llama-3.1-sonar-small-128k-online',
 
+  // Qwen (阿里云千问) Configuration
+  qwenApiKey: process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY || undefined,
+  qwenModel: process.env.QWEN_MODEL || 'qwen-plus',
+  qwenBaseUrl: process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+
   // AI Parameters
   maxTokens: parseInt(process.env.MAX_TOKENS || '8192'),
   temperature: parseFloat(process.env.TEMPERATURE || '0.7'),
@@ -28,7 +33,10 @@ const CONFIG = {
 
   // API Configuration
   geminiBaseUrl: process.env.GEMINI_BASE_URL || undefined,  // Custom Gemini API base URL
-  useChinese: process.env.USE_CHINESE === "true" // Whether to use Chinese translations
+  useChinese: process.env.USE_CHINESE === "true", // Whether to use Chinese translations
+
+  // Provider selection: 'gemini' or 'qwen'
+  aiProvider: process.env.AI_PROVIDER || (process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY ? 'qwen' : 'gemini')
 };
 
 // Set up logging based on log level
@@ -349,4 +357,4 @@ export {
   findCycles,
   toKebabCase,
   detectCamelCaseFlags
-};
+};;

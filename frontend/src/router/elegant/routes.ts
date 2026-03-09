@@ -40,17 +40,6 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
-    name: 'home',
-    path: '/home',
-    component: 'layout.base$view.home',
-    meta: {
-      title: 'home',
-      i18nKey: 'route.home',
-      icon: 'mdi:monitor-dashboard',
-      order: 1
-    }
-  },
-  {
     name: 'iframe-page',
     path: '/iframe-page/:url',
     component: 'layout.base$view.iframe-page',
@@ -76,25 +65,81 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
-    name: 'task',
-    path: '/task',
+    name: 'manage',
+    path: '/manage',
     component: 'layout.base',
     meta: {
-      title: 'task',
-      i18nKey: 'route.task',
-      constant: true,
+      title: 'manage',
+      i18nKey: 'route.manage',
+      icon: 'mdi:cog',
       order: 2
     },
     children: [
       {
-        name: 'task_list',
-        path: '/task/list',
-        component: 'view.task_list',
+        name: 'manage_config',
+        path: '/manage/config',
+        component: 'view.manage_config',
         meta: {
-          title: 'task_list',
-          i18nKey: 'route.task_list',
-          constant: true,
+          title: 'manage_config',
+          i18nKey: 'route.manage_config',
+          icon: 'mdi:cog-outline'
+        }
+      }
+    ]
+  },
+  {
+    name: 'requirement',
+    path: '/requirement',
+    component: 'layout.base',
+    meta: {
+      title: 'requirement',
+      i18nKey: 'route.requirement',
+      icon: 'mdi:file-document-outline',
+      order: 1
+    },
+    children: [
+      {
+        name: 'requirement_detail',
+        path: '/requirement/detail/:id',
+        component: 'view.requirement_detail',
+        props: true,
+        meta: {
+          title: 'requirement_detail',
+          i18nKey: 'route.requirement_detail',
+          hideInMenu: true,
+          order: 2
+        }
+      },
+      {
+        name: 'requirement_list',
+        path: '/requirement/list',
+        component: 'view.requirement_list',
+        meta: {
+          title: 'requirement_list',
+          i18nKey: 'route.requirement_list',
+          icon: 'mdi:format-list-bulleted',
           order: 1
+        }
+      },
+      {
+        name: 'requirement_task-detail',
+        path: '/requirement/task-detail/:id',
+        component: 'view.requirement_task-detail',
+        meta: {
+          title: 'requirement_task-detail',
+          i18nKey: 'route.requirement_task-detail',
+          hideInMenu: true
+        }
+      },
+      {
+        name: 'requirement_task-list',
+        path: '/requirement/task-list',
+        component: 'view.requirement_task-list',
+        meta: {
+          title: 'requirement_task-list',
+          i18nKey: 'route.requirement_task-list',
+          icon: 'mdi:clipboard-list',
+          order: 2
         }
       }
     ]

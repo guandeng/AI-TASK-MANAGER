@@ -9,10 +9,11 @@ import boxen from 'boxen';
 import ora from 'ora';
 import Table from 'cli-table3';
 import gradient from 'gradient-string';
-import { CONFIG, log, findTaskById, readJSON, readComplexityReport, truncate } from './utils.js';
+import { CONFIG, log, findTaskById, readComplexityReport, truncate } from './utils.js';
 import path from 'path';
 import fs from 'fs';
 import { findNextTask, analyzeTaskComplexity } from './task-manager.js';
+import { readTaskData } from './task-storage.js';
 
 // Create a color gradient for the banner
 const coolGradient = gradient(['#00b4d8', '#0077b6', '#03045e']);
@@ -435,7 +436,7 @@ async function displayNextTask(tasksPath) {
   displayBanner();
 
   // Read the tasks file
-  const data = readJSON(tasksPath);
+  const data = await readTaskData(tasksPath);
   if (!data || !data.tasks) {
     log('error', "No valid tasks found.");
     process.exit(1);
@@ -626,7 +627,7 @@ async function displayTaskById(tasksPath, taskId) {
   displayBanner();
 
   // Read the tasks file
-  const data = readJSON(tasksPath);
+  const data = await readTaskData(tasksPath);
   if (!data || !data.tasks) {
     log('error', "No valid tasks found.");
     process.exit(1);

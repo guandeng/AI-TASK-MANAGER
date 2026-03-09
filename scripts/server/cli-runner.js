@@ -10,6 +10,7 @@ import { program } from 'commander';
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
+import { taskDataExists, getTaskStorageMode } from '../modules/task-storage.js';
 
 /**
  * 显示路径调试信息
@@ -58,7 +59,7 @@ function showPathDebugInfo() {
   // 检查任务文件
   console.log(chalk.white('\nTask file information:'));
   const tasksPath = path.resolve(process.cwd(), 'tasks/tasks.json');
-  const tasksExists = fs.existsSync(tasksPath);
+  const tasksExists = await taskDataExists(tasksPath);
   console.log(chalk.yellow(`  ${tasksPath} ${tasksExists ? chalk.green('(exists)') : chalk.red('(not found)')}`));
 
   console.log(chalk.cyan('=============================='));
@@ -84,9 +85,9 @@ if (debugPaths) {
 }
 
 // Check if tasks file exists
-if (!fs.existsSync(tasksPath)) {
+if (!(await taskDataExists(tasksPath))) {
   console.error(chalk.red(`Error: Tasks file not found at ${tasksPath}`));
-  console.log(chalk.yellow('Make sure you have initialized the project with tasks.'));
+  console.log(chalk.yellow(`Make sure you have initialized the project with tasks. Current storage mode: ${getTaskStorageMode()}.`));
   process.exit(1);
 }
 

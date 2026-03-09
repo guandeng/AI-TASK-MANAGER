@@ -1,5 +1,5 @@
 import type { AxiosResponse } from 'axios';
-import { BACKEND_ERROR_CODE, createRequest } from '@sa/axios';
+import { BACKEND_ERROR_CODE, createFlatRequest } from '@sa/axios';
 import { getServiceBaseURL } from '@/utils/service';
 
 const isHttpProxy = import.meta.env.DEV && import.meta.env.VITE_HTTP_PROXY === 'Y';
@@ -7,11 +7,16 @@ const { baseURL } = getServiceBaseURL(import.meta.env, isHttpProxy);
 
 /**
  * 任务管理器 API 请求
- * 直接返回响应数据，不需要处理认证和错误码
+ * 返回 { data, error } 格式，便于错误处理
  */
-export const request = createRequest(
+export const request = createFlatRequest<
+  any,
+  any,
+  Record<string, unknown>
+>(
   {
-    baseURL
+    baseURL,
+    timeout: 60000 // 60 秒超时
   },
   {
     transform(response: AxiosResponse) {

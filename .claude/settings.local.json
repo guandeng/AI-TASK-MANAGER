@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run parse-prd -- scripts/prd.txt)",
+      "Bash(node -r dotenv/config scripts/dev.js parse-prd scripts/prd.txt)",
+      "Bash(node bin/task-manager.js parse-prd \"/Volumes/NVME/addcn/tw8591/poly/docs/ugc/test/需求文档（第二版）\\(1\\).md\")",
+      "Bash(node --check scripts/server/express-server.js)",
+      "Bash(curl -s http://localhost:9527/requirement/list)"
+    ]
+  }
+}

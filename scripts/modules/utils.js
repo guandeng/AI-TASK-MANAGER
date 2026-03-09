@@ -1,43 +1,59 @@
 /**
  * utils.js
  * Utility functions for the Task Master CLI
+ *
+ * 配置加载优先级:
+ * 1. task.json (推荐，支持后台管理)
+ * 2. .env 环境变量 (兼容旧版)
  */
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import chalk from 'chalk';
+import { createLegacyConfig } from './config-loader.js';
 
-// Configuration and constants
-const CONFIG = {
-  // AI Model Configuration
-  model: process.env.MODEL || 'gemini-2.0-pro',
-  geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-  perplexityModel: process.env.PERPLEXITY_MODEL || 'llama-3.1-sonar-small-128k-online',
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  // Qwen (阿里云千问) Configuration
-  qwenApiKey: process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY || undefined,
-  qwenModel: process.env.QWEN_MODEL || 'qwen-plus',
-  qwenBaseUrl: process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+function isDashScopeUrl(url) {
+  return typeof url === 'string' && url.includes('dashscope.aliyuncs.com');
+}
 
-  // AI Parameters
-  maxTokens: parseInt(process.env.MAX_TOKENS || '8192'),
-  temperature: parseFloat(process.env.TEMPERATURE || '0.7'),
+function resolveQwenApiKey() {
+  return process.env.QWEN_API_KEY
+    || process.env.DASHSCOPE_API_KEY
+    || process.env.OPENAI_API_KEY
+    || undefined;
+}
 
-  // General Configuration
-  debug: process.env.DEBUG === "true",
-  logLevel: process.env.LOG_LEVEL || "info",
-  defaultSubtasks: parseInt(process.env.DEFAULT_SUBTASKS || "3"),
-  defaultPriority: process.env.DEFAULT_PRIORITY || "medium",
-  projectName: process.env.PROJECT_NAME || "Task Master",
-  projectVersion: "1.5.0", // Hardcoded version - ALWAYS use this value, ignore environment variable
+function resolveQwenBaseUrl() {
+  return process.env.QWEN_BASE_URL
+    || process.env.DASHSCOPE_BASE_URL
+    || (isDashScopeUrl(process.env.OPENAI_BASE_URL) ? process.env.OPENAI_BASE_URL : undefined)
+    || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+}
 
-  // API Configuration
-  geminiBaseUrl: process.env.GEMINI_BASE_URL || undefined,  // Custom Gemini API base URL
-  useChinese: process.env.USE_CHINESE === "true", // Whether to use Chinese translations
+function resolveAIProvider() {
+  if (process.env.AI_PROVIDER) {
+    return process.env.AI_PROVIDER;
+  }
 
-  // Provider selection: 'gemini' or 'qwen'
-  aiProvider: process.env.AI_PROVIDER || (process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY ? 'qwen' : 'gemini')
-};
+  if (process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY) {
+    return 'qwen';
+  }
+
+  if (process.env.OPENAI_API_KEY && isDashScopeUrl(resolveQwenBaseUrl())) {
+    return 'qwen';
+  }
+
+  return 'gemini';
+}
+
+// 使用新的配置加载模块
+// 优先从 task.json 加载，如果不存在则从环境变量加载
+// 这样可以支持后台管理界面动态修改配置
+const CONFIG = createLegacyConfig();
 
 // Set up logging based on log level
 const LOG_LEVELS = {

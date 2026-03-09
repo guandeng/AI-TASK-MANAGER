@@ -1,7 +1,17 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { fetchTaskList, fetchTaskDetail, updateTask, updateSubtask } from '@/service/api/task';
-import type { Task, Subtask, TaskStatus, TaskStatistics } from '@/typings/api/task';
+import {
+  batchDeleteTasks as batchDeleteTasksApi,
+  clearTaskSubtasks as clearTaskSubtasksApi,
+  deleteTask as deleteTaskApi,
+  deleteSubtask as deleteSubtaskApi,
+  expandTask as expandTaskApi,
+  fetchTaskDetail,
+  fetchTaskList,
+  updateTask,
+  updateSubtask
+} from '@/service/api/task';
+import type { Task, Subtask, TaskStatus, TaskStatistics, TaskListParams } from '@/typings/api/task';
 
 export const useTaskStore = defineStore('task-store', () => {
   // 状态
@@ -51,11 +61,11 @@ export const useTaskStore = defineStore('task-store', () => {
   });
 
   // Actions
-  async function loadTasks() {
+  async function loadTasks(params?: TaskListParams) {
     loading.value = true;
     try {
-      const data = await fetchTaskList();
-      if (data) {
+      const { data, error } = await fetchTaskList(params);
+      if (!error && data) {
         tasks.value = data.tasks || [];
         projectName.value = data.projectName || '';
         projectVersion.value = data.projectVersion || '';
@@ -71,11 +81,11 @@ export const useTaskStore = defineStore('task-store', () => {
   async function loadTaskDetail(id: number, locale: string = 'zh') {
     loading.value = true;
     try {
-      const task = await fetchTaskDetail(id, locale);
-      if (task) {
-        currentTask.value = task;
+      const { data, error } = await fetchTaskDetail(id, locale);
+      if (!error && data) {
+        currentTask.value = data;
       }
-      return task;
+      return data;
     } catch (error) {
       window.$message?.error('加载任务详情失败');
       console.error('Failed to load task detail:', error);
@@ -87,8 +97,8 @@ export const useTaskStore = defineStore('task-store', () => {
 
   async function setTaskStatus(id: number, status: TaskStatus) {
     try {
-      const updatedTask = await updateTask(id, { status });
-      if (updatedTask) {
+      const { data: updatedTask, error } = await updateTask(id, { status });
+      if (!error && updatedTask) {
         // 更新列表中的任务
         const index = tasks.value.findIndex(t => t.id === id);
         if (index !== -1) {
@@ -109,10 +119,34 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
+  async function setTaskAssignee(id: number, assignee: string) {
+    try {
+      const { data: updatedTask, error } = await updateTask(id, { assignee });
+      if (!error && updatedTask) {
+        // 更新列表中的任务
+        const index = tasks.value.findIndex(t => t.id === id);
+        if (index !== -1) {
+          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+        }
+        // 如果是当前任务，也更新
+        if (currentTask.value?.id === id) {
+          currentTask.value = { ...currentTask.value, ...updatedTask };
+        }
+        window.$message?.success('负责人更新成功');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      window.$message?.error('负责人更新失败');
+      console.error('Failed to update task assignee:', error);
+      return false;
+    }
+  }
+
   async function setSubtaskStatus(taskId: number, subtaskId: number, status: TaskStatus) {
     try {
-      const updatedSubtask = await updateSubtask(taskId, subtaskId, { status });
-      if (updatedSubtask) {
+      const { data: updatedSubtask, error } = await updateSubtask(taskId, subtaskId, { status });
+      if (!error && updatedSubtask) {
         // 更新列表中任务的子任务
         const taskIndex = tasks.value.findIndex(t => t.id === taskId);
         if (taskIndex !== -1 && tasks.value[taskIndex].subtasks) {
@@ -145,6 +179,128 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
+  async function expandTask(id: number) {
+    loading.value = true;
+    try {
+      const { data: updatedTask, error } = await expandTaskApi(id);
+      if (!error && updatedTask) {
+        const index = tasks.value.findIndex(t => t.id === id);
+        if (index !== -1) {
+          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+        }
+        currentTask.value = updatedTask;
+        await loadTasks();
+        window.$message?.success('子任务拆分成功');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      window.$message?.error('子任务拆分失败');
+      console.error('Failed to expand task:', error);
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function clearTaskSubtasks(taskId: number) {
+    loading.value = true;
+    try {
+      const { data: updatedTask, error } = await clearTaskSubtasksApi(taskId);
+      if (!error && updatedTask) {
+        const index = tasks.value.findIndex(t => t.id === taskId);
+        if (index !== -1) {
+          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+        }
+        currentTask.value = updatedTask;
+        await loadTasks();
+        window.$message?.success('子任务已清空');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      window.$message?.error('清空子任务失败');
+      console.error('Failed to clear subtasks:', error);
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function deleteTask(taskId: number) {
+    loading.value = true;
+    try {
+      const { data: result, error } = await deleteTaskApi(taskId);
+      if (!error && result) {
+        tasks.value = tasks.value.filter(task => task.id !== taskId);
+        if (currentTask.value?.id === taskId) {
+          currentTask.value = null;
+        }
+        await loadTasks();
+        window.$message?.success('任务已删除');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      window.$message?.error('删除任务失败');
+      console.error('Failed to delete task:', error);
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function batchDeleteTasks(taskIds: number[]) {
+    if (!taskIds.length) {
+      return { successIds: [], failedIds: [] };
+    }
+
+    loading.value = true;
+
+    try {
+      const { data, error } = await batchDeleteTasksApi(taskIds);
+
+      const successIds = !error && data ? data.successIds || [] : [];
+      const failedIds = !error && data ? data.failedIds || [] : taskIds;
+
+      if (successIds.length) {
+        tasks.value = tasks.value.filter(task => !successIds.includes(task.id));
+        if (currentTask.value?.id && successIds.includes(currentTask.value.id)) {
+          currentTask.value = null;
+        }
+        await loadTasks();
+      }
+
+      return { successIds, failedIds };
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function deleteSubtask(taskId: number, subtaskId: number) {
+    loading.value = true;
+    try {
+      const { data: updatedTask, error } = await deleteSubtaskApi(taskId, subtaskId);
+      if (!error && updatedTask) {
+        const index = tasks.value.findIndex(t => t.id === taskId);
+        if (index !== -1) {
+          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+        }
+        currentTask.value = updatedTask;
+        await loadTasks();
+        window.$message?.success('子任务已删除');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      window.$message?.error('删除子任务失败');
+      console.error('Failed to delete subtask:', error);
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   function clearCurrentTask() {
     currentTask.value = null;
   }
@@ -163,7 +319,13 @@ export const useTaskStore = defineStore('task-store', () => {
     loadTasks,
     loadTaskDetail,
     setTaskStatus,
+    setTaskAssignee,
     setSubtaskStatus,
+    expandTask,
+    clearTaskSubtasks,
+    deleteTask,
+    batchDeleteTasks,
+    deleteSubtask,
     clearCurrentTask
   };
 });

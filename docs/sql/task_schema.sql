@@ -11,7 +11,7 @@
 -- ----------------------------
 CREATE TABLE IF NOT EXISTS `task_task` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '任务ID',
-  `requirement` VARCHAR(500) DEFAULT NULL COMMENT '关联需求',
+  `requirement_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '关联需求ID',
   `title` VARCHAR(500) NOT NULL COMMENT '任务标题(原文)',
   `title_trans` VARCHAR(500) DEFAULT NULL COMMENT '任务标题(翻译)',
   `description` TEXT COMMENT '任务描述(原文)',
@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS `task_task` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
+  INDEX `idx_requirement_id` (`requirement_id`),
   INDEX `idx_status` (`status`),
   INDEX `idx_priority` (`priority`),
   INDEX `idx_assignee` (`assignee`),

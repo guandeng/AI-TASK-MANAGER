@@ -8,8 +8,10 @@ import path from 'path';
 import chalk from 'chalk';
 import boxen from 'boxen';
 import fs from 'fs';
+import { execSync } from 'child_process';
 
-import { CONFIG, log, readJSON } from './utils.js';
+import { CONFIG, log } from './utils.js';
+import { readTaskData, taskDataExists, getTaskStorageMode } from './task-storage.js';
 import {
   parsePRD,
   updateTasks,
@@ -42,6 +44,49 @@ import {
 } from './ui.js';
 
 import { startWebServer } from '../server/index.js';
+
+function getListeningPids(port) {
+  try {
+    const output = execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    });
+
+    return output
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(pid => parseInt(pid, 10))
+      .filter(pid => !Number.isNaN(pid) && pid !== process.pid);
+  } catch {
+    return [];
+  }
+}
+
+async function terminateListeningProcesses(port) {
+  const pids = getListeningPids(port);
+
+  if (!pids.length) {
+    return;
+  }
+
+  console.log(chalk.yellow(`Found existing process on port ${port}: ${pids.join(', ')}`));
+
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {}
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  const remainingPids = getListeningPids(port);
+  for (const pid of remainingPids) {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {}
+  }
+}
 
 /**
  * Configure and register CLI commands
@@ -314,15 +359,15 @@ function registerCommands(programInstance) {
 
       if (all) {
         // If --all is specified, get all task IDs
-        const data = readJSON(tasksPath);
+        const data = await readTaskData(tasksPath);
         if (!data || !data.tasks) {
           console.error(chalk.red('Error: No valid tasks found'));
           process.exit(1);
         }
         const allIds = data.tasks.map(t => t.id).join(',');
-        clearSubtasks(tasksPath, allIds);
+        await clearSubtasks(tasksPath, allIds);
       } else {
-        clearSubtasks(tasksPath, taskIds);
+        await clearSubtasks(tasksPath, taskIds);
       }
     });
 
@@ -622,9 +667,9 @@ function registerCommands(programInstance) {
       console.log(chalk.blue(`Using tasks from: ${tasksPath}`));
 
       // Check if tasks file exists
-      if (!fs.existsSync(tasksPath)) {
+      if (!(await taskDataExists(tasksPath))) {
         console.error(chalk.red(`Error: Tasks file not found at ${tasksPath}`));
-        console.log(chalk.yellow('Make sure you have initialized the project with tasks.'));
+        console.log(chalk.yellow(`Make sure you have initialized the project with tasks. Current storage mode: ${getTaskStorageMode()}.`));
         process.exit(1);
       }
 
@@ -638,6 +683,38 @@ function registerCommands(programInstance) {
         });
       } catch (error) {
         console.error(chalk.red(`Failed to start web server: ${error.message}`));
+        process.exit(1);
+      }
+    });
+
+  programInstance
+    .command('reload')
+    .description('Reload the task management web UI server')
+    .option('-p, --port <port>', 'Port to run the server on', '3002')
+    .option('-f, --file <file>', 'Path to the tasks file', 'tasks/tasks.json')
+    .action(async (options) => {
+      const port = parseInt(options.port, 10);
+      const tasksPath = options.file;
+
+      console.log(chalk.blue(`Reloading Task Management Web UI on port ${port}`));
+      console.log(chalk.blue(`Using tasks from: ${tasksPath}`));
+
+      if (!(await taskDataExists(tasksPath))) {
+        console.error(chalk.red(`Error: Tasks file not found at ${tasksPath}`));
+        console.log(chalk.yellow(`Make sure you have initialized the project with tasks. Current storage mode: ${getTaskStorageMode()}.`));
+        process.exit(1);
+      }
+
+      try {
+        await terminateListeningProcesses(port);
+        await startWebServer({ port, tasksPath });
+
+        process.on('SIGINT', () => {
+          console.log(chalk.yellow('\nShutting down web server...'));
+          process.exit(0);
+        });
+      } catch (error) {
+        console.error(chalk.red(`Failed to reload web server: ${error.message}`));
         process.exit(1);
       }
     });

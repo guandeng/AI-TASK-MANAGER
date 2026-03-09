@@ -20,6 +20,8 @@ export interface Subtask {
 /** 任务 */
 export interface Task {
   id: number;
+  requirementTitle?: string;
+  requirementId?: number;
   title: string;
   titleTrans?: string;
   description: string;
@@ -42,6 +44,10 @@ export interface TaskListResponse {
   tasks: Task[];
 }
 
+export interface TaskListParams {
+  requirementId?: number;
+}
+
 /** 任务更新请求 */
 export interface TaskUpdateRequest {
   status?: TaskStatus;
@@ -50,6 +56,7 @@ export interface TaskUpdateRequest {
   details?: string;
   testStrategy?: string;
   priority?: TaskPriority;
+  assignee?: string;
 }
 
 /** 子任务更新请求 */

@@ -116,6 +116,31 @@ frontend/
 | 常量 | SCREAMING_SNAKE_CASE | `TASK_STATUS_OPTIONS` |
 | 变量/函数 | camelCase | `taskStore`, `handleStatusChange` |
 
+### 列表排序规范
+
+- 前端列表页默认按 `id desc` 展示
+- 需求列表按 `id desc` 排序
+- 任务列��按 `id desc` 排序
+
+### 菜单命名规范
+
+- 菜单名称必须使用中文
+- 在 `locales/langs/zh-cn.ts` 的 `route` 字段中定义中文菜单名
+- 示例：
+  ```typescript
+  route: {
+    requirement: '需求任务管理',
+    requirement_list: '需求列表',
+    requirement_task_list: '任务列表'
+  }
+  ```
+
+### AI 生成规范
+
+- 需求拆分任务时，生成内容必须使用中文
+- `title`、`description`、`details`、`testStrategy` 必须输出中文
+- 除技术标识符、库名、API 名、代码符号外，不输出英文句子
+
 ### 类型定义规范
 
 ```typescript
@@ -239,3 +264,4 @@ export const useTaskStore = defineStore('task-store', () => {
 3. **国际化**：用户可见的文本都要支持多语言（中文/英文）
 4. **错误处理**：API 调用要有 try-catch，并显示友好的错误提示
 5. **性能优化**：列表数据使用分页，避免一次性加载过多数据
+6. **交互确认**：所有删除操作、状态更新、负责人变更、清空操作、批量修改等会变更数据的按钮或控件，必须先弹出确认提示，再执行实际请求

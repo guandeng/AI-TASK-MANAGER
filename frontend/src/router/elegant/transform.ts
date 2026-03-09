@@ -166,11 +166,15 @@ const routeMap: RouteMap = {
   "403": "/403",
   "404": "/404",
   "500": "/500",
-  "home": "/home",
   "iframe-page": "/iframe-page/:url",
   "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?",
-  "task": "/task",
-  "task_list": "/task/list"
+  "manage": "/manage",
+  "manage_config": "/manage/config",
+  "requirement": "/requirement",
+  "requirement_detail": "/requirement/detail/:id",
+  "requirement_list": "/requirement/list",
+  "requirement_task-detail": "/requirement/task-detail/:id",
+  "requirement_task-list": "/requirement/task-list"
 };
 
 /**

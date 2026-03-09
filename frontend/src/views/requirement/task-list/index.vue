@@ -1,17 +1,25 @@
 <script setup lang="ts">
-import { h, computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { h, computed, onMounted, onActivated, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { NCard, NDataTable, NTag, NSpace, NButton, NInput, NSelect, NStatistic, NGrid, NGi, NProgress, NEmpty, NSpin } from 'naive-ui';
-import type { DataTableColumns } from 'naive-ui';
+import type { DataTableColumns, DataTableRowKey, SelectOption } from 'naive-ui';
 import { useTaskStore } from '@/store/modules/task';
 import type { Task, TaskStatus } from '@/typings/api/task';
 
+const route = useRoute();
 const router = useRouter();
 const taskStore = useTaskStore();
 
+function confirmAction(message: string) {
+  return window.confirm(message);
+}
+
 // 筛选状态
 const filterStatus = ref<TaskStatus | 'all'>('all');
+const filterRequirementId = ref<number | string | 'all'>('all');
+const routeRequirementTitle = ref('');
 const searchText = ref('');
+const checkedRowKeys = ref<DataTableRowKey[]>([]);
 
 // 状态选项
 const statusOptions = [
@@ -20,6 +28,12 @@ const statusOptions = [
   { label: '进行中', value: 'in-progress' },
   { label: '已完成', value: 'done' },
   { label: '已延期', value: 'deferred' }
+];
+
+// 负责人选项
+const assigneeOptions = [
+  { label: '张三', value: 'zhangsan' },
+  { label: '李四', value: 'lisi' }
 ];
 
 // 优先级颜色映射
@@ -52,9 +66,51 @@ const priorityTextMap: Record<string, string> = {
   low: '低'
 };
 
+const requirementOptions = computed<SelectOption[]>(() => {
+  const options: SelectOption[] = [{ label: '全部需求', value: 'all' }];
+  const seen = new Set<string>();
+
+  taskStore.tasks.forEach(task => {
+    const label = task.requirementTitle || (task.requirementId ? `需求 #${task.requirementId}` : '');
+    const value = task.requirementId ?? task.requirementTitle;
+
+    if (!label || value == null) {
+      return;
+    }
+
+    const key = String(value);
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    options.push({ label, value });
+  });
+
+  if (
+    filterRequirementId.value !== 'all' &&
+    !options.some(option => option.value === filterRequirementId.value)
+  ) {
+    options.push({
+      label: routeRequirementTitle.value || `需求 #${filterRequirementId.value}`,
+      value: filterRequirementId.value
+    });
+  }
+
+  return options;
+});
+
 // 过滤后的任务
 const filteredTasks = computed(() => {
   let result = taskStore.tasks;
+
+  if (filterRequirementId.value !== 'all') {
+    if (typeof filterRequirementId.value === 'number') {
+      result = result.filter(task => task.requirementId === filterRequirementId.value);
+    } else {
+      result = result.filter(task => task.requirementTitle === filterRequirementId.value);
+    }
+  }
 
   // 状态筛选
   if (filterStatus.value !== 'all') {
@@ -72,11 +128,14 @@ const filteredTasks = computed(() => {
     );
   }
 
-  return result;
+  return [...result].sort((a, b) => b.id - a.id);
 });
 
 // 表格列定义
 const columns: DataTableColumns<Task> = [
+  {
+    type: 'selection'
+  },
   {
     title: 'ID',
     key: 'id',
@@ -84,10 +143,29 @@ const columns: DataTableColumns<Task> = [
   },
   {
     title: '需求',
-    key: 'requirement',
+    key: 'requirementTitle',
     width: 150,
-    render() {
-      return '-';
+    render(row) {
+      if (!row.requirementId && !row.requirementTitle) {
+        return '-';
+      }
+
+      if (!row.requirementId) {
+        return row.requirementTitle;
+      }
+
+      return h(
+        'a',
+        {
+          class: 'cursor-pointer hover:text-primary transition-colors',
+          onClick: () => {
+            if (row.requirementId) {
+              router.push(`/requirement/detail/${row.requirementId}`);
+            }
+          }
+        },
+        row.requirementTitle || `需求 #${row.requirementId}`
+      );
     }
   },
   {
@@ -118,9 +196,16 @@ const columns: DataTableColumns<Task> = [
   {
     title: '负责人',
     key: 'assignee',
-    width: 100,
+    width: 120,
     render(row) {
-      return row.assignee || '-';
+      return h(NSelect, {
+        value: row.assignee,
+        options: assigneeOptions,
+        size: 'small',
+        style: 'width: 100px',
+        placeholder: '选择',
+        onUpdateValue: (value: string) => handleAssigneeChange(row.id, value)
+      });
     }
   },
   {
@@ -136,17 +221,104 @@ const columns: DataTableColumns<Task> = [
         onUpdateValue: (value: TaskStatus) => handleStatusChange(row.id, value)
       });
     }
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 100,
+    render(row) {
+      return h(
+        NButton,
+        {
+          size: 'small',
+          type: 'primary',
+          ghost: true,
+          onClick: () => viewTaskDetail(row.id)
+        },
+        { default: () => '详情' }
+      );
+    }
   }
 ];
 
 // 查看任务详情
 function viewTaskDetail(id: number) {
-  router.push(`/task/detail/${id}`);
+  router.push(`/requirement/task-detail/${id}`);
+}
+
+async function loadTaskListData() {
+  if (typeof filterRequirementId.value === 'number') {
+    await taskStore.loadTasks({ requirementId: filterRequirementId.value });
+    return;
+  }
+
+  await taskStore.loadTasks();
+}
+
+async function handleBatchDelete() {
+  const taskIds = checkedRowKeys.value.map(key => Number(key)).filter(id => !Number.isNaN(id));
+
+  if (!taskIds.length) {
+    return;
+  }
+
+  if (!confirmAction(`确认批量删除选中的 ${taskIds.length} 个任务吗？`)) {
+    return;
+  }
+
+  const { successIds, failedIds } = await taskStore.batchDeleteTasks(taskIds);
+
+  checkedRowKeys.value = checkedRowKeys.value.filter(key => !successIds.includes(Number(key)));
+  await loadTaskListData();
+
+  if (successIds.length && !failedIds.length) {
+    window.$message?.success(`已删除 ${successIds.length} 个任务`);
+    return;
+  }
+
+  if (successIds.length && failedIds.length) {
+    window.$message?.warning(`成功删除 ${successIds.length} 个，失败 ${failedIds.length} 个`);
+    return;
+  }
+
+  window.$message?.error('批量删除失败');
+}
+
+function syncRequirementFilterFromRoute() {
+  const rawRequirementId = Array.isArray(route.query.requirementId)
+    ? route.query.requirementId[0]
+    : route.query.requirementId;
+
+  const rawRequirementTitle = Array.isArray(route.query.requirementTitle)
+    ? route.query.requirementTitle[0]
+    : route.query.requirementTitle;
+
+  const parsedRequirementId = Number(rawRequirementId);
+
+  if (rawRequirementId && !Number.isNaN(parsedRequirementId) && parsedRequirementId > 0) {
+    filterRequirementId.value = parsedRequirementId;
+  } else {
+    filterRequirementId.value = 'all';
+  }
+
+  routeRequirementTitle.value = typeof rawRequirementTitle === 'string' ? rawRequirementTitle : '';
 }
 
 // 处理状态变更
 async function handleStatusChange(id: number, status: TaskStatus) {
+  if (!confirmAction(`确认将任务 ${id} 状态改为“${statusTextMap[status]}”吗？`)) {
+    return;
+  }
   await taskStore.setTaskStatus(id, status);
+}
+
+// 处理负责人变更
+async function handleAssigneeChange(id: number, assignee: string) {
+  const assigneeLabel = assigneeOptions.find(item => item.value === assignee)?.label || assignee;
+  if (!confirmAction(`确认将任务 ${id} 负责人改为“${assigneeLabel}”吗？`)) {
+    return;
+  }
+  await taskStore.setTaskAssignee(id, assignee);
 }
 
 // 完成率
@@ -157,7 +329,27 @@ const completionRate = computed(() => {
 
 // 加载数据
 onMounted(async () => {
-  await taskStore.loadTasks();
+  syncRequirementFilterFromRoute();
+  await loadTaskListData();
+});
+
+// 页面激活时重新加载数据
+onActivated(async () => {
+  syncRequirementFilterFromRoute();
+  await loadTaskListData();
+});
+
+watch(
+  () => [route.query.requirementId, route.query.requirementTitle],
+  async () => {
+    syncRequirementFilterFromRoute();
+    await loadTaskListData();
+  }
+);
+
+watch(filteredTasks, tasks => {
+  const visibleTaskIds = new Set(tasks.map(task => task.id));
+  checkedRowKeys.value = checkedRowKeys.value.filter(key => visibleTaskIds.has(Number(key)));
 });
 </script>
 
@@ -223,7 +415,12 @@ onMounted(async () => {
             :options="statusOptions"
             style="width: 120px"
           />
-          <NButton @click="taskStore.loadTasks()">
+          <NSelect
+            v-model:value="filterRequirementId"
+            :options="requirementOptions"
+            style="width: 180px"
+          />
+          <NButton @click="loadTaskListData">
             <template #icon>
               <span class="i-mdi:refresh"></span>
             </template>
@@ -237,8 +434,14 @@ onMounted(async () => {
           :columns="columns"
           :data="filteredTasks"
           :row-key="(row: Task) => row.id"
+          v-model:checked-row-keys="checkedRowKeys"
           :bordered="false"
         />
+        <div class="mt-16px flex justify-start">
+          <NButton type="error" ghost :disabled="checkedRowKeys.length === 0" @click="handleBatchDelete">
+            批量删除
+          </NButton>
+        </div>
         <NEmpty v-if="filteredTasks.length === 0 && !taskStore.loading" description="暂无任务数据" />
       </NSpin>
     </NCard>

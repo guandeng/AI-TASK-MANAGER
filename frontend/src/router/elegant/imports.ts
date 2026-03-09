@@ -20,6 +20,9 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   500: () => import("@/views/_builtin/500/index.vue"),
   "iframe-page": () => import("@/views/_builtin/iframe-page/[url].vue"),
   login: () => import("@/views/_builtin/login/index.vue"),
-  home: () => import("@/views/home/index.vue"),
-  task_list: () => import("@/views/task/list/index.vue"),
+  manage_config: () => import("@/views/manage/config/index.vue"),
+  requirement_detail: () => import("@/views/requirement/detail/[id].vue"),
+  requirement_list: () => import("@/views/requirement/list/index.vue"),
+  "requirement_task-detail": () => import("@/views/requirement/task-detail/[id].vue"),
+  "requirement_task-list": () => import("@/views/requirement/task-list/index.vue"),
 };

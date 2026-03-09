@@ -10,12 +10,12 @@ import { Anthropic } from '@anthropic-ai/sdk';
 
 import { 
     log, 
-    readJSON, 
     writeJSON, 
     taskExists,
     formatTaskId,
     findCycles
   } from './utils.js';
+import { readTaskData, writeTaskData, getTaskStorageMode } from './task-storage.js';
   
 import { displayBanner } from './ui.js';
 
@@ -36,7 +36,7 @@ const anthropic = new Anthropic({
 async function addDependency(tasksPath, taskId, dependencyId) {
     log('info', `Adding dependency ${dependencyId} to task ${taskId}...`);
     
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       log('error', 'No valid tasks found in tasks.json');
       process.exit(1);
@@ -132,7 +132,7 @@ async function addDependency(tasksPath, taskId, dependencyId) {
       });
       
       // Save changes
-      writeJSON(tasksPath, data);
+      await writeTaskData(tasksPath, data);
       log('success', `Added dependency ${formattedDependencyId} to task ${formattedTaskId}`);
       
       // Display a more visually appealing success message
@@ -162,7 +162,7 @@ async function addDependency(tasksPath, taskId, dependencyId) {
     log('info', `Removing dependency ${dependencyId} from task ${taskId}...`);
     
     // Read tasks file
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       log('error', "No valid tasks found.");
       process.exit(1);
@@ -244,7 +244,7 @@ async function addDependency(tasksPath, taskId, dependencyId) {
     targetTask.dependencies.splice(dependencyIndex, 1);
     
     // Save the updated tasks
-    writeJSON(tasksPath, data);
+    await writeTaskData(tasksPath, data);
     
     // Success message
     log('success', `Removed dependency: Task ${formattedTaskId} no longer depends on ${formattedDependencyId}`);
@@ -419,7 +419,7 @@ async function addDependency(tasksPath, taskId, dependencyId) {
     log('info', 'Checking for invalid dependencies in task files...');
     
     // Read tasks data
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       log('error', 'No valid tasks found in tasks.json');
       process.exit(1);
@@ -578,7 +578,7 @@ async function addDependency(tasksPath, taskId, dependencyId) {
     
     try {
       // Read tasks data
-      const data = readJSON(tasksPath);
+      const data = await readTaskData(tasksPath);
       if (!data || !data.tasks) {
         log('error', 'No valid tasks found in tasks.json');
         process.exit(1);
@@ -849,7 +849,7 @@ async function addDependency(tasksPath, taskId, dependencyId) {
       
       if (dataChanged) {
         // Save the changes
-        writeJSON(tasksPath, data);
+        await writeTaskData(tasksPath, data);
         log('success', 'Fixed dependency issues in tasks.json');
         
         // Regenerate task files
@@ -1018,7 +1018,7 @@ async function addDependency(tasksPath, taskId, dependencyId) {
     const changesDetected = JSON.stringify(tasksData) !== JSON.stringify(originalData);
     
     // Save changes if needed
-    if (tasksPath && changesDetected) {
+    if (tasksPath && changesDetected && getTaskStorageMode() === 'file') {
       try {
         writeJSON(tasksPath, tasksData);
         log('debug', 'Saved dependency fixes to tasks.json');

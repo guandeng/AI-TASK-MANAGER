@@ -35,9 +35,6 @@ pnpm-lock.yaml
 
 .VSCodeCounter
 
-# Local env files
-.env
-.env.test
 
 # GitHub
 .github/

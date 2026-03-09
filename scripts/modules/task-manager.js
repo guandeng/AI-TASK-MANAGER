@@ -5,12 +5,35 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import boxen from 'boxen';
 import Table from 'cli-table3';
 import readline from 'readline';
 import dotenv from 'dotenv';
-dotenv.config();
+
+// 尝试从多个位置加载 .env 文件
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const envPaths = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(__dirname, '../../.env'),
+  path.resolve(__dirname, '../../../.env')
+];
+
+let envLoaded = false;
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    envLoaded = true;
+    break;
+  }
+}
+
+if (!envLoaded) {
+  dotenv.config();
+}
 
 import {
   CONFIG,
@@ -23,6 +46,7 @@ import {
   findTaskInComplexityReport,
   truncate
 } from './utils.js';
+import { getTaskStorageMode, readTaskData, writeTaskData } from './task-storage.js';
 
 import { displayBanner, getStatusWithColor, formatDependenciesWithStatus, getComplexityWithColor, startLoadingIndicator, stopLoadingIndicator, createProgressBar } from './ui.js';
 
@@ -97,7 +121,7 @@ async function parsePRD(prdPath, tasksPath, numTasks, knowledgeBasePath = null) 
     }
 
     // Write the tasks to the file
-    writeJSON(tasksPath, tasksData);
+    await writeTaskData(tasksPath, tasksData);
 
     log('success', `Successfully generated ${tasksData.tasks.length} tasks from PRD`);
     if (knowledgeBase) {
@@ -105,7 +129,7 @@ async function parsePRD(prdPath, tasksPath, numTasks, knowledgeBasePath = null) 
     }
 
     // Generate individual task files
-    generateTaskFiles(tasksPath, path.dirname(tasksPath));
+    await generateTaskFiles(tasksPath, path.dirname(tasksPath));
 
     return tasksData;
   } catch (error) {
@@ -182,7 +206,7 @@ async function updateTasks(tasksPath, fromId, prompt, useResearch = false) {
     }
 
     // Read the tasks file
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       throw new Error(`No valid tasks found in ${tasksPath}`);
     }
@@ -370,7 +394,7 @@ Return only the updated tasks as a valid JSON array.`;
       });
 
       // Write the updated tasks to the file
-      writeJSON(tasksPath, data);
+      await writeTaskData(tasksPath, data);
 
       log('success', `Successfully updated ${updatedTasks.length} tasks`);
 
@@ -399,10 +423,15 @@ Return only the updated tasks as a valid JSON array.`;
  * @param {string} tasksPath - Path to the tasks.json file
  * @param {string} outputDir - Output directory for task files
  */
-function generateTaskFiles(tasksPath, outputDir) {
+async function generateTaskFiles(tasksPath, outputDir) {
   try {
+    if (getTaskStorageMode() !== 'file') {
+      log('info', 'Skipping task file generation because storage mode is not file');
+      return;
+    }
+
     log('info', `Reading tasks from ${tasksPath}...`);
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       throw new Error(`No valid tasks found in ${tasksPath}`);
     }
@@ -416,7 +445,10 @@ function generateTaskFiles(tasksPath, outputDir) {
 
     // Validate and fix dependencies before generating files
     log('info', `Validating and fixing dependencies before generating files...`);
-    validateAndFixDependencies(data, tasksPath);
+    const dependencyChangesDetected = validateAndFixDependencies(data, null);
+    if (dependencyChangesDetected) {
+      await writeTaskData(tasksPath, data);
+    }
 
     // Generate task files
     log('info', `Generating individual task files... (taskLength: ${data.tasks.length})`);
@@ -578,7 +610,7 @@ async function setTaskStatus(tasksPath, taskIdInput, newStatus) {
     ));
 
     log('info', `Reading tasks from ${tasksPath}...`);
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       throw new Error(`No valid tasks found in ${tasksPath}`);
     }
@@ -594,7 +626,7 @@ async function setTaskStatus(tasksPath, taskIdInput, newStatus) {
     }
 
     // Write the updated tasks to the file
-    writeJSON(tasksPath, data);
+    await writeTaskData(tasksPath, data);
 
     // Validate dependencies after status update
     log('info', 'Validating dependencies after status update...');
@@ -602,7 +634,7 @@ async function setTaskStatus(tasksPath, taskIdInput, newStatus) {
 
     // Generate individual task files
     log('info', 'Regenerating task files...');
-    generateTaskFiles(tasksPath, path.dirname(tasksPath));
+    await generateTaskFiles(tasksPath, path.dirname(tasksPath));
 
     // Display success message
     for (const id of updatedTasks) {
@@ -712,10 +744,10 @@ async function updateSingleTaskStatus(tasksPath, taskIdInput, newStatus, data) {
  * @param {string} statusFilter - Filter by status
  * @param {boolean} withSubtasks - Whether to show subtasks
  */
-function listTasks(tasksPath, statusFilter, withSubtasks = false) {
+async function listTasks(tasksPath, statusFilter, withSubtasks = false) {
   try {
     displayBanner();
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       throw new Error(`No valid tasks found in ${tasksPath}`);
     }
@@ -1219,15 +1251,17 @@ function safeColor(text, colorFn, maxLength = 0) {
  * @param {string} additionalContext - Additional context
  * @param {string} knowledgeBasePath - Optional path to business knowledge documents
  */
-async function expandTask(taskId, numSubtasks = CONFIG.defaultSubtasks, useResearch = false, additionalContext = '', knowledgeBasePath = null) {
+async function expandTask(taskId, numSubtasks = CONFIG.defaultSubtasks, useResearch = false, additionalContext = '', knowledgeBasePath = null, tasksPathOverride = null, showBanner = true) {
   try {
-    displayBanner();
+    if (showBanner) {
+      displayBanner();
+    }
 
     // Load tasks
-    const tasksPath = path.join(process.cwd(), 'tasks', 'tasks.json');
+    const tasksPath = tasksPathOverride || path.join(process.cwd(), 'tasks', 'tasks.json');
     log('info', `Loading tasks from ${tasksPath}...`);
 
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       throw new Error(`No valid tasks found in ${tasksPath}`);
     }
@@ -1321,7 +1355,7 @@ async function expandTask(taskId, numSubtasks = CONFIG.defaultSubtasks, useResea
     task.subtasks = [...task.subtasks, ...subtasks];
 
     // Write the updated tasks to the file
-    writeJSON(tasksPath, data);
+    await writeTaskData(tasksPath, data);
 
     // Generate individual task files
     await generateTaskFiles(tasksPath, path.dirname(tasksPath));
@@ -1394,7 +1428,7 @@ async function expandAllTasks(numSubtasks = CONFIG.defaultSubtasks, useResearch 
     const tasksPath = path.join(process.cwd(), 'tasks', 'tasks.json');
     log('info', `Loading tasks from ${tasksPath}...`);
 
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       throw new Error(`No valid tasks found in ${tasksPath}`);
     }
@@ -1547,11 +1581,11 @@ async function expandAllTasks(numSubtasks = CONFIG.defaultSubtasks, useResearch 
  * @param {string} tasksPath - Path to the tasks.json file
  * @param {string} taskIds - Task IDs to clear subtasks from
  */
-function clearSubtasks(tasksPath, taskIds) {
+async function clearSubtasks(tasksPath, taskIds) {
   displayBanner();
 
   log('info', `Reading tasks from ${tasksPath}...`);
-  const data = readJSON(tasksPath);
+  const data = await readTaskData(tasksPath);
   if (!data || !data.tasks) {
     log('error', "No valid tasks found.");
     process.exit(1);
@@ -1613,7 +1647,7 @@ function clearSubtasks(tasksPath, taskIds) {
   });
 
   if (clearedCount > 0) {
-    writeJSON(tasksPath, data);
+    await writeTaskData(tasksPath, data);
 
     // Show summary table
     console.log(boxen(
@@ -1624,7 +1658,7 @@ function clearSubtasks(tasksPath, taskIds) {
 
     // Regenerate task files to reflect changes
     log('info', "Regenerating task files...");
-    generateTaskFiles(tasksPath, path.dirname(tasksPath));
+    await generateTaskFiles(tasksPath, path.dirname(tasksPath));
 
     // Success message
     console.log(boxen(
@@ -1660,7 +1694,7 @@ async function addTask(tasksPath, prompt, dependencies = [], priority = 'medium'
   displayBanner();
 
   // Read the existing tasks
-  const data = readJSON(tasksPath);
+  const data = await readTaskData(tasksPath);
   if (!data || !data.tasks) {
     log('error', "Invalid or missing tasks.json.");
     process.exit(1);
@@ -1819,7 +1853,7 @@ async function addTask(tasksPath, prompt, dependencies = [], priority = 'medium'
     validateAndFixDependencies(data, null);
 
     // Write the updated tasks back to the file
-    writeJSON(tasksPath, data);
+    await writeTaskData(tasksPath, data);
 
     // Show success message
     const successBox = boxen(
@@ -1864,7 +1898,7 @@ async function analyzeTaskComplexity(options) {
   try {
     // Read tasks.json
     console.log(chalk.blue(`Reading tasks from ${tasksPath}...`));
-    const tasksData = readJSON(tasksPath);
+    const tasksData = await readTaskData(tasksPath);
 
     if (!tasksData || !tasksData.tasks || !Array.isArray(tasksData.tasks) || tasksData.tasks.length === 0) {
       throw new Error('No tasks found in the tasks file');
@@ -2465,7 +2499,7 @@ async function addSubtask(tasksPath, parentId, existingTaskId = null, newSubtask
     log('info', `Adding subtask to parent task ${parentId}...`);
 
     // Read the existing tasks
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       throw new Error(`Invalid or missing tasks file at ${tasksPath}`);
     }
@@ -2559,7 +2593,7 @@ async function addSubtask(tasksPath, parentId, existingTaskId = null, newSubtask
     }
 
     // Write the updated tasks back to the file
-    writeJSON(tasksPath, data);
+    await writeTaskData(tasksPath, data);
 
     // Generate task files if requested
     if (generateFiles) {
@@ -2628,7 +2662,7 @@ async function removeSubtask(tasksPath, subtaskId, convertToTask = false, genera
     log('info', `Removing subtask ${subtaskId}...`);
 
     // Read the existing tasks
-    const data = readJSON(tasksPath);
+    const data = await readTaskData(tasksPath);
     if (!data || !data.tasks) {
       throw new Error(`Invalid or missing tasks file at ${tasksPath}`);
     }
@@ -2705,7 +2739,7 @@ async function removeSubtask(tasksPath, subtaskId, convertToTask = false, genera
     }
 
     // Write the updated tasks back to the file
-    writeJSON(tasksPath, data);
+    await writeTaskData(tasksPath, data);
 
     // Generate task files if requested
     if (generateFiles) {

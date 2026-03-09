@@ -229,7 +229,13 @@ const local: App.I18n.Schema = {
     404: 'Page Not Found',
     500: 'Server Error',
     'iframe-page': 'Iframe',
-    home: 'Home'
+    requirement: 'Requirement & Task',
+    requirement_list: 'Requirement List',
+    requirement_detail: 'Requirement Detail',
+    'requirement_task-list': 'Task List',
+    'requirement_task-detail': 'Task Detail',
+    manage: 'System',
+    manage_config: 'Config'
   },
   page: {
     login: {

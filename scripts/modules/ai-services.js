@@ -5,6 +5,9 @@
 
 // NOTE/TODO: Include the beta header output-128k-2025-02-19 in your API request to increase the maximum output token length to 128k tokens for Claude 3.7 Sonnet.
 
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
@@ -12,8 +15,28 @@ import { CONFIG, log, sanitizePrompt } from './utils.js';
 import { startLoadingIndicator, stopLoadingIndicator } from './ui.js';
 import chalk from 'chalk';
 
-// Load environment variables
-dotenv.config();
+// 尝试从多个位置加载 .env 文件
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const envPaths = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(__dirname, '../../.env'),
+  path.resolve(__dirname, '../../../.env')
+];
+
+let envLoaded = false;
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    envLoaded = true;
+    break;
+  }
+}
+
+if (!envLoaded) {
+  dotenv.config();
+}
 
 function getGeminiOptions() {
   const proxyUrl = CONFIG.geminiBaseUrl;
@@ -55,11 +78,15 @@ function getQwenClient() {
   if (!qwenClient) {
     const apiKey = CONFIG.qwenApiKey;
     if (!apiKey) {
-      throw new Error("QWEN_API_KEY 或 DASHSCOPE_API_KEY environment variable is missing. 请在.env文件中配置千问API密钥。");
+      throw new Error("缺少千问 API Key，请在 .env 中配置 QWEN_API_KEY、DASHSCOPE_API_KEY 或 OPENAI_API_KEY。");
     }
     qwenClient = new OpenAI({
       apiKey: apiKey,
       baseURL: CONFIG.qwenBaseUrl,
+      timeout: 300000,
+      defaultHeaders: {
+        'Content-Type': 'application/json'
+      }
     });
     console.log(`使用千问 API: ${CONFIG.qwenBaseUrl}, 模型: ${CONFIG.qwenModel}`);
   }
@@ -115,6 +142,13 @@ function handleAIError(error, provider = 'gemini') {
       default:
         return `${providerName} API error: ${error.message}`;
     }
+  }
+
+  if (error.status === 401) {
+    return `${providerName} API Key 无效或未生效，请检查密钥和环境变量配置。`;
+  }
+  if (error.status === 403) {
+    return `${providerName} 当前账号没有模型访问权限，请检查百炼开通状态和权限。`;
   }
 
   // Check for network/timeout errors
@@ -554,9 +588,10 @@ Each subtask should be implementable in a focused coding session.`;
     }
 
     const translationInstruction = CONFIG.useChinese ? `
-IMPORTANT: For each subtask, also provide Chinese translations for the title, description, details, and test strategy fields.
-These translations should be natural and fluent Chinese that accurately conveys the original English content.
-Include these translations in the "titleTrans", "descriptionTrans", "detailsTrans", and "testStrategyTrans" fields in the JSON response.` : '';
+IMPORTANT: All human-readable content in the response must be written in Chinese, not English.
+Use Chinese for "title", "description", "details", and "testStrategy".
+Do not output English sentences unless a technical identifier, library name, API name, or code symbol must remain in its original form.
+Also provide the same Chinese content in the "titleTrans", "descriptionTrans", "detailsTrans", and "testStrategyTrans" fields in the JSON response.` : '';
 
     const userPrompt = `Please break down this task into ${numSubtasks ? `${numSubtasks}` : 'an optimal number of'} specific, actionable subtasks:
 

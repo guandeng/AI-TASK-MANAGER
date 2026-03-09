@@ -224,10 +224,14 @@ const local: App.I18n.Schema = {
     403: '无权限',
     404: '页面不存在',
     500: '服务器错误',
-    'iframe-page': '外链页面',
-    home: '首页',
-    task: '任务管理',
-    task_list: '任务列表'
+    'iframe-page': '外���页面',
+    requirement: '需求任务管理',
+    requirement_list: '需求列表',
+    requirement_detail: '需求详情',
+    'requirement_task-list': '任务列表',
+    'requirement_task-detail': '任务详情',
+    manage: '系统管理',
+    manage_config: '配置管理'
   },
   page: {
     login: {

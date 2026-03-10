@@ -305,34 +305,30 @@ onMounted(() => {
     <NSpin :show="requirementStore.detailLoading">
       <!-- 顶部操作栏 -->
       <NCard class="mb-4">
-        <NSpace justify="space-between" align="center">
-          <NSpace align="center">
-            <NButton text @click="handleBack">
-              <template #icon>
-                <span class="i-mdi:arrow-left text-lg"></span>
-              </template>
-            </NButton>
-            <span class="text-lg font-medium">
-              {{ isNew ? '新建需求' : '编辑需求' }}
-            </span>
-            <NTag v-if="!isNew && requirementStore.currentRequirement" :type="statusColors[requirementStore.currentRequirement.status] as any">
-              {{ statusText[requirementStore.currentRequirement.status] }}
-            </NTag>
-          </NSpace>
-          <NSpace>
-            <NButton v-if="!isNew" @click="togglePreview">
-              <template #icon>
-                <span :class="previewMode ? 'i-mdi:pencil' : 'i-mdi:eye'"></span>
-              </template>
-              {{ previewMode ? '编辑' : '预览' }}
-            </NButton>
-            <NButton type="primary" @click="handleSave">
-              <template #icon>
-                <span class="i-mdi:content-save"></span>
-              </template>
-              保存
-            </NButton>
-          </NSpace>
+        <NSpace justify="center" align="center">
+          <NButton text @click="handleBack">
+            <template #icon>
+              <span class="i-mdi:arrow-left text-lg"></span>
+            </template>
+          </NButton>
+          <span class="text-lg font-medium">
+            {{ isNew ? '新建需求' : '编辑需求' }}
+          </span>
+          <NTag v-if="!isNew && requirementStore.currentRequirement" :type="statusColors[requirementStore.currentRequirement.status] as any">
+            {{ statusText[requirementStore.currentRequirement.status] }}
+          </NTag>
+          <NButton v-if="!isNew" @click="togglePreview">
+            <template #icon>
+              <span :class="previewMode ? 'i-mdi:pencil' : 'i-mdi:eye'"></span>
+            </template>
+            {{ previewMode ? '编辑' : '预览' }}
+          </NButton>
+          <NButton type="primary" @click="handleSave" class="min-w-20">
+            <template #icon>
+              <span class="i-mdi:content-save"></span>
+            </template>
+            保存
+          </NButton>
         </NSpace>
       </NCard>
 

@@ -38,3 +38,12 @@ export function clearTaskSubtasks(taskId: number) {
 export function deleteSubtask(taskId: number, subtaskId: number) {
   return request({ url: `${API_BASE}/tasks/${taskId}/subtasks/${subtaskId}`, method: 'DELETE' });
 }
+
+export function regenerateSubtask(taskId: number, subtaskId: number, data: { prompt?: string } = {}) {
+  return request({
+    url: `${API_BASE}/tasks/${taskId}/subtasks/${subtaskId}/regenerate`,
+    method: 'POST',
+    data,
+    timeout: 5 * 60 * 1000 // 5 分钟超时
+  });
+}

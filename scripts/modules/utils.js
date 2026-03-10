@@ -63,6 +63,23 @@ const LOG_LEVELS = {
   error: 3
 };
 
+// 日志目录
+const LOG_DIR = path.join(process.cwd(), 'logs');
+
+// 确保日志目录存在
+function ensureLogDir() {
+  if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+  }
+}
+
+// 获取日志文件路径（按日期）
+function getLogFilePath() {
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  return path.join(LOG_DIR, `app-${dateStr}.log`);
+}
+
 /**
  * Logs a message at the specified level
  * @param {string} level - The log level (debug, info, warn, error)
@@ -79,7 +96,19 @@ function log(level, ...args) {
 
   if (LOG_LEVELS[level] >= LOG_LEVELS[CONFIG.logLevel]) {
     const icon = icons[level] || '';
-    console.log(`${icon} ${args.join(' ')}`);
+    const message = `${icon} ${args.join(' ')}`;
+    console.log(message);
+
+    // 写入日志文件
+    try {
+      ensureLogDir();
+      const timestamp = new Date().toISOString();
+      const logLine = `[${timestamp}] [${level.toUpperCase()}] ${args.join(' ')}\n`;
+      fs.appendFileSync(getLogFilePath(), logLine);
+    } catch (err) {
+      // 写入日志文件失败时，仅输出到控制台，避免循环
+      console.error('Failed to write log file:', err.message);
+    }
   }
 }
 

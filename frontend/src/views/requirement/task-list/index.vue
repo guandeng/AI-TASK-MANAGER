@@ -404,28 +404,29 @@ watch(filteredTasks, tasks => {
     <NCard title="任务列表">
       <template #header-extra>
         <NSpace>
-          <NInput
-            v-model:value="searchText"
-            placeholder="搜索任务..."
-            clearable
-            style="width: 200px"
-          />
-          <NSelect
-            v-model:value="filterStatus"
-            :options="statusOptions"
-            style="width: 120px"
-          />
-          <NSelect
-            v-model:value="filterRequirementId"
-            :options="requirementOptions"
-            style="width: 180px"
-          />
           <NButton @click="loadTaskListData">
             <template #icon>
               <span class="i-mdi:refresh"></span>
             </template>
             刷新
           </NButton>
+          <NSelect
+            v-model:value="filterRequirementId"
+            :options="requirementOptions"
+            style="width: 150px"
+            placeholder="需求筛选"
+          />
+          <NSelect
+            v-model:value="filterStatus"
+            :options="statusOptions"
+            style="width: 120px"
+          />
+          <NInput
+            v-model:value="searchText"
+            placeholder="搜索任务..."
+            clearable
+            style="width: 180px"
+          />
         </NSpace>
       </template>
 

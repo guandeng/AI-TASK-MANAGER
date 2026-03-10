@@ -83,7 +83,7 @@ export const useAppStore = defineStore(SetupStoreId.App, () => {
 
   // watch store
   scope.run(() => {
-    // watch isMobile, if is mobile, collapse sider
+    // watch isMobile, if is mobile, change layout to vertical but keep sider state
     watch(
       isMobile,
       newValue => {
@@ -95,7 +95,7 @@ export const useAppStore = defineStore(SetupStoreId.App, () => {
           });
 
           themeStore.setThemeLayout('vertical');
-          setSiderCollapse(true);
+          // 不再自动收起侧边栏，保持用户当前状态
         } else {
           // when is not mobile, recover the backup theme setting
           const backup = localStg.get('backupThemeSettingBeforeIsMobile');

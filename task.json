@@ -43,12 +43,12 @@
     "type": "db",
     "database": {
       "connection": "mysql",
-      "host": "192.168.8.167",
-      "hostSlave": "192.168.8.167",
+      "host": "127.0.0.1",
+      "hostSlave": "127.0.0.1",
       "port": 3306,
       "database": "ai_task",
-      "username": "a8591",
-      "password": "RaD$%^@DNO&^*QQ254&~",
+      "username": "root",
+      "password": "123456",
       "charset": "utf8mb4",
       "collation": "utf8mb4_unicode_ci"
     }

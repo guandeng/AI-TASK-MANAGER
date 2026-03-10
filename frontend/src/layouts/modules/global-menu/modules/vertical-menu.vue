@@ -24,12 +24,23 @@ const inverted = computed(() => !themeStore.darkMode && themeStore.sider.inverte
 
 const expandedKeys = ref<string[]>([]);
 
+function getAllParentKeys(menus: App.Global.Menu[]): string[] {
+  const keys: string[] = [];
+  for (const menu of menus) {
+    if (menu.children && menu.children.length > 0) {
+      keys.push(menu.key);
+      keys.push(...getAllParentKeys(menu.children));
+    }
+  }
+  return keys;
+}
+
 function updateExpandedKeys() {
-  if (appStore.siderCollapse || !selectedKey.value) {
+  if (appStore.siderCollapse) {
     expandedKeys.value = [];
     return;
   }
-  expandedKeys.value = routeStore.getSelectedMenuKeyPath(selectedKey.value);
+  expandedKeys.value = getAllParentKeys(routeStore.menus);
 }
 
 watch(

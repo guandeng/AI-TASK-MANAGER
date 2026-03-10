@@ -625,6 +625,109 @@ export async function startWebServer(options = {}) {
     }
   });
 
+  // Regenerate a single subtask
+  app.post('/api/tasks/:taskId/subtasks/:subtaskId/regenerate', async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const subtaskId = parseInt(req.params.subtaskId, 10);
+      const { prompt: additionalContext } = req.body || {};
+
+      const data = await readTaskData(tasksPath);
+      if (!data || !data.tasks) {
+        return res.status(404).json({ error: 'Tasks file not found' });
+      }
+
+      const task = data.tasks.find(t => t.id === taskId);
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      if (!task.subtasks || !Array.isArray(task.subtasks)) {
+        return res.status(404).json({ error: 'Task has no subtasks' });
+      }
+
+      const subtaskIndex = task.subtasks.findIndex(st => st.id === subtaskId);
+      if (subtaskIndex === -1) {
+        return res.status(404).json({ error: 'Subtask not found' });
+      }
+
+      const oldSubtask = task.subtasks[subtaskIndex];
+
+      // 构造提示词，让 AI 重新生成这一个子任务
+      const regeneratePrompt = additionalContext
+        ? `Please regenerate this subtask with the following guidance: ${additionalContext}
+
+Original subtask to regenerate:
+- ID: ${subtaskId}
+- Title: ${oldSubtask.titleTrans || oldSubtask.title}
+- Description: ${oldSubtask.descriptionTrans || oldSubtask.description || 'N/A'}
+
+Keep the same subtask ID (${subtaskId}) and maintain any existing dependencies.`
+        : `Please regenerate this subtask with a fresh approach:
+
+Original subtask to regenerate:
+- ID: ${subtaskId}
+- Title: ${oldSubtask.titleTrans || oldSubtask.title}
+- Description: ${oldSubtask.descriptionTrans || oldSubtask.description || 'N/A'}
+
+Keep the same subtask ID (${subtaskId}) and maintain any existing dependencies.`;
+
+      // 调用 AI 生成单个子任务
+      const newSubtasks = await generateSubtasks(
+        task,
+        1,  // 只生成一个子任务
+        subtaskId,  // 使用相同的 ID
+        regeneratePrompt,
+        null,  // knowledgeBase
+        0  // retryCount
+      );
+
+      if (!newSubtasks || newSubtasks.length === 0) {
+        return res.status(500).json({ error: 'Failed to regenerate subtask' });
+      }
+
+      // 替换旧子任务
+      const newSubtask = newSubtasks[0];
+      // 保持原有依赖关系
+      if (oldSubtask.dependencies) {
+        newSubtask.dependencies = oldSubtask.dependencies;
+      }
+      task.subtasks[subtaskIndex] = newSubtask;
+
+      // 写入文件
+      await writeTaskData(tasksPath, data);
+
+      // 返回更新后的任务
+      const updatedData = await readTaskData(tasksPath);
+      const updatedTask = updatedData?.tasks?.find(t => t.id === taskId);
+      if (!updatedTask) {
+        return res.status(404).json({ error: 'Task not found after regeneration' });
+      }
+
+      const localizedTask = JSON.parse(JSON.stringify(updatedTask));
+      if (localizedTask.titleTrans) localizedTask.title = localizedTask.titleTrans;
+      if (localizedTask.descriptionTrans) localizedTask.description = localizedTask.descriptionTrans;
+      if (localizedTask.detailsTrans) localizedTask.details = localizedTask.detailsTrans;
+      if (localizedTask.testStrategyTrans) localizedTask.testStrategy = localizedTask.testStrategyTrans;
+
+      if (localizedTask.subtasks && localizedTask.subtasks.length > 0) {
+        localizedTask.subtasks = localizedTask.subtasks.map(subtask => {
+          const subtaskCopy = { ...subtask };
+          if (subtaskCopy.titleTrans) subtaskCopy.title = subtaskCopy.titleTrans;
+          if (subtaskCopy.descriptionTrans) subtaskCopy.description = subtaskCopy.descriptionTrans;
+          if (subtaskCopy.detailsTrans) subtaskCopy.details = subtaskCopy.detailsTrans;
+          if (subtaskCopy.testStrategyTrans) subtaskCopy.testStrategy = subtaskCopy.testStrategyTrans;
+          return subtaskCopy;
+        });
+      }
+
+      res.json(localizedTask);
+    } catch (error) {
+      log('error', `Error regenerating subtask: ${error.message}`);
+      res.status(500).json({ error: 'Failed to regenerate subtask' });
+    }
+  });
+
   app.post('/api/tasks/:taskId/expand', async (req, res) => {
     try {
       const taskId = parseInt(req.params.taskId, 10);

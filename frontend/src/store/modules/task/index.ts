@@ -8,8 +8,9 @@ import {
   expandTask as expandTaskApi,
   fetchTaskDetail,
   fetchTaskList,
+  regenerateSubtask as regenerateSubtaskApi,
   updateTask,
-  updateSubtask
+  updateSubtask as updateSubtaskApi
 } from '@/service/api/task';
 import type { Task, Subtask, TaskStatus, TaskStatistics, TaskListParams } from '@/typings/api/task';
 
@@ -143,6 +144,29 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
+  // 通用更新任务方法
+  async function updateTaskById(id: number, data: Record<string, any>) {
+    try {
+      const { data: updatedTask, error } = await updateTask(id, data);
+      if (!error && updatedTask) {
+        // 更新列表中的任务
+        const index = tasks.value.findIndex(t => t.id === id);
+        if (index !== -1) {
+          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+        }
+        // 如果是当前任务，也更新
+        if (currentTask.value?.id === id) {
+          currentTask.value = { ...currentTask.value, ...updatedTask };
+        }
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to update task:', error);
+      return false;
+    }
+  }
+
   async function setSubtaskStatus(taskId: number, subtaskId: number, status: TaskStatus) {
     try {
       const { data: updatedSubtask, error } = await updateSubtask(taskId, subtaskId, { status });
@@ -175,6 +199,41 @@ export const useTaskStore = defineStore('task-store', () => {
     } catch (error) {
       window.$message?.error('子任务状态更新失败');
       console.error('Failed to update subtask status:', error);
+      return false;
+    }
+  }
+
+  // 通用子任务更新方法
+  async function updateSubtask(taskId: number, subtaskId: number, data: Record<string, any>) {
+    try {
+      const { data: updatedSubtask, error } = await updateSubtaskApi(taskId, subtaskId, data);
+      if (!error && updatedSubtask) {
+        // 更新列表中任务的子任务
+        const taskIndex = tasks.value.findIndex(t => t.id === taskId);
+        if (taskIndex !== -1 && tasks.value[taskIndex].subtasks) {
+          const subtaskIndex = tasks.value[taskIndex].subtasks!.findIndex(st => st.id === subtaskId);
+          if (subtaskIndex !== -1) {
+            tasks.value[taskIndex].subtasks![subtaskIndex] = {
+              ...tasks.value[taskIndex].subtasks![subtaskIndex],
+              ...updatedSubtask
+            };
+          }
+        }
+        // 如果是当前任务，也更新
+        if (currentTask.value?.id === taskId && currentTask.value.subtasks) {
+          const subtaskIndex = currentTask.value.subtasks.findIndex(st => st.id === subtaskId);
+          if (subtaskIndex !== -1) {
+            currentTask.value.subtasks[subtaskIndex] = {
+              ...currentTask.value.subtasks[subtaskIndex],
+              ...updatedSubtask
+            };
+          }
+        }
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to update subtask:', error);
       return false;
     }
   }
@@ -301,6 +360,29 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
+  async function regenerateSubtask(taskId: number, subtaskId: number, prompt?: string) {
+    loading.value = true;
+    try {
+      const { data: updatedTask, error } = await regenerateSubtaskApi(taskId, subtaskId, { prompt });
+      if (!error && updatedTask) {
+        const index = tasks.value.findIndex(t => t.id === taskId);
+        if (index !== -1) {
+          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+        }
+        currentTask.value = updatedTask;
+        window.$message?.success('子任务已重新生成');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      window.$message?.error('重新生成子任务失败');
+      console.error('Failed to regenerate subtask:', error);
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   function clearCurrentTask() {
     currentTask.value = null;
   }
@@ -320,12 +402,15 @@ export const useTaskStore = defineStore('task-store', () => {
     loadTaskDetail,
     setTaskStatus,
     setTaskAssignee,
+    updateTask,
     setSubtaskStatus,
+    updateSubtask,
     expandTask,
     clearTaskSubtasks,
     deleteTask,
     batchDeleteTasks,
     deleteSubtask,
+    regenerateSubtask,
     clearCurrentTask
   };
 });

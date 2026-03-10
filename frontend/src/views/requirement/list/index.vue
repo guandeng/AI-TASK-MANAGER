@@ -358,29 +358,27 @@ onActivated(() => {
 
     <!-- 搜索和筛选 -->
     <NCard class="mb-4">
-      <NSpace justify="space-between">
-        <NSpace>
-          <NInput
-            v-model:value="searchKeyword"
-            placeholder="搜索需求标题或内容"
-            clearable
-            class="w-60"
-          />
-          <NSelect
-            v-model:value="filterStatus"
-            :options="statusOptions"
-            placeholder="状态筛选"
-            clearable
-            class="w-32"
-          />
-          <NSelect
-            v-model:value="filterPriority"
-            :options="priorityOptions"
-            placeholder="优先级筛选"
-            clearable
-            class="w-32"
-          />
-        </NSpace>
+      <NSpace justify="center">
+        <NInput
+          v-model:value="searchKeyword"
+          placeholder="搜索需求标题或内容"
+          clearable
+          class="w-60"
+        />
+        <NSelect
+          v-model:value="filterStatus"
+          :options="statusOptions"
+          placeholder="状态筛选"
+          clearable
+          class="w-32"
+        />
+        <NSelect
+          v-model:value="filterPriority"
+          :options="priorityOptions"
+          placeholder="优先级筛选"
+          clearable
+          class="w-32"
+        />
         <NButton type="primary" @click="handleCreate">
           <template #icon>
             <span class="i-mdi:plus"></span>

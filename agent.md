@@ -56,10 +56,21 @@ CREATE TABLE `task_history` (     -- 历史记录表
 
 ### 必备字段
 
-每个表都应包含：
+每个表**必须**包含以下字段：
+
+```sql
+`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+`created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+`updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+`deleted_at` TIMESTAMP NULL DEFAULT NULL COMMENT '删���时间(软删除)',
+PRIMARY KEY (`id`)
+```
+
+**字段说明：**
 - `id` - 主键，BIGINT UNSIGNED AUTO_INCREMENT
-- `created_at` - 创建时间
-- `updated_at` - 更新时间
+- `created_at` - 创建时间，记录首次插入时间
+- `updated_at` - 更新时间，记录最后修改时间
+- `deleted_at` - 删除时间，软删除标记字段，NULL 表示未删除
 
 ### 索引规范
 

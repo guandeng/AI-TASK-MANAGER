@@ -25,6 +25,8 @@ declare module "@elegant-router/types" {
     "manage": "/manage";
     "manage_config": "/manage/config";
     "manage_menu": "/manage/menu";
+    "message": "/message";
+    "message_list": "/message/list";
     "requirement": "/requirement";
     "requirement_detail": "/requirement/detail/:id";
     "requirement_list": "/requirement/list";
@@ -73,6 +75,7 @@ declare module "@elegant-router/types" {
     | "iframe-page"
     | "login"
     | "manage"
+    | "message"
     | "requirement"
     | "team"
     | "templates"
@@ -99,6 +102,7 @@ declare module "@elegant-router/types" {
     | "login"
     | "manage_config"
     | "manage_menu"
+    | "message_list"
     | "requirement_detail"
     | "requirement_list"
     | "requirement_task-detail"

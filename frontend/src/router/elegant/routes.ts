@@ -97,6 +97,26 @@ export const generatedRoutes: GeneratedRoute[] = [
     ]
   },
   {
+    name: 'message',
+    path: '/message',
+    component: 'layout.base',
+    meta: {
+      title: 'message',
+      i18nKey: 'route.message'
+    },
+    children: [
+      {
+        name: 'message_list',
+        path: '/message/list',
+        component: 'view.message_list',
+        meta: {
+          title: 'message_list',
+          i18nKey: 'route.message_list'
+        }
+      }
+    ]
+  },
+  {
     name: 'requirement',
     path: '/requirement',
     component: 'layout.base',

@@ -171,6 +171,8 @@ const routeMap: RouteMap = {
   "manage": "/manage",
   "manage_config": "/manage/config",
   "manage_menu": "/manage/menu",
+  "message": "/message",
+  "message_list": "/message/list",
   "requirement": "/requirement",
   "requirement_detail": "/requirement/detail/:id",
   "requirement_list": "/requirement/list",

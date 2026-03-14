@@ -6,6 +6,7 @@ import {
   deleteTask as deleteTaskApi,
   deleteSubtask as deleteSubtaskApi,
   expandTask as expandTaskApi,
+  expandTaskAsync as expandTaskAsyncApi,
   fetchTaskDetail,
   fetchTaskList,
   regenerateSubtask as regenerateSubtaskApi,
@@ -291,6 +292,21 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
+  // 异步拆分子任务 - 返回消息ID用于轮询
+  async function expandTaskAsync(id: number) {
+    try {
+      const { data, error } = await expandTaskAsyncApi(id);
+      if (!error && data) {
+        return data.messageId;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to start async task expansion:', error);
+      window.$message?.error('启动异步拆分失败');
+      return null;
+    }
+  }
+
   async function clearTaskSubtasks(taskId: number) {
     loading.value = true;
     try {
@@ -530,6 +546,7 @@ export const useTaskStore = defineStore('task-store', () => {
     setSubtaskStatus,
     updateSubtask,
     expandTask,
+    expandTaskAsync,
     clearTaskSubtasks,
     deleteTask,
     batchDeleteTasks,

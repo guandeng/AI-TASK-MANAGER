@@ -16,8 +16,7 @@ function confirmAction(message: string) {
 
 // 筛选状态
 const filterStatus = ref<TaskStatus | 'all'>('all');
-const filterRequirementId = ref<number | string | 'all'>('all');
-const routeRequirementTitle = ref('');
+const filterRequirementId = ref<number | 'all'>('all');
 const searchText = ref('');
 const checkedRowKeys = ref<DataTableRowKey[]>([]);
 
@@ -68,34 +67,23 @@ const priorityTextMap: Record<string, string> = {
 
 const requirementOptions = computed<SelectOption[]>(() => {
   const options: SelectOption[] = [{ label: '全部需求', value: 'all' }];
-  const seen = new Set<string>();
+  const seen = new Set<number>();
 
   taskStore.tasks.forEach(task => {
-    const label = task.requirementTitle || (task.requirementId ? `需求 #${task.requirementId}` : '');
-    const value = task.requirementId ?? task.requirementTitle;
-
-    if (!label || value == null) {
+    if (!task.requirementId) {
       return;
     }
 
-    const key = String(value);
-    if (seen.has(key)) {
+    if (seen.has(task.requirementId)) {
       return;
     }
 
-    seen.add(key);
-    options.push({ label, value });
-  });
-
-  if (
-    filterRequirementId.value !== 'all' &&
-    !options.some(option => option.value === filterRequirementId.value)
-  ) {
+    seen.add(task.requirementId);
     options.push({
-      label: routeRequirementTitle.value || `需求 #${filterRequirementId.value}`,
-      value: filterRequirementId.value
+      label: task.requirementTitle || `需求 #${task.requirementId}`,
+      value: task.requirementId
     });
-  }
+  });
 
   return options;
 });
@@ -105,11 +93,7 @@ const filteredTasks = computed(() => {
   let result = taskStore.tasks;
 
   if (filterRequirementId.value !== 'all') {
-    if (typeof filterRequirementId.value === 'number') {
-      result = result.filter(task => task.requirementId === filterRequirementId.value);
-    } else {
-      result = result.filter(task => task.requirementTitle === filterRequirementId.value);
-    }
+    result = result.filter(task => task.requirementId === filterRequirementId.value);
   }
 
   // 状态筛选
@@ -247,7 +231,7 @@ function viewTaskDetail(id: number) {
 }
 
 async function loadTaskListData() {
-  if (typeof filterRequirementId.value === 'number') {
+  if (filterRequirementId.value !== 'all') {
     await taskStore.loadTasks({ requirementId: filterRequirementId.value });
     return;
   }
@@ -289,10 +273,6 @@ function syncRequirementFilterFromRoute() {
     ? route.query.requirementId[0]
     : route.query.requirementId;
 
-  const rawRequirementTitle = Array.isArray(route.query.requirementTitle)
-    ? route.query.requirementTitle[0]
-    : route.query.requirementTitle;
-
   const parsedRequirementId = Number(rawRequirementId);
 
   if (rawRequirementId && !Number.isNaN(parsedRequirementId) && parsedRequirementId > 0) {
@@ -300,8 +280,6 @@ function syncRequirementFilterFromRoute() {
   } else {
     filterRequirementId.value = 'all';
   }
-
-  routeRequirementTitle.value = typeof rawRequirementTitle === 'string' ? rawRequirementTitle : '';
 }
 
 // 处理状态变更
@@ -340,7 +318,7 @@ onActivated(async () => {
 });
 
 watch(
-  () => [route.query.requirementId, route.query.requirementTitle],
+  () => route.query.requirementId,
   async () => {
     syncRequirementFilterFromRoute();
     await loadTaskListData();

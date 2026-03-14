@@ -28,7 +28,7 @@ export const themeSettings: App.Theme.ThemeSetting = {
       showIcon: true
     },
     multilingual: {
-      visible: true
+      visible: false
     },
     globalSearch: {
       visible: true

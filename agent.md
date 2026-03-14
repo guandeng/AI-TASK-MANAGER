@@ -62,7 +62,7 @@ CREATE TABLE `task_history` (     -- 历史记录表
 `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
 `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
 `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-`deleted_at` TIMESTAMP NULL DEFAULT NULL COMMENT '删���时间(软删除)',
+`deleted_at` TIMESTAMP NULL DEFAULT NULL COMMENT '删时间(软删除)',
 PRIMARY KEY (`id`)
 ```
 
@@ -117,21 +117,21 @@ frontend/
 
 ### 命名规范
 
-| 类型 | 规范 | 示例 |
-|------|------|------|
-| 数据库表名 | 小写 + 下划线 + 前缀 | `task_task`, `task_subtask` |
-| 数据库字段 | 小写 + 下划线 | `created_at`, `title_trans` |
-| TypeScript 接口 | PascalCase | `Task`, `Subtask`, `TaskListResponse` |
-| TypeScript 类型 | PascalCase | `TaskStatus`, `TaskPriority` |
-| Vue 组件 | PascalCase | `TaskList`, `TaskDetail` |
-| 常量 | SCREAMING_SNAKE_CASE | `TASK_STATUS_OPTIONS` |
-| 变量/函数 | camelCase | `taskStore`, `handleStatusChange` |
+| 类型            | 规范                 | 示例                                  |
+| --------------- | -------------------- | ------------------------------------- |
+| 数据库表名      | 小写 + 下划线 + 前缀 | `task_task`, `task_subtask`           |
+| 数据库字段      | 小写 + 下划线        | `created_at`, `title_trans`           |
+| TypeScript 接口 | PascalCase           | `Task`, `Subtask`, `TaskListResponse` |
+| TypeScript 类型 | PascalCase           | `TaskStatus`, `TaskPriority`          |
+| Vue 组件        | PascalCase           | `TaskList`, `TaskDetail`              |
+| 常量            | SCREAMING_SNAKE_CASE | `TASK_STATUS_OPTIONS`                 |
+| 变量/函数       | camelCase            | `taskStore`, `handleStatusChange`     |
 
 ### 列表排序规范
 
 - 前端列表页默认按 `id desc` 展示
 - 需求列表按 `id desc` 排序
-- 任务列��按 `id desc` 排序
+- 任务列按 `id desc` 排序
 
 ### 菜单命名规范
 
@@ -151,6 +151,13 @@ frontend/
 - 需求拆分任务时，生成内容必须使用中文
 - `title`、`description`、`details`、`testStrategy` 必须输出中文
 - 除技术标识符、库名、API 名、代码符号外，不输出英文句子
+
+### 语言规范
+
+- **项目只支持中文，不支持多语言**
+- 禁止添加英文语言包或任何多语言切换功能
+- 所有用户可见文本使用中文
+- 路由、菜单、按钮、提示等均使用中文
 
 ### 类型定义规范
 
@@ -218,12 +225,12 @@ export const useTaskStore = defineStore('task-store', () => {
 
 ### RESTful 设计
 
-| 操作 | 方法 | 路径 | 说明 |
-|------|------|------|------|
-| 获取任务列表 | GET | `/api/tasks` | 返回任务列表 |
-| 获取任务详情 | GET | `/api/tasks/:id` | 返回单个任务 |
-| 更新任务状态 | PATCH | `/api/tasks/:id` | 部分更新任务 |
-| 更新子任务 | PATCH | `/api/tasks/:taskId/subtasks/:subtaskId` | 更新子任务 |
+| 操作         | 方法  | 路径                                     | 说明         |
+| ------------ | ----- | ---------------------------------------- | ------------ |
+| 获取任务列表 | GET   | `/api/tasks`                             | 返回任务列表 |
+| 获取任务详情 | GET   | `/api/tasks/:id`                         | 返回单个任务 |
+| 更新任务状态 | PATCH | `/api/tasks/:id`                         | 部分更新任务 |
+| 更新子任务   | PATCH | `/api/tasks/:taskId/subtasks/:subtaskId` | 更新子任务   |
 
 ### 响应格式
 
@@ -249,15 +256,15 @@ export const useTaskStore = defineStore('task-store', () => {
 
 使用 Conventional Commits：
 
-| 类型 | 说明 | 示例 |
-|------|------|------|
-| `feat` | 新功能 | `feat: 添加任务状态切换功能` |
-| `fix` | 修复 bug | `fix: 修复任务列表分页问题` |
-| `docs` | 文档更新 | `docs: 更新数据库设计文档` |
-| `style` | 代码格式 | `style: 格式化代码` |
-| `refactor` | 代码重构 | `refactor: 重构任务 store` |
-| `test` | 测试相关 | `test: 添加任务单元测试` |
-| `chore` | 构建/工具 | `chore: 更新依赖版本` |
+| 类型       | 说明      | 示例                         |
+| ---------- | --------- | ---------------------------- |
+| `feat`     | 新功能    | `feat: 添加任务状态切换功能` |
+| `fix`      | 修复 bug  | `fix: 修复任务列表分页问题`  |
+| `docs`     | 文档更新  | `docs: 更新数据库设计文档`   |
+| `style`    | 代码格式  | `style: 格式化代码`          |
+| `refactor` | 代码重构  | `refactor: 重构任务 store`   |
+| `test`     | 测试相关  | `test: 添加任务单元测试`     |
+| `chore`    | 构建/工具 | `chore: 更新依赖版本`        |
 
 ### 分支命名
 
@@ -273,6 +280,5 @@ export const useTaskStore = defineStore('task-store', () => {
 1. **状态管理**：使用 Pinia 进行状态管理，避免组件间直接传递复杂数据
 2. **类型安全**：所有 API 响应和 Store 数据都要有 TypeScript 类型定义
 3. **国际化**：用户可见的文本都要支持多语言（中文/英文）
-4. **错误处理**：API 调用要有 try-catch，并显示友好的错误提示
-5. **性能优化**：列表数据使用分页，避免一次性加载过多数据
-6. **交互确认**：所有删除操作、状态更新、负责人变更、清空操作、批量修改等会变更数据的按钮或控件，必须先弹出确认提示，再执行实际请求
+4. **性能优化**：列表数据使用分页，避免一次性加载过多数据
+5. **交互确认**：所有删除操作、状态更新、负责人变更、清空操作、批量修改等会变更数据的按钮或控件，必须先弹出确认提示，再执行实际请求

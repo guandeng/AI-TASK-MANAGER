@@ -248,8 +248,7 @@ function handleViewTasks(row: Requirement) {
   router.push({
     path: '/requirement/task-list',
     query: {
-      requirementId: String(row.id),
-      requirementTitle: row.title
+      requirementId: String(row.id)
     }
   });
 }

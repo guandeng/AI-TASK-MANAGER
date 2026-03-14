@@ -15,7 +15,6 @@ import { readTaskData, taskDataExists, getTaskStorageMode } from './task-storage
 import {
   parsePRD,
   updateTasks,
-  generateTaskFiles,
   setTaskStatus,
   listTasks,
   expandTask,
@@ -194,22 +193,6 @@ function registerCommands(programInstance) {
       }
 
       await updateTasks(tasksPath, fromId, prompt, useResearch);
-    });
-
-  // generate command
-  programInstance
-    .command('generate')
-    .description('Generate task files from tasks.json')
-    .option('-f, --file <file>', 'Path to the tasks file', 'tasks/tasks.json')
-    .option('-o, --output <dir>', 'Output directory', 'tasks')
-    .action(async (options) => {
-      const tasksPath = options.file;
-      const outputDir = options.output;
-
-      console.log(chalk.blue(`Generating task files from: ${tasksPath}`));
-      console.log(chalk.blue(`Output directory: ${outputDir}`));
-
-      await generateTaskFiles(tasksPath, outputDir);
     });
 
   // set-status command

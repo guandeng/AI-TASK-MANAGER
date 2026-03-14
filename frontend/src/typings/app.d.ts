@@ -296,7 +296,7 @@ declare namespace App {
   namespace I18n {
     type RouteKey = import('@elegant-router/types').RouteKey;
 
-    type LangType = 'en-US' | 'zh-CN';
+    type LangType = 'zh-CN';
 
     type LangOption = {
       label: string;
@@ -462,10 +462,6 @@ declare namespace App {
             enableUserName: string;
             enableTime: string;
             timeFormat: string;
-          };
-          multilingual: {
-            title: string;
-            visible: string;
           };
           globalSearch: {
             title: string;

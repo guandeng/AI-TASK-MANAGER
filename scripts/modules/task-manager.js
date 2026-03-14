@@ -46,7 +46,12 @@ import {
   findTaskInComplexityReport,
   truncate
 } from './utils.js';
-import { getTaskStorageMode, readTaskData, writeTaskData } from './task-storage.js';
+import { readTaskData, writeTaskData, setTaskExpanding, getTaskById } from './task-storage.js';
+import {
+  createMessage,
+  updateMessageStatus,
+  getMessageById
+} from './message-storage.js';
 
 import { displayBanner, getStatusWithColor, formatDependenciesWithStatus, getComplexityWithColor, startLoadingIndicator, stopLoadingIndicator, createProgressBar } from './ui.js';
 
@@ -127,9 +132,6 @@ async function parsePRD(prdPath, tasksPath, numTasks, knowledgeBasePath = null) 
     if (knowledgeBase) {
       log('info', `Tasks were generated with business knowledge context from ${knowledgeBasePath}`);
     }
-
-    // Generate individual task files
-    await generateTaskFiles(tasksPath, path.dirname(tasksPath));
 
     return tasksData;
   } catch (error) {
@@ -398,9 +400,6 @@ Return only the updated tasks as a valid JSON array.`;
 
       log('success', `Successfully updated ${updatedTasks.length} tasks`);
 
-      // Generate individual task files
-      await generateTaskFiles(tasksPath, path.dirname(tasksPath));
-
       console.log(boxen(
         chalk.green(`Successfully updated ${updatedTasks.length} tasks`),
         { padding: 1, borderColor: 'green', borderStyle: 'round' }
@@ -415,182 +414,6 @@ Return only the updated tasks as a valid JSON array.`;
     if (CONFIG.debug) {
       console.error(error);
     }
-  }
-}
-
-/**
- * Generate individual task files from tasks.json
- * @param {string} tasksPath - Path to the tasks.json file
- * @param {string} outputDir - Output directory for task files
- */
-async function generateTaskFiles(tasksPath, outputDir) {
-  try {
-    if (getTaskStorageMode() !== 'file') {
-      log('info', 'Skipping task file generation because storage mode is not file');
-      return;
-    }
-
-    log('info', `Reading tasks from ${tasksPath}...`);
-    const data = await readTaskData(tasksPath);
-    if (!data || !data.tasks) {
-      throw new Error(`No valid tasks found in ${tasksPath}`);
-    }
-
-    // Create the output directory if it doesn't exist
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    log('info', `Found ${data.tasks.length} tasks to generate files for.`);
-
-    // Validate and fix dependencies before generating files
-    log('info', `Validating and fixing dependencies before generating files...`);
-    const dependencyChangesDetected = validateAndFixDependencies(data, null);
-    if (dependencyChangesDetected) {
-      await writeTaskData(tasksPath, data);
-    }
-
-    // Generate task files
-    log('info', `Generating individual task files... (taskLength: ${data.tasks.length})`);
-    data.tasks.forEach(task => {
-      const taskPath = path.join(outputDir, `task_${task.id.toString().padStart(3, '0')}.txt`);
-
-      // Format the content
-      let content = `# Task ID: ${task.id}\n`;
-      content += `# Title: ${task.title}\n`;
-
-      // Add Chinese translation for title if enabled and available
-      if (CONFIG.useChinese && task.titleTrans) {
-        content += `# TitleTrans: ${task.titleTrans}\n`;
-      }
-
-      content += `# Status: ${task.status || 'pending'}\n`;
-
-      // Format dependencies with their status
-      if (task.dependencies && task.dependencies.length > 0) {
-        content += `# Dependencies: ${formatDependenciesWithStatus(task.dependencies, data.tasks, false)}\n`;
-      } else {
-        content += '# Dependencies: None\n';
-      }
-
-      content += `# Priority: ${task.priority || 'medium'}\n`;
-      content += `# Description: ${task.description || ''}\n`;
-
-      // Add Chinese translation for description if enabled and available
-      if (CONFIG.useChinese && task.descriptionTrans) {
-        content += `# DescriptionTrans: ${task.descriptionTrans}\n`;
-      }
-
-      // Add more detailed sections
-      content += '# Details:\n';
-      content += (task.details || '').split('\n').map(line => line).join('\n');
-      content += '\n\n';
-
-      // Add Chinese translation for details if enabled and available
-      if (CONFIG.useChinese && task.detailsTrans) {
-        content += '# DetailsTrans:\n';
-        content += (task.detailsTrans || '').split('\n').map(line => line).join('\n');
-        content += '\n\n';
-      }
-
-      content += '# Test Strategy:\n';
-      content += (task.testStrategy || '').split('\n').map(line => line).join('\n');
-      content += '\n';
-
-      // Add Chinese translation for test strategy if enabled and available
-      if (CONFIG.useChinese && task.testStrategyTrans) {
-        content += '# Test Strategy Trans:\n';
-        content += (task.testStrategyTrans || '').split('\n').map(line => line).join('\n');
-        content += '\n';
-      }
-
-      // Add subtasks if they exist
-      if (task.subtasks && task.subtasks.length > 0) {
-        content += '\n# Subtasks:\n';
-
-        task.subtasks.forEach(subtask => {
-          // 使用统一格式: 父任务ID.子任务ID
-          const subTaskId = `${task.id}.${subtask.id}`;
-
-          // 新的格式化方式，明确显示ID和Title字段
-          content += `## Sub Task ID: ${subTaskId}\n`;
-          content += `## Title: ${subtask.title}\n`;
-
-          // Add Chinese translation for subtask title if enabled and available
-          if (CONFIG.useChinese && subtask.titleTrans) {
-            content += `## TitleTrans: ${subtask.titleTrans}\n`;
-          }
-
-          content += `## Status: ${subtask.status || 'pending'}\n`;
-
-          if (subtask.dependencies && subtask.dependencies.length > 0) {
-            // Format subtask dependencies
-            let subtaskDeps = subtask.dependencies.map(depId => {
-              if (typeof depId === 'number') {
-                // Handle numeric dependencies to other subtasks
-                const foundSubtask = task.subtasks.find(st => st.id === depId);
-                if (foundSubtask) {
-                  // Just return the plain ID format without any color formatting
-                  return `${task.id}.${depId}`;
-                }
-              }
-              return depId.toString();
-            }).join(', ');
-
-            content += `### Dependencies: ${subtaskDeps}\n`;
-          } else {
-            content += '### Dependencies: None\n';
-          }
-
-          content += `### Description: ${subtask.description || ''}\n`;
-
-          // Add Chinese translation for subtask description if enabled and available
-          if (CONFIG.useChinese && subtask.descriptionTrans) {
-            content += `### DescriptionTrans: ${subtask.descriptionTrans}\n`;
-          }
-
-          content += '### Details:\n';
-          content += (subtask.details || '').split('\n').map(line => line).join('\n');
-          content += '\n\n';
-
-          // Add Chinese translation for subtask details if enabled and available
-          if (CONFIG.useChinese && subtask.detailsTrans) {
-            content += '### DetailsTrans:\n';
-            content += (subtask.detailsTrans || '').split('\n').map(line => line).join('\n');
-            content += '\n\n';
-          }
-
-          // Add test strategy for subtask if available
-          if (subtask.testStrategy) {
-            content += '### Test Strategy:\n';
-            content += (subtask.testStrategy || '').split('\n').map(line => line).join('\n');
-            content += '\n\n';
-
-            // Add Chinese translation for test strategy if enabled and available
-            if (CONFIG.useChinese && subtask.testStrategyTrans) {
-              content += '### Test Strategy Trans:\n';
-              content += (subtask.testStrategyTrans || '').split('\n').map(line => line).join('\n');
-              content += '\n\n';
-            }
-          }
-        });
-      }
-
-      // Write the file
-      fs.writeFileSync(taskPath, content);
-      log('info', `Generated: task_${task.id.toString().padStart(3, '0')}.txt`);
-    });
-
-    log('info', `All ${data.tasks.length} tasks have been generated into '${outputDir}'.`);
-  } catch (error) {
-    log('error', `Error generating task files: ${error.message}`);
-    console.error(chalk.red(`Error generating task files: ${error.message}`));
-
-    if (CONFIG.debug) {
-      console.error(error);
-    }
-
-    process.exit(1);
   }
 }
 
@@ -631,10 +454,6 @@ async function setTaskStatus(tasksPath, taskIdInput, newStatus) {
     // Validate dependencies after status update
     log('info', 'Validating dependencies after status update...');
     validateTaskDependencies(data.tasks);
-
-    // Generate individual task files
-    log('info', 'Regenerating task files...');
-    await generateTaskFiles(tasksPath, path.dirname(tasksPath));
 
     // Display success message
     for (const id of updatedTasks) {
@@ -1357,9 +1176,6 @@ async function expandTask(taskId, numSubtasks = CONFIG.defaultSubtasks, useResea
     // Write the updated tasks to the file
     await writeTaskData(tasksPath, data);
 
-    // Generate individual task files
-    await generateTaskFiles(tasksPath, path.dirname(tasksPath));
-
     // Display success message
     console.log(boxen(
       chalk.green(`Successfully added ${subtasks.length} subtasks to task ${taskId}`),
@@ -1655,10 +1471,6 @@ async function clearSubtasks(tasksPath, taskIds) {
       { padding: { left: 2, right: 2, top: 0, bottom: 0 }, margin: { top: 1, bottom: 0 }, borderColor: 'blue', borderStyle: 'round' }
     ));
     console.log(summaryTable.toString());
-
-    // Regenerate task files to reflect changes
-    log('info', "Regenerating task files...");
-    await generateTaskFiles(tasksPath, path.dirname(tasksPath));
 
     // Success message
     console.log(boxen(
@@ -2595,12 +2407,6 @@ async function addSubtask(tasksPath, parentId, existingTaskId = null, newSubtask
     // Write the updated tasks back to the file
     await writeTaskData(tasksPath, data);
 
-    // Generate task files if requested
-    if (generateFiles) {
-      log('info', 'Regenerating task files...');
-      await generateTaskFiles(tasksPath, path.dirname(tasksPath));
-    }
-
     return newSubtask;
   } catch (error) {
     log('error', `Error adding subtask: ${error.message}`);
@@ -2741,12 +2547,6 @@ async function removeSubtask(tasksPath, subtaskId, convertToTask = false, genera
     // Write the updated tasks back to the file
     await writeTaskData(tasksPath, data);
 
-    // Generate task files if requested
-    if (generateFiles) {
-      log('info', 'Regenerating task files...');
-      await generateTaskFiles(tasksPath, path.dirname(tasksPath));
-    }
-
     return convertedTask;
   } catch (error) {
     log('error', `Error removing subtask: ${error.message}`);
@@ -2758,11 +2558,11 @@ async function removeSubtask(tasksPath, subtaskId, convertToTask = false, genera
 export {
   parsePRD,
   updateTasks,
-  generateTaskFiles,
   setTaskStatus,
   updateSingleTaskStatus,
   listTasks,
   expandTask,
+  expandTaskAsync,
   expandAllTasks,
   clearSubtasks,
   addTask,
@@ -2771,3 +2571,155 @@ export {
   findNextTask,
   analyzeTaskComplexity,
 };
+
+/**
+ * 异步拆分任务为子任务
+ * 创建消息记录并启动后台任务，立即返回消息ID
+ * @param {number} taskId - 任务ID
+ * @param {object} options - 选项
+ * @param {number} [options.numSubtasks] - 子任务数量
+ * @param {boolean} [options.useResearch] - 是否使用研究增强
+ * @param {string} [options.additionalContext] - 额外上下文
+ * @param {string} [options.knowledgeBasePath] - 知识库路径
+ * @returns {Promise<{messageId: number}>} 消息ID
+ */
+async function expandTaskAsync(taskId, options = {}) {
+  const { numSubtasks = CONFIG.defaultSubtasks, useResearch = false, additionalContext = '', knowledgeBasePath = null } = options;
+  const tasksPath = path.join(process.cwd(), 'tasks', 'tasks.json');
+
+  // 加载任务数据
+  const data = await readTaskData(tasksPath);
+  if (!data || !data.tasks) {
+    throw new Error('No valid tasks found');
+  }
+
+  // 查找任务
+  const task = data.tasks.find(t => t.id === taskId);
+  if (!task) {
+    throw new Error(`Task ${taskId} not found`);
+  }
+
+  // 检查任务是否已完成
+  if (task.status === 'done' || task.status === 'completed') {
+    throw new Error(`Task ${taskId} is already completed`);
+  }
+
+  // 检查是否正在拆分中
+  if (task.isExpanding) {
+    throw new Error(`Task ${taskId} is already being expanded`);
+  }
+
+  // 创建消息记录
+  const message = await createMessage(taskId, 'expand_task', `拆分任务 #${taskId} - ${task.title}`);
+
+  // 设置任务为拆分中状态
+  await setTaskExpanding(taskId, true, message.id);
+
+  // 启动后台任务（不等待完成）
+  expandTaskInBackground(taskId, {
+    numSubtasks,
+    useResearch,
+    additionalContext,
+    knowledgeBasePath,
+    messageId: message.id,
+    tasksPath
+  }).catch(error => {
+    log('error', `Background expand task failed: ${error.message}`);
+  });
+
+  return { messageId: message.id };
+}
+
+/**
+ * 后台执行拆分任务
+ * @param {number} taskId - 任务ID
+ * @param {object} options - 选项
+ */
+async function expandTaskInBackground(taskId, options) {
+  const { numSubtasks, useResearch, additionalContext, knowledgeBasePath, messageId, tasksPath } = options;
+
+  try {
+    // 更新消息状态为处理中
+    await updateMessageStatus(messageId, 'processing', { content: '正在生成子任务...' });
+
+    // 重新加载数据
+    const data = await readTaskData(tasksPath);
+    if (!data || !data.tasks) {
+      throw new Error('No valid tasks found');
+    }
+
+    const task = data.tasks.find(t => t.id === taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+
+    // 处理知识库
+    let knowledgeBase = null;
+    const actualKnowledgeBasePath = knowledgeBasePath || data.metadata?.knowledgeBasePath;
+    if (actualKnowledgeBasePath && fs.existsSync(actualKnowledgeBasePath)) {
+      knowledgeBase = readKnowledgeBase(actualKnowledgeBasePath);
+    }
+
+    // 检查复杂度报告
+    const complexityReport = readComplexityReport();
+    let taskAnalysis = null;
+    let actualNumSubtasks = numSubtasks;
+    let actualAdditionalContext = additionalContext;
+
+    if (complexityReport) {
+      taskAnalysis = findTaskInComplexityReport(complexityReport, taskId);
+      if (taskAnalysis) {
+        if (taskAnalysis.recommendedSubtasks && numSubtasks === CONFIG.defaultSubtasks) {
+          actualNumSubtasks = taskAnalysis.recommendedSubtasks;
+        }
+        if (taskAnalysis.expansionPrompt && !additionalContext) {
+          actualAdditionalContext = taskAnalysis.expansionPrompt;
+        }
+      }
+    }
+
+    // 初始化子任务数组
+    if (!task.subtasks) {
+      task.subtasks = [];
+    }
+
+    // 确定下一个子任务ID
+    const nextSubtaskId = task.subtasks.length > 0
+      ? Math.max(...task.subtasks.map(st => st.id)) + 1
+      : 1;
+
+    // 生成子任务
+    let subtasks;
+    if (useResearch) {
+      subtasks = await generateSubtasksWithPerplexity(task, actualNumSubtasks, nextSubtaskId, actualAdditionalContext, knowledgeBase);
+    } else {
+      subtasks = await generateSubtasks(task, actualNumSubtasks, nextSubtaskId, actualAdditionalContext, knowledgeBase);
+    }
+
+    // 添加子任务到任务
+    task.subtasks = [...task.subtasks, ...subtasks];
+
+    // 保存更新后的任务
+    await writeTaskData(tasksPath, data);
+
+    // 更新消息状态为成功
+    const resultSummary = `成功生成 ${subtasks.length} 个子任务`;
+    await updateMessageStatus(messageId, 'success', {
+      content: `任务 #${taskId} 拆分完成，生成了 ${subtasks.length} 个子任务`,
+      resultSummary
+    });
+
+    log('info', `Task ${taskId} expanded successfully with ${subtasks.length} subtasks`);
+  } catch (error) {
+    log('error', `Failed to expand task ${taskId}: ${error.message}`);
+
+    // 更新消息状态为失败
+    await updateMessageStatus(messageId, 'failed', {
+      content: '拆分任务失败',
+      errorMessage: error.message
+    });
+  } finally {
+    // 清除任务拆分状态
+    await setTaskExpanding(taskId, false, null);
+  }
+}

@@ -8,19 +8,17 @@ import chalk from 'chalk';
 import boxen from 'boxen';
 import { Anthropic } from '@anthropic-ai/sdk';
 
-import { 
-    log, 
-    writeJSON, 
+import {
+    log,
+    writeJSON,
     taskExists,
     formatTaskId,
     findCycles
   } from './utils.js';
-import { readTaskData, writeTaskData, getTaskStorageMode } from './task-storage.js';
-  
+import { readTaskData, writeTaskData } from './task-storage.js';
+
 import { displayBanner } from './ui.js';
 
-import { generateTaskFiles } from './task-manager.js';
-  
 // Initialize Anthropic client
 const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -141,11 +139,6 @@ async function addDependency(tasksPath, taskId, dependencyId) {
         `Task ${chalk.bold(formattedTaskId)} now depends on ${chalk.bold(formattedDependencyId)}`,
         { padding: 1, borderColor: 'green', borderStyle: 'round', margin: { top: 1 } }
       ));
-      
-      // Generate updated task files
-      await generateTaskFiles(tasksPath, 'tasks');
-      
-      log('info', 'Task files regenerated with updated dependencies.');
     } else {
       log('error', `Cannot add dependency ${formattedDependencyId} to task ${formattedTaskId} as it would create a circular dependency.`);
       process.exit(1);
@@ -255,11 +248,8 @@ async function addDependency(tasksPath, taskId, dependencyId) {
       `Task ${chalk.bold(formattedTaskId)} no longer depends on ${chalk.bold(formattedDependencyId)}`,
       { padding: 1, borderColor: 'green', borderStyle: 'round', margin: { top: 1 } }
     ));
-    
-    // Regenerate task files
-    await generateTaskFiles(tasksPath, 'tasks');
   }
-  
+
   /**
    * Check if adding a dependency would create a circular dependency
    * @param {Array} tasks - Array of all tasks
@@ -518,10 +508,6 @@ async function addDependency(tasksPath, taskId, dependencyId) {
             console.log(`  ${warning}`);
           });
         }
-        
-        // Regenerate task files to reflect the changes
-        await generateTaskFiles(tasksPath, path.dirname(tasksPath));
-        log('info', 'Task files regenerated to reflect dependency changes');
       } else {
         log('success', 'No invalid dependencies found - all dependencies are valid');
         
@@ -851,10 +837,6 @@ async function addDependency(tasksPath, taskId, dependencyId) {
         // Save the changes
         await writeTaskData(tasksPath, data);
         log('success', 'Fixed dependency issues in tasks.json');
-        
-        // Regenerate task files
-        log('info', 'Regenerating task files to reflect dependency changes...');
-        await generateTaskFiles(tasksPath, path.dirname(tasksPath));
       } else {
         log('info', 'No changes needed to fix dependencies');
       }
@@ -1016,17 +998,7 @@ async function addDependency(tasksPath, taskId, dependencyId) {
     
     // Check if any changes were made by comparing with original data
     const changesDetected = JSON.stringify(tasksData) !== JSON.stringify(originalData);
-    
-    // Save changes if needed
-    if (tasksPath && changesDetected && getTaskStorageMode() === 'file') {
-      try {
-        writeJSON(tasksPath, tasksData);
-        log('debug', 'Saved dependency fixes to tasks.json');
-      } catch (error) {
-        log('error', 'Failed to save dependency fixes to tasks.json', error);
-      }
-    }
-    
+
     return changesDetected;
   }
   

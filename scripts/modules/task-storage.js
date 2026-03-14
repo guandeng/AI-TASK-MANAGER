@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 
 // 按优先级尝试加载 .env 文件
 const envPaths = [
-  path.resolve(process.cwd(), '.env'),           // 当前工���目录
+  path.resolve(process.cwd(), '.env'),           // 当前工目录
   path.resolve(__dirname, '../../.env'),         // scripts/modules/../../.env = 项目根目录
   path.resolve(__dirname, '../../../.env')       // 备选路径
 ];
@@ -37,7 +37,6 @@ for (const [key, value] of Object.entries(mergedEnvConfig)) {
   }
 }
 
-const STORAGE_MODE = (process.env.TASK_STORAGE || 'db').toLowerCase();
 const DB_CONNECTION = (process.env.DB_CONNECTION || 'mysql').toLowerCase();
 const TABLE_PREFIX = (process.env.DB_TABLE_PREFIX || 'task_').replace(/[^a-zA-Z0-9_]/g, '') || 'task_';
 const TASK_TABLE = `${TABLE_PREFIX}task`;
@@ -50,10 +49,6 @@ let writePool = null;
 let readPools = [];
 let initPromise = null;
 let readPoolIndex = 0;
-
-function useDatabaseStorage() {
-  return STORAGE_MODE !== 'file';
-}
 
 function parseSlaveHosts() {
   return (process.env.DB_HOST_SLAVE || '')
@@ -115,10 +110,6 @@ function normalizeSubtaskDependency(taskId, depId) {
 }
 
 async function ensureDbReady() {
-  if (!useDatabaseStorage()) {
-    return;
-  }
-
   if (initPromise) {
     await initPromise;
     return;
@@ -130,7 +121,24 @@ async function ensureDbReady() {
     }
 
     if (!process.env.DB_HOST || !process.env.DB_DATABASE || !process.env.DB_USERNAME) {
-      throw new Error('Missing MySQL configuration. Please set DB_HOST, DB_DATABASE and DB_USERNAME.');
+      console.error(`
+╔════════════════════════════════════════════════════════════════╗
+║                    数据库未配置                                  ║
+╠════════════════════════════════════════════════════════════════╣
+║  请在 .env 文件中配置以下数据库连接信息：                          ║
+║                                                                ║
+║  DB_HOST=localhost         # 数据库主机地址                      ║
+║  DB_PORT=3306              # 数据库端口                          ║
+║  DB_DATABASE=task_manager  # 数据库名称                          ║
+║  DB_USERNAME=root          # 数据库用户名                        ║
+║  DB_PASSWORD=password      # 数据库密码                          ║
+║                                                                ║
+║  可选配置：                                                     ║
+║  DB_HOST_SLAVE=slave1,slave2  # 从库地址（读写分离）              ║
+║  DB_TABLE_PREFIX=task_        # 表名前缀                         ║
+╚════════════════════════════════════════════════════════════════╝
+      `);
+      throw new Error('数据库未配置，请先在 .env 文件中设置 DB_HOST, DB_DATABASE, DB_USERNAME 等环境变量');
     }
 
     writePool = mysql.createPool(getDbConfig(process.env.DB_HOST));
@@ -181,6 +189,20 @@ async function ensureDbReady() {
       await writePool.query(`
         ALTER TABLE \`${TASK_TABLE}\`
         DROP COLUMN \`requirement\`
+      `);
+    }
+
+    // 添加 is_expanding 和 expand_message_id 字段
+    const [isExpandingColumns] = await writePool.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = 'is_expanding'
+    `, [process.env.DB_DATABASE, TASK_TABLE]);
+
+    if (isExpandingColumns.length === 0) {
+      await writePool.query(`
+        ALTER TABLE \`${TASK_TABLE}\`
+        ADD COLUMN \`is_expanding\` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否正在AI拆分子任务中',
+        ADD COLUMN \`expand_message_id\` BIGINT UNSIGNED DEFAULT NULL COMMENT '关联的消息ID'
       `);
     }
 
@@ -351,6 +373,8 @@ async function readTaskDataFromDb(tasksPath) {
     testStrategy: row.test_strategy || '',
     testStrategyTrans: row.test_strategy_trans || undefined,
     assignee: row.assignee || undefined,
+    isExpanding: Boolean(row.is_expanding),
+    expandMessageId: row.expand_message_id == null ? undefined : Number(row.expand_message_id),
     dependencies: [],
     subtasks: []
   }));
@@ -423,29 +447,11 @@ async function readTaskDataFromDb(tasksPath) {
 }
 
 export async function readTaskData(tasksPath = 'tasks/tasks.json') {
-  if (!useDatabaseStorage()) {
-    if (!fs.existsSync(tasksPath)) {
-      return null;
-    }
-
-    return JSON.parse(fs.readFileSync(tasksPath, 'utf8'));
-  }
-
   await ensureDbReady();
   return await readTaskDataFromDb(tasksPath);
 }
 
 export async function writeTaskData(tasksPath = 'tasks/tasks.json', data) {
-  if (!useDatabaseStorage()) {
-    const dir = path.dirname(tasksPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    fs.writeFileSync(tasksPath, JSON.stringify(data, null, 2));
-    return;
-  }
-
   await ensureDbReady();
 
   const connection = await writePool.getConnection();
@@ -588,17 +594,13 @@ export async function writeTaskData(tasksPath = 'tasks/tasks.json', data) {
 }
 
 export async function taskDataExists(tasksPath = 'tasks/tasks.json') {
-  if (!useDatabaseStorage()) {
-    return fs.existsSync(tasksPath);
+  try {
+    await ensureDbReady();
+    // 表存在即可，不需要有数据
+    return true;
+  } catch (error) {
+    return false;
   }
-
-  await ensureDbReady();
-
-  const [rows] = await getReadPool().query(
-    `SELECT COUNT(*) AS total FROM \`${TASK_TABLE}\``
-  );
-
-  return Number(rows[0]?.total || 0) > 0 || fs.existsSync(tasksPath);
 }
 
 export async function closeTaskStorage() {
@@ -611,5 +613,113 @@ export async function closeTaskStorage() {
 }
 
 export function getTaskStorageMode() {
-  return useDatabaseStorage() ? 'db' : 'file';
+  return 'db';
+}
+
+/**
+ * 设置任务拆分状态
+ * @param {number} taskId - 任务ID
+ * @param {boolean} isExpanding - 是否正在拆分
+ * @param {number|null} messageId - 关联的消息ID
+ */
+export async function setTaskExpanding(taskId, isExpanding, messageId = null) {
+  await ensureDbReady();
+
+  await writePool.query(
+    `UPDATE \`${TASK_TABLE}\` SET is_expanding = ?, expand_message_id = ? WHERE id = ?`,
+    [isExpanding ? 1 : 0, messageId, taskId]
+  );
+}
+
+/**
+ * 获取单个任务的详情
+ * @param {number} taskId - 任务ID
+ * @returns {Promise<object|null>}
+ */
+export async function getTaskById(taskId) {
+  await ensureDbReady();
+
+  const [rows] = await getReadPool().query(
+    `SELECT * FROM \`${TASK_TABLE}\` WHERE id = ?`,
+    [taskId]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const row = rows[0];
+  const task = {
+    id: Number(row.id),
+    requirementId: row.requirement_id == null ? undefined : Number(row.requirement_id),
+    title: row.title,
+    titleTrans: row.title_trans || undefined,
+    description: row.description || '',
+    descriptionTrans: row.description_trans || undefined,
+    status: row.status,
+    priority: row.priority,
+    details: row.details || '',
+    detailsTrans: row.details_trans || undefined,
+    testStrategy: row.test_strategy || '',
+    testStrategyTrans: row.test_strategy_trans || undefined,
+    assignee: row.assignee || undefined,
+    isExpanding: Boolean(row.is_expanding),
+    expandMessageId: row.expand_message_id == null ? undefined : Number(row.expand_message_id),
+    dependencies: [],
+    subtasks: []
+  };
+
+  // 获取依赖
+  const [depRows] = await getReadPool().query(
+    `SELECT depends_on_task_id FROM \`${TASK_DEPENDENCY_TABLE}\` WHERE task_id = ? ORDER BY depends_on_task_id ASC`,
+    [taskId]
+  );
+  task.dependencies = depRows.map(r => Number(r.depends_on_task_id));
+
+  // 获取子任务
+  const [subtaskRows] = await getReadPool().query(
+    `SELECT * FROM \`${SUBTASK_TABLE}\` WHERE task_id = ? ORDER BY sort_order ASC, id ASC`,
+    [taskId]
+  );
+
+  const subtaskDbIds = subtaskRows.map(r => Number(r.id));
+
+  for (const stRow of subtaskRows) {
+    const exposedSubtaskId = Number(stRow.sort_order) || Number(stRow.id);
+    const subtask = {
+      id: exposedSubtaskId,
+      title: stRow.title,
+      titleTrans: stRow.title_trans || undefined,
+      description: stRow.description || '',
+      descriptionTrans: stRow.description_trans || undefined,
+      details: stRow.details || '',
+      detailsTrans: stRow.details_trans || undefined,
+      status: stRow.status,
+      dependencies: []
+    };
+
+    // 获取子任务依赖
+    if (subtaskDbIds.length > 0) {
+      const [subDepRows] = await getReadPool().query(
+        `SELECT sd.subtask_id, sd.depends_on_subtask_id
+         FROM \`${SUBTASK_DEPENDENCY_TABLE}\` sd
+         WHERE sd.subtask_id = ?
+         ORDER BY sd.depends_on_subtask_id ASC`,
+        [stRow.id]
+      );
+
+      for (const depRow of subDepRows) {
+        // 找到依赖的子任务对应的 exposed id
+        const depSubtaskRow = subtaskRows.find(r => Number(r.id) === Number(depRow.depends_on_subtask_id));
+        if (depSubtaskRow) {
+          const depExposedId = Number(depSubtaskRow.sort_order) || Number(depSubtaskRow.id);
+          subtask.dependencies.push(depExposedId);
+        }
+      }
+    }
+
+    task.subtasks.push(subtask);
+  }
+
+  return task;
 }

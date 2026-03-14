@@ -63,3 +63,13 @@ export function copyTask(taskId: number) {
     timeout: 60 * 1000 // 1 分钟超时
   });
 }
+
+// 异步拆分子任务 - 立即返回消息ID
+export function expandTaskAsync(id: number, data?: { prompt?: string; additionalContext?: string }) {
+  return request<{ messageId: number }>({
+    url: `${API_BASE}/tasks/${id}/expand-async`,
+    method: 'POST',
+    data,
+    timeout: 300 * 1000 // 5 分钟超时
+  });
+}

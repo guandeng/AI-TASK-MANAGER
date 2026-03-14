@@ -562,6 +562,68 @@ export async function startWebServer(options = {}) {
     }
   });
 
+  // Reorder subtasks
+  app.post('/api/tasks/:taskId/subtasks/reorder', async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const { subtaskIds } = req.body;
+
+      if (!Array.isArray(subtaskIds)) {
+        return res.status(400).json({ error: 'subtaskIds must be an array' });
+      }
+
+      const data = await readTaskData(tasksPath);
+      if (!data || !data.tasks) {
+        return res.status(404).json({ error: 'Tasks file not found' });
+      }
+
+      const task = data.tasks.find(t => t.id === taskId);
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      if (!task.subtasks || !Array.isArray(task.subtasks)) {
+        return res.status(404).json({ error: 'Task has no subtasks' });
+      }
+
+      // Create a map of subtasks by id
+      const subtaskMap = new Map(task.subtasks.map(st => [st.id, st]));
+
+      // Reorder subtasks based on the provided order
+      const reorderedSubtasks = subtaskIds
+        .map(id => subtaskMap.get(id))
+        .filter(st => st !== undefined);
+
+      // If some subtasks were not included, append them at the end
+      const reorderedIds = new Set(subtaskIds);
+      const remainingSubtasks = task.subtasks.filter(st => !reorderedIds.has(st.id));
+      task.subtasks = [...reorderedSubtasks, ...remainingSubtasks];
+
+      await writeTaskData(tasksPath, data);
+
+      // Return localized task
+      const localizedTask = JSON.parse(JSON.stringify(task));
+      if (localizedTask.titleTrans) localizedTask.title = localizedTask.titleTrans;
+      if (localizedTask.descriptionTrans) localizedTask.description = localizedTask.descriptionTrans;
+      if (localizedTask.detailsTrans) localizedTask.details = localizedTask.detailsTrans;
+      if (localizedTask.testStrategyTrans) localizedTask.testStrategy = localizedTask.testStrategyTrans;
+
+      if (localizedTask.subtasks && localizedTask.subtasks.length > 0) {
+        localizedTask.subtasks = localizedTask.subtasks.map(subtask => {
+          const subtaskCopy = { ...subtask };
+          if (subtaskCopy.titleTrans) subtaskCopy.title = subtaskCopy.titleTrans;
+          if (subtaskCopy.descriptionTrans) subtaskCopy.description = subtaskCopy.descriptionTrans;
+          return subtaskCopy;
+        });
+      }
+
+      res.json(localizedTask);
+    } catch (error) {
+      log('error', `Error reordering subtasks: ${error.message}`);
+      res.status(500).json({ error: 'Failed to reorder subtasks' });
+    }
+  });
+
   app.delete('/api/tasks/:taskId/subtasks/:subtaskId', async (req, res) => {
     try {
       const taskId = parseInt(req.params.taskId, 10);
@@ -775,6 +837,62 @@ Keep the same subtask ID (${subtaskId}) and maintain any existing dependencies.`
     } catch (error) {
       log('error', `Error expanding task: ${error.message}`);
       res.status(500).json({ error: 'Failed to expand task' });
+    }
+  });
+
+  // 异步拆分子任务 - 立即返回消息ID，后台处理
+  app.post('/api/tasks/:taskId/expand-async', async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const additionalContext = req.body?.prompt || req.body?.additionalContext || '';
+      const knowledgeBasePath = req.body?.knowledgeBasePath || null;
+
+      const data = await readTaskData(tasksPath);
+      if (!data || !data.tasks) {
+        return res.status(404).json({ error: 'Tasks file not found' });
+      }
+
+      const task = data.tasks.find(t => t.id === taskId);
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // 创建消息记录
+      const { createMessage, updateMessageStatus } = await import('../modules/message-storage.js');
+      const message = await createMessage(taskId, 'expand_task', `拆分任务: ${task.titleTrans || task.title}`);
+
+      // 立即返回消息ID
+      res.json({ messageId: message.id, status: 'pending' });
+
+      // 后台异步处理
+      (async () => {
+        try {
+          // 更新消息状态为处理中
+          await updateMessageStatus(message.id, 'processing', {
+            content: '正在拆分任务...'
+          });
+
+          // 执行拆分
+          await expandTask(taskId, null, false, additionalContext, knowledgeBasePath, tasksPath, false);
+
+          // 更新消息状态为成功
+          await updateMessageStatus(message.id, 'success', {
+            resultSummary: '任务拆分完成'
+          });
+
+          log('info', `Async task expansion completed: task ${taskId}, message ${message.id}`);
+        } catch (error) {
+          log('error', `Async task expansion failed: ${error.message}`);
+          // 更新消息状态为失败
+          await updateMessageStatus(message.id, 'failed', {
+            errorMessage: error.message || '拆分任务失败'
+          });
+        }
+      })();
+
+    } catch (error) {
+      log('error', `Error starting async task expansion: ${error.message}`);
+      res.status(500).json({ error: 'Failed to start async task expansion' });
     }
   });
 
@@ -1246,14 +1364,608 @@ Keep the same subtask ID (${subtaskId}) and maintain any existing dependencies.`
     }
   });
 
-  // 非 API 路由不再提供旧静态页面
-  app.get('*', (req, res) => {
-    if (req.path.startsWith('/api/')) {
-      return res.status(404).json({ error: 'API endpoint not found' });
-    }
+  // ========================================
+  // 成员管理 API 端点
+  // ========================================
 
-    res.status(404).json({ error: 'Route not found' });
+  // 获取成员列表
+  app.get('/api/members', async (req, res) => {
+    try {
+      const { status, department, role, search, page, pageSize } = req.query;
+      const filters = {};
+      if (status) filters.status = status;
+      if (department) filters.department = department;
+      if (role) filters.role = role;
+      if (search) filters.search = search;
+
+      const { listMembersWithPaging, listMembers } = await import('../modules/member-manager.js');
+
+      if (page || pageSize) {
+        const result = await listMembersWithPaging({
+          page: page ? parseInt(page, 10) : 1,
+          pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+          filters
+        });
+        res.json(result);
+      } else {
+        const members = await listMembers(filters);
+        res.json(members);
+      }
+    } catch (error) {
+      log('error', `Error fetching members: ${error.message}`);
+      res.status(500).json({ error: 'Failed to fetch members' });
+    }
   });
+
+  // 获取单个成员
+  app.get('/api/members/:id', async (req, res) => {
+    try {
+      const { getMember } = await import('../modules/member-manager.js');
+      const member = await getMember(parseInt(req.params.id, 10));
+      if (!member) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+      res.json(member);
+    } catch (error) {
+      log('error', `Error fetching member: ${error.message}`);
+      res.status(500).json({ error: 'Failed to fetch member' });
+    }
+  });
+
+  // 创建成员
+  app.post('/api/members', async (req, res) => {
+    try {
+      const { createNewMember } = await import('../modules/member-manager.js');
+      const member = await createNewMember(req.body);
+      res.status(201).json(member);
+    } catch (error) {
+      log('error', `Error creating member: ${error.message}`);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // 更新成员
+  app.put('/api/members/:id', async (req, res) => {
+    try {
+      const { updateMemberById } = await import('../modules/member-manager.js');
+      const member = await updateMemberById(parseInt(req.params.id, 10), req.body);
+      if (!member) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+      res.json(member);
+    } catch (error) {
+      log('error', `Error updating member: ${error.message}`);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // 删除成员
+  app.delete('/api/members/:id', async (req, res) => {
+    try {
+      const { deleteMemberById } = await import('../modules/member-manager.js');
+      const success = await deleteMemberById(parseInt(req.params.id, 10));
+      if (!success) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      log('error', `Error deleting member: ${error.message}`);
+      res.status(500).json({ error: 'Failed to delete member' });
+    }
+  });
+
+  // ============ 活动日志 API ============
+
+  // 获取任务活动日志
+  app.get('/api/tasks/:taskId/activities', async (req, res) => {
+    try {
+      const { getTaskActivities } = await import('../modules/activity-storage.js');
+      const taskId = parseInt(req.params.taskId, 10);
+      const options = {
+        subtaskId: req.query.subtaskId ? parseInt(req.query.subtaskId, 10) : undefined,
+        action: req.query.action,
+        limit: req.query.limit ? parseInt(req.query.limit, 10) : 50
+      };
+      const activities = await getTaskActivities(taskId, options);
+      res.json(activities);
+    } catch (error) {
+      log('error', `Error fetching task activities: ${error.message}`);
+      res.status(500).json({ error: 'Failed to fetch task activities' });
+    }
+  });
+
+  // 获取全局活动日志
+  app.get('/api/activities', async (req, res) => {
+    try {
+      const { getGlobalActivities } = await import('../modules/activity-storage.js');
+      const options = {
+        memberId: req.query.memberId ? parseInt(req.query.memberId, 10) : undefined,
+        action: req.query.action,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
+        limit: req.query.limit ? parseInt(req.query.limit, 10) : 50,
+        offset: req.query.offset ? parseInt(req.query.offset, 10) : 0
+      };
+      const activities = await getGlobalActivities(options);
+      res.json(activities);
+    } catch (error) {
+      log('error', `Error fetching global activities: ${error.message}`);
+      res.status(500).json({ error: 'Failed to fetch activities' });
+    }
+  });
+
+  // 获取活动统计
+  app.get('/api/activities/statistics', async (req, res) => {
+    try {
+      const { getActivityStatistics } = await import('../modules/activity-storage.js');
+      const options = {
+        startDate: req.query.startDate,
+        endDate: req.query.endDate
+      };
+      const statistics = await getActivityStatistics(options);
+      res.json(statistics);
+    } catch (error) {
+      log('error', `Error fetching activity statistics: ${error.message}`);
+      res.status(500).json({ error: 'Failed to fetch activity statistics' });
+    }
+  });
+
+  // ============ 菜单管理 API ============
+
+  // 获取菜单列表
+  app.get('/api/menus', async (req, res) => {
+    try {
+      const { getMenuList } = await import('../modules/menu-storage.js');
+      const menus = await getMenuList();
+      res.json({ menus });
+    } catch (error) {
+      log('error', `Error fetching menus: ${error.message}`);
+      res.status(500).json({ error: 'Failed to fetch menus' });
+    }
+  });
+
+  // 获取菜单树
+  app.get('/api/menus/tree', async (req, res) => {
+    try {
+      const { getMenuTree } = await import('../modules/menu-storage.js');
+      const menus = await getMenuTree();
+      res.json({ menus });
+    } catch (error) {
+      log('error', `Error fetching menu tree: ${error.message}`);
+      res.status(500).json({ error: 'Failed to fetch menu tree' });
+    }
+  });
+
+  // 获取单个菜单
+  app.get('/api/menus/:key', async (req, res) => {
+    try {
+      const { getMenuByKey } = await import('../modules/menu-storage.js');
+      const menu = await getMenuByKey(req.params.key);
+      if (!menu) {
+        return res.status(404).json({ error: 'Menu not found' });
+      }
+      res.json({ menu });
+    } catch (error) {
+      log('error', `Error fetching menu: ${error.message}`);
+      res.status(500).json({ error: 'Failed to fetch menu' });
+    }
+  });
+
+  // 创建菜单
+  app.post('/api/menus', async (req, res) => {
+    try {
+      const { createMenu } = await import('../modules/menu-storage.js');
+      const menu = await createMenu(req.body);
+      res.status(201).json({ success: true, message: 'Menu created successfully', menu });
+    } catch (error) {
+      log('error', `Error creating menu: ${error.message}`);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // 更新菜单
+  app.put('/api/menus/:key', async (req, res) => {
+    try {
+      const { updateMenuByKey } = await import('../modules/menu-storage.js');
+      const menu = await updateMenuByKey(req.params.key, req.body);
+      if (!menu) {
+        return res.status(404).json({ error: 'Menu not found' });
+      }
+      res.json({ success: true, message: 'Menu updated successfully', menu });
+    } catch (error) {
+      log('error', `Error updating menu: ${error.message}`);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // 删除菜单
+  app.delete('/api/menus/:key', async (req, res) => {
+    try {
+      const { deleteMenuByKey } = await import('../modules/menu-storage.js');
+      const success = await deleteMenuByKey(req.params.key);
+      if (!success) {
+        return res.status(404).json({ error: 'Menu not found' });
+      }
+      res.json({ success: true, message: 'Menu deleted successfully' });
+    } catch (error) {
+      log('error', `Error deleting menu: ${error.message}`);
+      res.status(500).json({ error: 'Failed to delete menu' });
+    }
+  });
+
+  // 批量删除菜单
+  app.post('/api/menus/batch-delete', async (req, res) => {
+    try {
+      const { batchDeleteMenus } = await import('../modules/menu-storage.js');
+      const result = await batchDeleteMenus(req.body.keys || []);
+      res.json(result);
+    } catch (error) {
+      log('error', `Error batch deleting menus: ${error.message}`);
+      res.status(500).json({ error: 'Failed to batch delete menus' });
+    }
+  });
+
+  // 更新菜单排序
+  app.put('/api/menus/reorder', async (req, res) => {
+    try {
+      const { reorderMenus } = await import('../modules/menu-storage.js');
+      await reorderMenus(req.body);
+      res.json({ success: true });
+    } catch (error) {
+      log('error', `Error reordering menus: ${error.message}`);
+      res.status(500).json({ error: 'Failed to reorder menus' });
+    }
+  });
+
+  // 移动菜单
+  app.put('/api/menus/:key/move', async (req, res) => {
+    try {
+      const { moveMenu } = await import('../modules/menu-storage.js');
+      const menu = await moveMenu(req.params.key, req.body.targetParentKey);
+      if (!menu) {
+        return res.status(404).json({ error: 'Menu not found' });
+      }
+      res.json({ success: true, message: 'Menu moved successfully', menu });
+    } catch (error) {
+      log('error', `Error moving menu: ${error.message}`);
+      res.status(500).json({ error: 'Failed to move menu' });
+    }
+  });
+
+  // 切换菜单启用状态
+  app.put('/api/menus/:key/toggle', async (req, res) => {
+    try {
+      const { toggleMenuEnabled } = await import('../modules/menu-storage.js');
+      const menu = await toggleMenuEnabled(req.params.key, req.body.enabled);
+      if (!menu) {
+        return res.status(404).json({ error: 'Menu not found' });
+      }
+      res.json({ success: true, message: 'Menu toggled successfully', menu });
+    } catch (error) {
+      log('error', `Error toggling menu: ${error.message}`);
+      res.status(500).json({ error: 'Failed to toggle menu' });
+    }
+  });
+
+  // ============ 消息管理 API ============
+
+  // 获取消息列表
+  app.get('/api/messages', async (req, res) => {
+    try {
+      const { getMessages } = await import('../modules/message-storage.js');
+      const options = {
+        taskId: req.query.taskId ? parseInt(req.query.taskId, 10) : undefined,
+        type: req.query.type,
+        status: req.query.status,
+        isRead: req.query.isRead === 'true' ? true : req.query.isRead === 'false' ? false : undefined,
+        limit: req.query.limit ? parseInt(req.query.limit, 10) : 50,
+        offset: req.query.offset ? parseInt(req.query.offset, 10) : 0
+      };
+      const messages = await getMessages(options);
+      res.json(messages);
+    } catch (error) {
+      log('error', `Error fetching messages: ${error.message}`);
+      res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+  });
+
+  // 获取未读消息数量
+  app.get('/api/messages/unread-count', async (req, res) => {
+    try {
+      const { getUnreadCount } = await import('../modules/message-storage.js');
+      const count = await getUnreadCount();
+      res.json({ count });
+    } catch (error) {
+      log('error', `Error fetching unread count: ${error.message}`);
+      res.status(500).json({ error: 'Failed to fetch unread count' });
+    }
+  });
+
+  // 标记消息为已读
+  app.put('/api/messages/:id/read', async (req, res) => {
+    try {
+      const { markAsRead } = await import('../modules/message-storage.js');
+      const success = await markAsRead(parseInt(req.params.id, 10));
+      if (!success) {
+        return res.status(404).json({ error: 'Message not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      log('error', `Error marking message as read: ${error.message}`);
+      res.status(500).json({ error: 'Failed to mark message as read' });
+    }
+  });
+
+  // 标记所有消息为已读
+  app.put('/api/messages/read-all', async (req, res) => {
+    try {
+      const { markAllAsRead } = await import('../modules/message-storage.js');
+      await markAllAsRead();
+      res.json({ success: true });
+    } catch (error) {
+      log('error', `Error marking all messages as read: ${error.message}`);
+      res.status(500).json({ error: 'Failed to mark all messages as read' });
+    }
+  });
+
+  // 删除消息
+  app.delete('/api/messages/:id', async (req, res) => {
+    try {
+      const { deleteMessage } = await import('../modules/message-storage.js');
+      const success = await deleteMessage(parseInt(req.params.id, 10));
+      if (!success) {
+        return res.status(404).json({ error: 'Message not found' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      log('error', `Error deleting message: ${error.message}`);
+      res.status(500).json({ error: 'Failed to delete message' });
+    }
+  });
+
+  // ========================================
+  // Assignment API Routes
+  // ========================================
+  const {
+    getTaskAssignments,
+    getSubtaskAssignments,
+    assignTaskToMember,
+    assignSubtaskToMember,
+    removeTaskAssignment,
+    removeSubtaskAssignment,
+    getMemberAssignments,
+    getMemberWorkload,
+    updateTaskTimeFields
+  } = await import('../modules/assignment-storage.js');
+
+  // 获取任务分配列表
+  app.get('/api/tasks/:id/assignments', async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id, 10);
+      const assignments = await getTaskAssignments(taskId);
+      res.json(assignments);
+    } catch (error) {
+      log('error', `Error getting task assignments: ${error.message}`);
+      res.status(500).json({ error: 'Failed to get task assignments' });
+    }
+  });
+
+  // 获取任务分配概览
+  app.get('/api/tasks/:id/assignments/overview', async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id, 10);
+      const assignments = await getTaskAssignments(taskId);
+
+      const overview = {
+        totalAssignees: assignments.length,
+        assignees: assignments.filter(a => a.role === 'assignee').map(a => a.member),
+        reviewers: assignments.filter(a => a.role === 'reviewer').map(a => a.member),
+        collaborators: assignments.filter(a => a.role === 'collaborator').map(a => a.member),
+        totalEstimatedHours: assignments.reduce((sum, a) => sum + (a.estimatedHours || 0), 0),
+        totalActualHours: assignments.reduce((sum, a) => sum + (a.actualHours || 0), 0)
+      };
+
+      res.json(overview);
+    } catch (error) {
+      log('error', `Error getting assignment overview: ${error.message}`);
+      res.status(500).json({ error: 'Failed to get assignment overview' });
+    }
+  });
+
+  // 分配任务给成员
+  app.post('/api/tasks/:id/assignments', async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id, 10);
+      const { memberId, role, assignedBy, estimatedHours, actualHours } = req.body;
+
+      if (!memberId) {
+        return res.status(400).json({ error: 'memberId is required' });
+      }
+
+      const assignments = await assignTaskToMember(taskId, memberId, {
+        role,
+        assignedBy,
+        estimatedHours,
+        actualHours
+      });
+
+      res.json(assignments);
+    } catch (error) {
+      log('error', `Error assigning task: ${error.message}`);
+      res.status(500).json({ error: error.message || 'Failed to assign task' });
+    }
+  });
+
+  // 移除任务分配
+  app.delete('/api/tasks/:taskId/assignments/:assignmentId', async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.taskId, 10);
+      const assignmentId = parseInt(req.params.assignmentId, 10);
+
+      const success = await removeTaskAssignment(taskId, assignmentId);
+
+      if (success) {
+        res.json({ success: true, message: 'Assignment removed successfully' });
+      } else {
+        res.status(404).json({ error: 'Assignment not found' });
+      }
+    } catch (error) {
+      log('error', `Error removing task assignment: ${error.message}`);
+      res.status(500).json({ error: 'Failed to remove task assignment' });
+    }
+  });
+
+  // 获取子任务分配列表
+  app.get('/api/tasks/:taskId/subtasks/:subtaskId/assignments', async (req, res) => {
+    try {
+      const subtaskId = parseInt(req.params.subtaskId, 10);
+      const assignments = await getSubtaskAssignments(subtaskId);
+      res.json(assignments);
+    } catch (error) {
+      log('error', `Error getting subtask assignments: ${error.message}`);
+      res.status(500).json({ error: 'Failed to get subtask assignments' });
+    }
+  });
+
+  // 分配子任务给成员
+  app.post('/api/tasks/:taskId/subtasks/:subtaskId/assignments', async (req, res) => {
+    try {
+      const subtaskId = parseInt(req.params.subtaskId, 10);
+      const { memberId, role, assignedBy, estimatedHours, actualHours } = req.body;
+
+      if (!memberId) {
+        return res.status(400).json({ error: 'memberId is required' });
+      }
+
+      const assignments = await assignSubtaskToMember(subtaskId, memberId, {
+        role,
+        assignedBy,
+        estimatedHours,
+        actualHours
+      });
+
+      res.json(assignments);
+    } catch (error) {
+      log('error', `Error assigning subtask: ${error.message}`);
+      res.status(500).json({ error: error.message || 'Failed to assign subtask' });
+    }
+  });
+
+  // 移除子任务分配
+  app.delete('/api/tasks/:taskId/subtasks/:subtaskId/assignments/:assignmentId', async (req, res) => {
+    try {
+      const subtaskId = parseInt(req.params.subtaskId, 10);
+      const assignmentId = parseInt(req.params.assignmentId, 10);
+
+      const success = await removeSubtaskAssignment(subtaskId, assignmentId);
+
+      if (success) {
+        res.json({ success: true, message: 'Assignment removed successfully' });
+      } else {
+        res.status(404).json({ error: 'Assignment not found' });
+      }
+    } catch (error) {
+      log('error', `Error removing subtask assignment: ${error.message}`);
+      res.status(500).json({ error: 'Failed to remove subtask assignment' });
+    }
+  });
+
+  // 获取成员任务分配列表
+  app.get('/api/members/:id/assignments', async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id, 10);
+      const { role, status, limit } = req.query;
+
+      const filters = {};
+      if (role) filters.role = role;
+      if (status) filters.status = status;
+      if (limit) filters.limit = parseInt(limit, 10);
+
+      const assignments = await getMemberAssignments(memberId, filters);
+      res.json(assignments);
+    } catch (error) {
+      log('error', `Error getting member assignments: ${error.message}`);
+      res.status(500).json({ error: 'Failed to get member assignments' });
+    }
+  });
+
+  // 获取成员工作量
+  app.get('/api/members/:id/workload', async (req, res) => {
+    try {
+      const memberId = parseInt(req.params.id, 10);
+      const workload = await getMemberWorkload(memberId);
+      res.json(workload);
+    } catch (error) {
+      log('error', `Error getting member workload: ${error.message}`);
+      res.status(500).json({ error: 'Failed to get member workload' });
+    }
+  });
+
+  // 更新任务时间信息
+  app.put('/api/tasks/:id/time', async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id, 10);
+      const { startDate, dueDate, completedAt, estimatedHours, actualHours } = req.body;
+
+      const success = await updateTaskTimeFields(taskId, {
+        startDate,
+        dueDate,
+        completedAt,
+        estimatedHours,
+        actualHours
+      });
+
+      if (success) {
+        res.json({ success: true, message: 'Task time info updated successfully' });
+      } else {
+        res.json({ success: true, message: 'No fields to update' });
+      }
+    } catch (error) {
+      log('error', `Error updating task time: ${error.message}`);
+      res.status(500).json({ error: 'Failed to update task time' });
+    }
+  });
+
+  // 提供前端静态文件
+  const frontendDistPath = path.join(__dirname, '../../frontend/dist');
+
+  // 检查前端构建目录是否存在
+  if (fs.existsSync(frontendDistPath)) {
+    // 静态资源文件（JS、CSS、图片等）
+    app.use(express.static(frontendDistPath, { index: false }));
+
+    // 所有非 API 路由都返回 index.html（支持前端路由）
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+      }
+
+      const indexPath = path.join(frontendDistPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        return res.sendFile(indexPath);
+      }
+
+      res.status(404).json({ error: 'Frontend not built. Please run: cd frontend && pnpm build' });
+    });
+
+    log('success', `Serving frontend from: ${frontendDistPath}`);
+  } else {
+    log('warn', `Frontend dist not found at ${frontendDistPath}`);
+    log('warn', 'Please build the frontend first: cd frontend && pnpm build');
+
+    // 如果前端没有构建，返回提示信息
+    app.get('*', (req, res) => {
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+      }
+
+      res.status(404).json({
+        error: 'Frontend not built',
+        message: 'Please build the frontend first',
+        command: 'cd frontend && pnpm build'
+      });
+    });
+  }
 
   // Start the server
   return new Promise((resolve, reject) => {

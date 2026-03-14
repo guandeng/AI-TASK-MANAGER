@@ -203,10 +203,6 @@ const local: App.I18n.Schema = {
         enableTime: '显示当前时间',
         timeFormat: '时间格式'
       },
-      multilingual: {
-        title: '多语言设置',
-        visible: '显示多语言按钮'
-      },
       globalSearch: {
         title: '全局搜索设置',
         visible: '显示全局搜索按钮'
@@ -224,14 +220,23 @@ const local: App.I18n.Schema = {
     403: '无权限',
     404: '页面不存在',
     500: '服务器错误',
-    'iframe-page': '外���页面',
+    'iframe-page': '外页面',
     requirement: '需求任务管理',
     requirement_list: '需求列表',
     requirement_detail: '需求详情',
     'requirement_task-list': '任务列表',
     'requirement_task-detail': '任务详情',
     manage: '系统管理',
-    manage_config: '配置管理'
+    manage_config: '配置管理',
+    manage_menu: '菜单管理',
+    message: '消息中心',
+    message_list: '消息列表',
+    team: '团队管理',
+    team_members: '成员管理',
+    team_workload: '工作负载',
+    templates: '模板管理',
+    templates_projects: '项目模板',
+    templates_tasks: '任务模板'
   },
   page: {
     login: {

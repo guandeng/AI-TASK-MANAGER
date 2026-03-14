@@ -3,7 +3,6 @@ import { computed } from 'vue';
 import type { Component } from 'vue';
 import { getPaletteColorByNumber, mixColor } from '@sa/color';
 import { loginModuleRecord } from '@/constants/app';
-import { useAppStore } from '@/store/modules/app';
 import { useThemeStore } from '@/store/modules/theme';
 import { $t } from '@/locales';
 import PwdLogin from './modules/pwd-login.vue';
@@ -19,7 +18,6 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const appStore = useAppStore();
 const themeStore = useThemeStore();
 
 interface LoginModule {
@@ -58,21 +56,12 @@ const bgColor = computed(() => {
         <header class="flex-y-center justify-between">
           <SystemLogo class="size-64px lt-sm:size-48px" />
           <h3 class="text-28px text-primary font-500 lt-sm:text-22px">{{ $t('system.title') }}</h3>
-          <div class="i-flex-col">
-            <ThemeSchemaSwitch
-              :theme-schema="themeStore.themeScheme"
-              :show-tooltip="false"
-              class="text-20px lt-sm:text-18px"
-              @switch="themeStore.toggleThemeScheme"
-            />
-            <LangSwitch
-              v-if="themeStore.header.multilingual.visible"
-              :lang="appStore.locale"
-              :lang-options="appStore.localeOptions"
-              :show-tooltip="false"
-              @change-lang="appStore.changeLocale"
-            />
-          </div>
+          <ThemeSchemaSwitch
+            :theme-schema="themeStore.themeScheme"
+            :show-tooltip="false"
+            class="text-20px lt-sm:text-18px"
+            @switch="themeStore.toggleThemeScheme"
+          />
         </header>
         <main class="pt-24px">
           <h3 class="text-18px text-primary font-medium">{{ $t(activeModule.label) }}</h3>

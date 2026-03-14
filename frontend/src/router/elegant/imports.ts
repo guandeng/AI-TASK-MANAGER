@@ -22,6 +22,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   login: () => import("@/views/_builtin/login/index.vue"),
   manage_config: () => import("@/views/manage/config/index.vue"),
   manage_menu: () => import("@/views/manage/menu/index.vue"),
+  message_list: () => import("@/views/message/list/index.vue"),
   requirement_detail: () => import("@/views/requirement/detail/[id].vue"),
   requirement_list: () => import("@/views/requirement/list/index.vue"),
   "requirement_task-detail": () => import("@/views/requirement/task-detail/[id].vue"),

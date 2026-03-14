@@ -8,6 +8,7 @@ import { MdEditor, MdPreview } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { useTaskStore } from '@/store/modules/task';
 import { useMemberStore } from '@/store/modules/member';
+import { useMessageStore } from '@/store/modules/message';
 import type { TaskStatus, Subtask } from '@/typings/api/task';
 import CommentSection from '@/components/task/CommentSection.vue';
 import AssignmentPanel from '@/components/task/AssignmentPanel.vue';
@@ -17,6 +18,7 @@ const route = useRoute();
 const router = useRouter();
 const taskStore = useTaskStore();
 const memberStore = useMemberStore();
+const messageStore = useMessageStore();
 
 // 当前用户成员ID（用于评论功能）
 const currentMemberId = computed(() => memberStore.currentMember?.id);
@@ -214,14 +216,69 @@ const showRegenerateModal = ref(false);
 const regeneratePrompt = ref('');
 const regeneratingSubtaskId = ref<number | null>(null);
 
+// 拆分子任务 - 异步版本
 async function handleExpandTask() {
   if (!taskId.value) return;
 
+  // 检查任务是否已经在拆分中
+  if (task.value?.isExpanding) {
+    window.$message?.warning('任务正在拆分中，请查看消息中心');
+    router.push('/message/list');
+    return;
+  }
+
   expandLoading.value = true;
   try {
-    await taskStore.expandTask(taskId.value);
+    const messageId = await taskStore.expandTaskAsync(taskId.value);
+    if (messageId) {
+      window.$message?.success('拆分任务已提交，正在后台处理');
+      // 跳转到消息列表页面
+      router.push('/message/list');
+    } else {
+      window.$message?.error('提交拆分任务失败');
+    }
+  } catch (error) {
+    console.error('Failed to expand task async:', error);
+    window.$message?.error('拆分任务失败');
   } finally {
     expandLoading.value = false;
+  }
+}
+
+// 开始轮询消息状态
+function startPollingMessageStatus() {
+  const interval = 5000; // 5秒
+
+  pollingTimer.value = setInterval(async () => {
+    if (!pollingMessageId.value) return;
+
+    try {
+      await messageStore.loadMessages({ taskId: taskId.value });
+      const message = messageStore.messages.find(m => m.id === pollingMessageId.value);
+      if (message) {
+        if (message.status === 'success') {
+          // 拆分成功，刷新任务
+          await taskStore.loadTaskDetail(taskId.value);
+          window.$message?.success('子任务拆分完成');
+          stopPolling();
+        } else if (message.status === 'failed') {
+          // 拆分失败
+          window.$message?.error(message.errorMessage || '拆分失败');
+          stopPolling();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to poll message status:', error);
+    }
+  }, interval);
+}
+
+// 停止轮询
+function stopPolling() {
+  if (pollingTimer.value) {
+    clearInterval(pollingTimer.value);
+    pollingTimer.value = null;
+    pollingMessageId.value = null;
   }
 }
 
@@ -241,7 +298,7 @@ async function handleClearSubtasks() {
 async function handleDeleteTask() {
   if (!taskId.value) return;
 
-  if (!window.confirm(`确认删除任务 ${taskId.value} 吗？删除后会同时删除全部子任务。`)) return;
+  if (!window.confirm(`确认删除任务 ${taskId.value} 吗？删除后会同时删除全部子任务。`,)) return;
 
   deleteLoading.value = true;
   try {
@@ -327,6 +384,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   taskStore.clearCurrentTask();
+  stopPolling();
 });
 </script>
 
@@ -335,8 +393,14 @@ onUnmounted(() => {
     <NSpace vertical :size="16">
       <NSpace>
         <NButton secondary @click="router.back()">返回</NButton>
-        <NButton type="primary" :loading="expandLoading" @click="handleExpandTask">
-          拆分子任务
+        <!-- 拆分子任务按钮 - 根据状态显示不同文案 -->
+        <NButton
+          type="primary"
+          :loading="task?.isExpanding || expandLoading"
+          :disabled="task?.isExpanding"
+          @click="handleExpandTask"
+        >
+          {{ task?.isExpanding ? '拆分中...' : '拆分子任务' }}
         </NButton>
         <NButton
           type="error"

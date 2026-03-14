@@ -107,10 +107,13 @@ export const useMenuStore = defineStore('menu-store', () => {
     loading.value = true;
     try {
       const { data, error } = await createMenuApi(formData);
-      if (!error && data?.success) {
-        await loadMenus();
-        window.$message?.success('菜单创建成功');
-        return data.menu;
+      if (!error && data) {
+        const responseData = (data as any).data;
+        if (responseData?.success) {
+          await loadMenus();
+          window.$message?.success('菜单创建成功');
+          return responseData.menu;
+        }
       }
       return null;
     } catch (error) {
@@ -126,10 +129,13 @@ export const useMenuStore = defineStore('menu-store', () => {
     loading.value = true;
     try {
       const { data, error } = await updateMenuApi(key, formData);
-      if (!error && data?.success) {
-        await loadMenus();
-        window.$message?.success('菜单更新成功');
-        return data.menu;
+      if (!error && data) {
+        const responseData = (data as any).data;
+        if (responseData?.success) {
+          await loadMenus();
+          window.$message?.success('菜单更新成功');
+          return responseData.menu;
+        }
       }
       return null;
     } catch (error) {
@@ -145,12 +151,13 @@ export const useMenuStore = defineStore('menu-store', () => {
     loading.value = true;
     try {
       const { data, error } = await deleteMenuApi(key);
-      if (!error && data?.success) {
-        menus.value = menus.value.filter(m => m.key !== key);
-        // 同时删除子菜单
-        menus.value = menus.value.filter(m => m.parentKey !== key);
-        window.$message?.success('菜单删除成功');
-        return true;
+      if (!error && data) {
+        const responseData = (data as any).data;
+        if (responseData?.success) {
+          await loadMenus();
+          window.$message?.success('菜单删除成功');
+          return true;
+        }
       }
       return false;
     } catch (error) {
@@ -170,17 +177,18 @@ export const useMenuStore = defineStore('menu-store', () => {
     loading.value = true;
     try {
       const { data, error } = await batchDeleteMenusApi(keys);
-      const successKeys = !error && data ? data.deletedKeys || [] : [];
-      const failedKeys = !error && data ? keys.filter(k => !successKeys.includes(k)) : keys;
+      if (!error && data) {
+        const responseData = (data as any).data;
+        const successKeys = responseData?.deletedKeys || [];
+        const failedKeys = keys.filter(k => !successKeys.includes(k));
 
-      if (successKeys.length) {
-        menus.value = menus.value.filter(m => !successKeys.includes(m.key));
-        // 同时删除子菜单
-        menus.value = menus.value.filter(m => !successKeys.includes(m.parentKey || ''));
-        await loadMenus();
+        if (successKeys.length) {
+          await loadMenus();
+        }
+
+        return { successKeys, failedKeys };
       }
-
-      return { successKeys, failedKeys };
+      return { successKeys: [], failedKeys: keys };
     } finally {
       loading.value = false;
     }
@@ -189,10 +197,13 @@ export const useMenuStore = defineStore('menu-store', () => {
   async function reorderMenus(orderData: { key: string; order: number }[]) {
     try {
       const { data, error } = await reorderMenusApi(orderData);
-      if (!error && data?.success) {
-        await loadMenus();
-        window.$message?.success('菜单排序更新成功');
-        return true;
+      if (!error && data) {
+        const responseData = (data as any).data;
+        if (responseData?.success) {
+          await loadMenus();
+          window.$message?.success('菜单排序更新成功');
+          return true;
+        }
       }
       return false;
     } catch (error) {
@@ -224,13 +235,16 @@ export const useMenuStore = defineStore('menu-store', () => {
   async function toggleMenuEnabled(key: string, enabled: boolean) {
     try {
       const { data, error } = await toggleMenuEnabledApi(key, enabled);
-      if (!error && data?.success) {
-        const menu = menus.value.find(m => m.key === key);
-        if (menu) {
-          menu.enabled = enabled;
+      if (!error && data) {
+        const responseData = (data as any).data;
+        if (responseData?.success) {
+          const menu = menus.value.find(m => m.key === key);
+          if (menu) {
+            menu.enabled = enabled;
+          }
+          window.$message?.success(enabled ? '菜单已启用' : '菜单已禁用');
+          return true;
         }
-        window.$message?.success(enabled ? '菜单已启用' : '菜单已禁用');
-        return true;
       }
       return false;
     } catch (error) {

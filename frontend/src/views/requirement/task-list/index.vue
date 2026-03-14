@@ -20,6 +20,11 @@ const filterRequirementId = ref<number | 'all'>('all');
 const searchText = ref('');
 const checkedRowKeys = ref<DataTableRowKey[]>([]);
 
+// 分页
+const currentPage = ref(1);
+const pageSize = ref(20);
+const total = ref(0);
+
 // 状态选项
 const statusOptions = [
   { label: '全部', value: 'all' },
@@ -86,33 +91,6 @@ const requirementOptions = computed<SelectOption[]>(() => {
   });
 
   return options;
-});
-
-// 过滤后的任务
-const filteredTasks = computed(() => {
-  let result = taskStore.tasks;
-
-  if (filterRequirementId.value !== 'all') {
-    result = result.filter(task => task.requirementId === filterRequirementId.value);
-  }
-
-  // 状态筛选
-  if (filterStatus.value !== 'all') {
-    result = result.filter(task => task.status === filterStatus.value);
-  }
-
-  // 搜索筛选
-  if (searchText.value) {
-    const keyword = searchText.value.toLowerCase();
-    result = result.filter(task =>
-      task.title.toLowerCase().includes(keyword) ||
-      (task.titleTrans && task.titleTrans.toLowerCase().includes(keyword)) ||
-      task.description.toLowerCase().includes(keyword) ||
-      (task.descriptionTrans && task.descriptionTrans.toLowerCase().includes(keyword))
-    );
-  }
-
-  return [...result].sort((a, b) => b.id - a.id);
 });
 
 // 表格列定义
@@ -231,12 +209,25 @@ function viewTaskDetail(id: number) {
 }
 
 async function loadTaskListData() {
+  const params: TaskListParams = {
+    page: currentPage.value,
+    pageSize: pageSize.value
+  };
+
   if (filterRequirementId.value !== 'all') {
-    await taskStore.loadTasks({ requirementId: filterRequirementId.value });
-    return;
+    params.requirementId = filterRequirementId.value;
   }
 
-  await taskStore.loadTasks();
+  if (filterStatus.value !== 'all') {
+    params.status = filterStatus.value;
+  }
+
+  if (searchText.value) {
+    params.keyword = searchText.value;
+  }
+
+  await taskStore.loadTasks(params);
+  total.value = taskStore.total;
 }
 
 async function handleBatchDelete() {
@@ -299,6 +290,24 @@ async function handleAssigneeChange(id: number, assignee: string) {
   await taskStore.setTaskAssignee(id, assignee);
 }
 
+// 分页配置
+const paginationConfig = computed(() => ({
+  page: currentPage.value,
+  pageSize: pageSize.value,
+  itemCount: total.value,
+  showSizePicker: true,
+  showQuickJumper: true,
+  pageSizes: [10, 20, 50, 100],
+  onChange: (page: number) => {
+    currentPage.value = page;
+    loadTaskListData();
+  },
+  onUpdatePageSize: (size: number) => {
+    pageSize.value = size;
+    currentPage.value = 1;
+    loadTaskListData();
+  }
+}));
 // 完成率
 const completionRate = computed(() => {
   if (taskStore.statistics.total === 0) return 0;
@@ -325,10 +334,13 @@ watch(
   }
 );
 
-watch(filteredTasks, tasks => {
-  const visibleTaskIds = new Set(tasks.map(task => task.id));
-  checkedRowKeys.value = checkedRowKeys.value.filter(key => visibleTaskIds.has(Number(key)));
-});
+watch(
+  () => [filterRequirementId.value, filterStatus.value, searchText.value],
+  () => {
+    currentPage.value = 1;
+    loadTaskListData();
+  }
+);
 </script>
 
 <template>
@@ -411,17 +423,18 @@ watch(filteredTasks, tasks => {
       <NSpin :show="taskStore.loading">
         <NDataTable
           :columns="columns"
-          :data="filteredTasks"
+          :data="taskStore.tasks"
           :row-key="(row: Task) => row.id"
           v-model:checked-row-keys="checkedRowKeys"
           :bordered="false"
+          :pagination="paginationConfig"
         />
         <div class="mt-16px flex justify-start">
           <NButton type="error" ghost :disabled="checkedRowKeys.length === 0" @click="handleBatchDelete">
             批量删除
           </NButton>
         </div>
-        <NEmpty v-if="filteredTasks.length === 0 && !taskStore.loading" description="暂无任务数据" />
+        <NEmpty v-if="taskStore.tasks.length === 0 && !taskStore.loading" description="暂无任务数据" />
       </NSpin>
     </NCard>
   </div>

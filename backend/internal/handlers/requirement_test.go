@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/ai-task-manager/backend/internal/config"
 	"github.com/ai-task-manager/backend/internal/database"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -21,7 +22,8 @@ func init() {
 
 func setupRequirementTestWithDB(t *testing.T) (*RequirementHandler, *gin.Engine, sqlmock.Sqlmock) {
 	logger := zap.NewNop()
-	handler := NewRequirementHandler(logger)
+	cfg := &config.Config{}
+	handler := NewRequirementHandler(logger, cfg)
 
 	// 创建 mock 数据库
 	sqlDB, mock, err := sqlmock.New()

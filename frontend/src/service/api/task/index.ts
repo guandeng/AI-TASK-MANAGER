@@ -78,3 +78,31 @@ export function expandTaskAsync(id: number, data?: { prompt?: string; additional
     timeout: 300 * 1000 // 5 分钟超时
   });
 }
+
+// 依赖关系相关 API
+export function getTaskDependencies() {
+  return request({ url: `${API_BASE}/tasks/dependencies`, method: 'GET' });
+}
+
+export function addTaskDependency(taskId: number, dependsOnTaskId: number) {
+  return request({
+    url: `${API_BASE}/tasks/${taskId}/dependencies`,
+    method: 'POST',
+    data: { dependsOnTaskId }
+  });
+}
+
+export function removeTaskDependency(taskId: number, dependsOnTaskId: number) {
+  return request({
+    url: `${API_BASE}/tasks/${taskId}/dependencies/${dependsOnTaskId}`,
+    method: 'DELETE'
+  });
+}
+
+export function validateDependencies() {
+  return request({ url: `${API_BASE}/tasks/dependencies/validate`, method: 'GET' });
+}
+
+export function getReadyTasks() {
+  return request({ url: `${API_BASE}/tasks/ready`, method: 'GET' });
+}

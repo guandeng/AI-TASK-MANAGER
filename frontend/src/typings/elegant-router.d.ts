@@ -30,6 +30,8 @@ declare module "@elegant-router/types" {
     "requirement": "/requirement";
     "requirement_detail": "/requirement/detail/:id";
     "requirement_list": "/requirement/list";
+    "requirement_task-board": "/requirement/task-board";
+    "requirement_task-create": "/requirement/task-create";
     "requirement_task-detail": "/requirement/task-detail/:id";
     "requirement_task-list": "/requirement/task-list";
     "team": "/team";
@@ -105,6 +107,8 @@ declare module "@elegant-router/types" {
     | "message_list"
     | "requirement_detail"
     | "requirement_list"
+    | "requirement_task-board"
+    | "requirement_task-create"
     | "requirement_task-detail"
     | "requirement_task-list"
     | "team_members"

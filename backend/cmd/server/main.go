@@ -13,6 +13,7 @@ import (
 	"github.com/ai-task-manager/backend/internal/database"
 	"github.com/ai-task-manager/backend/internal/handlers"
 	"github.com/ai-task-manager/backend/internal/middleware"
+	"github.com/ai-task-manager/backend/internal/services"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -243,5 +244,22 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			taskTemplates.POST("/:id/delete", templateHandler.DeleteTaskTemplate)
 			taskTemplates.POST("/:id/instantiate", templateHandler.InstantiateTaskTemplate)
 		}
+
+		// 备份管理
+		backupService := services.NewBackupService(logger)
+		backupHandler := handlers.NewBackupHandler(logger, backupService)
+		backupGroup := api.Group("/requirements/:id/backups")
+		{
+			backupGroup.GET("", backupHandler.List)
+			backupGroup.POST("/create", backupHandler.Create)
+			backupGroup.POST("/:backupId/restore", backupHandler.Restore)
+			backupGroup.POST("/:backupId/delete", backupHandler.Delete)
+			backupGroup.GET("/schedule", backupHandler.GetSchedule)
+			backupGroup.POST("/schedule/update", backupHandler.UpdateSchedule)
+			backupGroup.POST("/schedule/disable", backupHandler.DisableSchedule)
+		}
+
+		// 启动备份调度器
+		backupService.StartScheduler()
 	}
 }

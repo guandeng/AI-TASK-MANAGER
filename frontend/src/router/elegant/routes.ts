@@ -151,9 +151,31 @@ export const generatedRoutes: GeneratedRoute[] = [
         }
       },
       {
+        name: 'requirement_task-board',
+        path: '/requirement/task-board',
+        component: 'view.requirement_task-board',
+        meta: {
+          title: 'requirement_task-board',
+          i18nKey: 'route.requirement_task-board',
+          icon: 'mdi:view-board',
+          order: 3
+        }
+      },
+      {
+        name: 'requirement_task-create',
+        path: '/requirement/task-create',
+        component: 'view.requirement_task-create',
+        meta: {
+          title: 'requirement_task-create',
+          i18nKey: 'route.requirement_task-create',
+          hideInMenu: true
+        }
+      },
+      {
         name: 'requirement_task-detail',
         path: '/requirement/task-detail/:id',
         component: 'view.requirement_task-detail',
+        props: true,
         meta: {
           title: 'requirement_task-detail',
           i18nKey: 'route.requirement_task-detail',

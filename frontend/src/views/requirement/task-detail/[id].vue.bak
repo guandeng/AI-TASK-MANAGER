@@ -14,7 +14,6 @@ import CommentSection from '@/components/task/CommentSection.vue';
 import AssignmentPanel from '@/components/task/AssignmentPanel.vue';
 import ActivityTimeline from '@/components/task/ActivityTimeline.vue';
 import BackupModal from '@/components/requirement/BackupModal.vue';
-import DependencyGraph from '@/components/task/DependencyGraph.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -66,12 +65,6 @@ function getSubtaskStatusClass(status: TaskStatus): string {
 
 const taskId = computed(() => Number(route.params.id));
 const task = computed(() => taskStore.currentTask);
-
-// 备份弹框状态
-const showBackupModal = ref(false);
-
-// 获取需求 ID（从任务中获取）
-const requirementId = computed(() => task.value?.requirementId);
 
 // 独立的 loading 状态
 const expandLoading = ref(false);
@@ -390,7 +383,6 @@ async function handleDragEnd() {
 onMounted(async () => {
   if (taskId.value) {
     await taskStore.loadTaskDetail(taskId.value);
-    await taskStore.loadTaskDependencies();
   }
   // 加载成员列表以便获取当前用户信息
   if (memberStore.members.length === 0) {
@@ -430,9 +422,6 @@ onUnmounted(() => {
         </NButton>
         <NButton type="error" :loading="deleteLoading" @click="handleDeleteTask">
           删除任务
-        </NButton>
-        <NButton type="success" :disabled="!requirementId" @click="showBackupModal = true">
-          定时备份
         </NButton>
       </NSpace>
     </div>
@@ -656,11 +645,6 @@ onUnmounted(() => {
                     <AssignmentPanel :task-id="taskId!" @assigned="() => {}" @unassigned="() => {}" />
                   </div>
                 </NTabPane>
-                <NTabPane name="dependencies" tab="依赖">
-                  <div class="sidebar-content">
-                    <DependencyGraph :taskId="taskId" :height="300" />
-                  </div>
-                </NTabPane>
                 <NTabPane name="activities" tab="活动">
                   <div class="sidebar-content">
                     <ActivityTimeline :task-id="taskId!" />
@@ -706,12 +690,6 @@ onUnmounted(() => {
           />
         </NSpace>
       </NModal>
-
-      <!-- 备份弹框 -->
-      <BackupModal
-        v-model:show="showBackupModal"
-        :requirement-id="requirementId"
-      />
     </div>
   </div>
 </template>

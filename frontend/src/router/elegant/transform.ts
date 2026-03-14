@@ -176,6 +176,8 @@ const routeMap: RouteMap = {
   "requirement": "/requirement",
   "requirement_detail": "/requirement/detail/:id",
   "requirement_list": "/requirement/list",
+  "requirement_task-board": "/requirement/task-board",
+  "requirement_task-create": "/requirement/task-create",
   "requirement_task-detail": "/requirement/task-detail/:id",
   "requirement_task-list": "/requirement/task-list",
   "team": "/team",

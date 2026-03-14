@@ -18,6 +18,7 @@ import type { FormInst, FormRules, SelectOption } from 'naive-ui';
 import { useTaskStore } from '@/store/modules/task';
 import { useRequirementStore } from '@/store/modules/requirement';
 import type { TaskPriority } from '@/typings/api/task';
+import TagSelector from '@/components/task/TagSelector.vue';
 
 const router = useRouter();
 const taskStore = useTaskStore();
@@ -39,6 +40,7 @@ const formData = ref({
   assignee: undefined as string | undefined,
   requirementId: undefined as number | undefined,
   dependencies: [] as number[],
+  tags: [] as string[],
   startDate: undefined as string | undefined,
   dueDate: undefined as string | undefined,
   estimatedHours: undefined as number | undefined

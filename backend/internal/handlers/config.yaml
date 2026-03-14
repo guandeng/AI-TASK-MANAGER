@@ -1,0 +1,40 @@
+server:
+    port: 8080
+    mode: debug
+database:
+    host: localhost
+    port: 3306
+    database: ai_task
+    username: root
+    password: "123456"
+    tableprefix: task_
+    charset: utf8mb4
+    collation: utf8mb4_unicode_ci
+    poolsize: 10
+ai:
+    provider: qwen
+    providers:
+        gemini:
+            enabled: false
+            apikey: ""
+            model: gemini-pro
+            baseurl: ""
+        perplexity:
+            enabled: false
+            apikey: ""
+            model: llama-3.1-sonar-large-128k-online
+            baseurl: ""
+        qwen:
+            enabled: true
+            apikey: ""
+            model: qwen-max
+            baseurl: ""
+    parameters:
+        maxtokens: 8192
+        temperature: 0.7
+general:
+    debug: false
+    loglevel: info
+    defaultsubtasks: 3
+    defaultpriority: medium
+    projectname: AI Task Manager

@@ -1,11 +1,52 @@
 # Agent 开发规范
 
+## 角色定位
+
+**AI 技术负责人 (AI Tech Lead)** — 兼具产品经理和项目经理经验
+
+全权负责项目的需求分析、产品设计、技术架构、代码实现和交付管理。
+
+| 职责域 | 具体内容 |
+|--------|----------|
+| 产品 | 需求分析、用户价值判断、功能优先级、拒绝过度设计 |
+| 项目 | 任务拆解、排期评估、风险管理、进度把控 |
+| 架构 | 技术选型、系统设计、代码可维护性和扩展性 |
+| 开发 | 高质量代码实现，遵循项目规范和最佳实践 |
+| 质量 | 自测代码、主动修复 bug、确保系统稳定性 |
+
+**工作原则：**
+1. 主动沟通 - 需求不明确或存在多种方案时，先确认再执行
+2. 小步迭代 - 每次改动范围可控，确保可回滚
+3. 文档记录 - 关键决策、架构变动记录在案
+4. 遵循规范 - 严格遵守项目已有的代码风格、目录结构、命名约定
+5. 中文优先 - 项目只支持中文，所有用户可见文本使用中文
+
+---
+
+## 项目核心规范
+
+### 语言规范
+
+- **项目只支持中文，不支持多语言**
+- 已删除英文语言包 `en-us.ts`
+- 已移除语言切换组件 `lang-switch.vue`
+- 所有用户可见文本使用中文
+
+### 前端架构
+
+- 使用 Vue 3 + Pinia + TypeScript
+- i18n 配置固定为 `zh-CN`，不再支持语言切换
+- 语言包位置：`frontend/src/locales/langs/zh-cn.ts`
+
+---
+
 ## 目录
 
 - [数据库设计规范](#数据库设计规范)
 - [前端代码规范](#前端代码规范)
 - [API 接口规范](#api-接口规范)
 - [Git 提交规范](#git-提交规范)
+- [MySQL Docker 操作](#mysql-docker-操作)
 
 ---
 
@@ -282,3 +323,48 @@ export const useTaskStore = defineStore('task-store', () => {
 3. **国际化**：用户可见的文本都要支持多语言（中文/英文）
 4. **性能优化**：列表数据使用分页，避免一次性加载过多数据
 5. **交互确认**：所有删除操作、状态更新、负责人变更、清空操作、批量修改等会变更数据的按钮或控件，必须先弹出确认提示，再执行实际请求
+
+---
+
+## MySQL Docker 操作
+
+### 容器信息
+
+- 容器名称：`mysql`
+- 镜像：`mysql:latest`
+- 端口映射：`3306:3306`
+- 数据库：`ai_task`
+- 用户名：`root`
+- 密码：`123456`
+
+### 执行 SQL 脚本
+
+```bash
+# 方式 1：直接执行 SQL 文件
+docker exec -i mysql mysql -h localhost -u root -p123456 ai_task < /path/to/script.sql
+
+# 方式 2：进入容器交互执行
+docker exec -it mysql mysql -h localhost -u root -p123456 ai_task
+```
+
+### 常用命令
+
+```bash
+# 查看 MySQL 容器状态
+docker ps | grep mysql
+
+# 进入 MySQL 容器
+docker exec -it mysql bash
+
+# 执行 SQL 查询
+docker exec -i mysql mysql -h localhost -u root -p123456 ai_task -e "SELECT * FROM task_menu"
+
+# 注意：key 是 MySQL 保留字，查询时需用反引号包裹
+docker exec -i mysql mysql -h localhost -u root -p123456 ai_task -e "SELECT \`key\`, title FROM task_menu"
+```
+
+### 注意事项
+
+1. 执行 SQL 脚本时，字段名 `key` 是 MySQL 保留字，在查询时必须使用反引号包裹：\`key\`
+2. 使用 `-p` 参数传递密码时会有安全警告，建议使用配置文件或环境变量
+3. SQL 文件路径必须是容器内可访问的路径，使用 `-i` 参数通过 stdin 传入

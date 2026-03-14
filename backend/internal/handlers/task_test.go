@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/ai-task-manager/backend/internal/config"
 	"github.com/ai-task-manager/backend/internal/database"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -21,7 +22,8 @@ func init() {
 
 func setupTaskTest(t *testing.T) (*TaskHandler, *gin.Engine) {
 	logger := zap.NewNop()
-	handler := NewTaskHandler(logger)
+	cfg := &config.Config{}
+	handler := NewTaskHandler(logger, cfg)
 
 	router := gin.New()
 	return handler, router
@@ -29,6 +31,7 @@ func setupTaskTest(t *testing.T) (*TaskHandler, *gin.Engine) {
 
 func setupTaskTestWithDB(t *testing.T) (*TaskHandler, *gin.Engine, sqlmock.Sqlmock) {
 	logger := zap.NewNop()
+	cfg := &config.Config{}
 
 	// 创建 mock 数据库
 	sqlDB, mock, err := sqlmock.New()
@@ -47,7 +50,7 @@ func setupTaskTestWithDB(t *testing.T) (*TaskHandler, *gin.Engine, sqlmock.Sqlmo
 	// 设置全局 DB
 	database.DB = gormDB
 
-	handler := NewTaskHandler(logger)
+	handler := NewTaskHandler(logger, cfg)
 	router := gin.New()
 
 	return handler, router, mock

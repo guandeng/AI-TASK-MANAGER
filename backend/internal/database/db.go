@@ -79,6 +79,8 @@ func autoMigrate() error {
 		&models.ProjectTemplateTask{},
 		&models.ProjectTemplateSubtask{},
 		&models.TaskTemplate{},
+		&models.Backup{},
+		&models.BackupSchedule{},
 	)
 }
 

@@ -14,9 +14,14 @@ import {
   reorderSubtasks as reorderSubtasksApi,
   updateTask,
   updateSubtask as updateSubtaskApi,
-  copyTask as copyTaskApi
+  copyTask as copyTaskApi,
+  getTaskDependencies as getTaskDependenciesApi,
+  addTaskDependency as addTaskDependencyApi,
+  removeTaskDependency as removeTaskDependencyApi,
+  validateDependencies as validateDependenciesApi,
+  getReadyTasks as getReadyTasksApi
 } from '@/service/api/task';
-import type { Task, Subtask, TaskStatus, TaskStatistics, TaskListParams, TaskCreateRequest } from '@/typings/api/task';
+import type { Task, Subtask, TaskStatus, TaskStatistics, TaskListParams, TaskCreateRequest, TaskDependency } from '@/typings/api/task';
 import { createLoadingService, LoadingService, LOADING_PRESETS } from '@/utils/loading-service';
 
 // 辅助函数：提取后端返回的 data 字段
@@ -41,6 +46,7 @@ export const useTaskStore = defineStore('task-store', () => {
   const total = ref(0);
   const page = ref(1);
   const pageSize = ref(20);
+  const taskDependencies = ref<TaskDependency[]>([]);
 
   // 计算属性：任务统计
   const statistics = computed<TaskStatistics>(() => {
@@ -609,6 +615,78 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
+  // 依赖关系相关方法
+  async function loadTaskDependencies() {
+    try {
+      const { data, error } = await getTaskDependenciesApi();
+      if (!error && data) {
+        taskDependencies.value = extractData(data) || [];
+      }
+    } catch (error) {
+      console.error('Failed to load task dependencies:', error);
+    }
+  }
+
+  async function addTaskDependency(taskId: number, dependsOnTaskId: number) {
+    try {
+      const { data, error } = await addTaskDependencyApi(taskId, dependsOnTaskId);
+      if (!error && data) {
+        await loadTaskDependencies();
+        window.$message?.success('依赖关系添加成功');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      window.$message?.error('添加依赖关系失败');
+      console.error('Failed to add task dependency:', error);
+      return false;
+    }
+  }
+
+  async function removeTaskDependency(taskId: number, dependsOnTaskId: number) {
+    try {
+      const { data, error } = await removeTaskDependencyApi(taskId, dependsOnTaskId);
+      if (!error && data) {
+        await loadTaskDependencies();
+        window.$message?.success('依赖关系移除成功');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      window.$message?.error('移除依赖关系失败');
+      console.error('Failed to remove task dependency:', error);
+      return false;
+    }
+  }
+
+  async function validateDependencies() {
+    try {
+      const { data, error } = await validateDependenciesApi();
+      if (!error && data) {
+        const result = extractData(data);
+        return { valid: !result.includes('Circular'), message: result };
+      }
+      return { valid: true, message: '依赖关系有效' };
+    } catch (error) {
+      window.$message?.error('验证依赖关系失败');
+      console.error('Failed to validate dependencies:', error);
+      return { valid: false, message: '验证失败' };
+    }
+  }
+
+  async function loadReadyTasks() {
+    try {
+      const { data, error } = await getReadyTasksApi();
+      if (!error && data) {
+        return extractData(data) || [];
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to load ready tasks:', error);
+      return [];
+    }
+  }
+
   function clearCurrentTask() {
     currentTask.value = null;
   }
@@ -623,6 +701,7 @@ export const useTaskStore = defineStore('task-store', () => {
     total,
     page,
     pageSize,
+    taskDependencies,
     // 计算属性
     statistics,
     tasksByStatus,
@@ -644,6 +723,11 @@ export const useTaskStore = defineStore('task-store', () => {
     reorderSubtasks,
     clearCurrentTask,
     copyTask,
-    createTask
+    createTask,
+    loadTaskDependencies,
+    addTaskDependency,
+    removeTaskDependency,
+    validateDependencies,
+    loadReadyTasks
   };
 });

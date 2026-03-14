@@ -1,7 +1,7 @@
+# ==================== Node.js ====================
 # Dependency directories
 node_modules/
 jspm_packages/
-
 
 # Logs
 logs/
@@ -10,6 +10,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+pnpm-debug.log*
 
 # Coverage directory used by tools like istanbul
 coverage
@@ -40,27 +41,70 @@ coverage
 .nuxt
 dist
 
-# Mac files
-.DS_Store
+# ==================== Go ====================
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# Debug files
-*.debug
-init-debug.log
-dev-debug.log
-.github/
+# Test binary, built with `go test -c`
+*.test
 
-# Added by Claude Task Master
-# Editor directories and files
-.idea
-.vscode
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Build output
+backend/bin/
+backend/tmp/
+
+# ==================== IDE & Editor ====================
+.idea/
+.vscode/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-# OS specific
+
+# ==================== OS Specific ====================
+# Mac files
+.DS_Store
+
+# Windows files
+Thumbs.db
+Desktop.ini
+
+# ==================== Project Specific ====================
+# Debug files
+*.debug
+init-debug.log
+dev-debug.log
+
 # Task files
 tasks.json
 tasks/
 
+# Environment files
 .env
+.env.local
+.env.*.local
+
+# PID files
+*.pid
+.backend.pid
+.frontend.pid
+
+# Uploaded files
+backend/uploads/
+
+# Config with secrets
+backend/config.local.yaml
+
+# Github (if not needed)
+# .github/

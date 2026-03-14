@@ -59,7 +59,14 @@ export const useMemberStore = defineStore('member-store', () => {
       if (err) {
         error.value = err;
       } else if (data) {
-        members.value = data;
+        // 后端返回格式: { code: 0, message: "success", data: { list, total, page, pageSize } }
+        const responseData = (data as any).data || data;
+
+        if (Array.isArray(responseData)) {
+          members.value = responseData;
+        } else if (responseData && 'list' in responseData) {
+          members.value = responseData.list || [];
+        }
       }
     } finally {
       loading.value = false;

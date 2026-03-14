@@ -1,69 +1,28 @@
 {
   "name": "ai-task-manager",
-  "version": "0.9.37",
-  "description": "A task management system for ambitious AI-driven development that doesn't overwhelm and confuse Cursor.",
-  "main": "index.js",
+  "version": "1.0.0",
+  "description": "AI Task Manager - 前后端分离的任务管理系统（Go + Vue3）",
+  "private": true,
   "type": "module",
-  "bin": {
-    "task-manager": "bin/task-manager.js",
-    "task-manager-init": "bin/task-manager-init.js",
-    "task-manager-server": "scripts/server/server.js",
-    "task-manager-mcp-server": "mcp-server/server.js"
-  },
-  "scripts": {
-    "test": "node --experimental-vm-modules node_modules/.bin/jest",
-    "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
-    "test:coverage": "node --experimental-vm-modules node_modules/.bin/jest --coverage",
-    "prepare-package": "node scripts/prepare-package.js",
-    "prepublishOnly": "npm run prepare-package",
-    "prepare": "chmod +x bin/task-manager.js bin/task-manager-init.js scripts/server/express-server.js",
-    "changeset": "changeset",
-    "release": "changeset publish",
-    "dev": "node scripts/dev.js",
-    "list": "node scripts/dev.js list",
-    "generate": "node scripts/dev.js generate",
-    "parse-prd": "node scripts/dev.js parse-prd"
-  },
-  "keywords": [
-    "claude",
-    "gemini",
-    "task",
-    "management",
-    "ai",
-    "development",
-    "cursor",
-    "anthropic",
-    "google",
-    "llm",
-    "mcp",
-    "context"
+  "workspaces": [
+    "frontend"
   ],
-  "author": "Eyal Toledano",
-  "license": "MIT",
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
-    "@google/generative-ai": "^0.24.0",
-    "ajv": "^8.18.0",
-    "boxen": "^8.0.1",
-    "chalk": "^4.1.2",
-    "cli-table3": "^0.6.5",
-    "commander": "^11.1.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.21.2",
-    "fastmcp": "^1.20.5",
-    "figlet": "^1.8.0",
-    "fuse.js": "^7.0.0",
-    "gradient-string": "^3.0.0",
-    "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "multer": "^2.1.1",
-    "mysql2": "^3.19.0",
-    "openai": "^4.89.0",
-    "ora": "^8.2.0"
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "cd backend && go run ./cmd/server",
+    "build": "npm run build --workspace=frontend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "cd backend && go build -o bin/server ./cmd/server",
+    "start:backend": "cd backend && ./bin/server",
+    "install:all": "npm install",
+    "clean": "rm -rf node_modules frontend/node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.0.0"
   },
   "repository": {
     "type": "git",
@@ -72,30 +31,5 @@
   "homepage": "https://github.com/skindhu/AI-TASK-MANAGER#readme",
   "bugs": {
     "url": "https://github.com/skindhu/AI-TASK-MANAGER/issues"
-  },
-  "files": [
-    "scripts/init.js",
-    "scripts/dev.js",
-    "scripts/modules/**",
-    "scripts/server/**",
-    "assets/**",
-    ".cursor/**",
-    "README-task-manager.md",
-    "index.js",
-    "bin/**",
-    "mcp-server/**"
-  ],
-  "overrides": {
-    "node-fetch": "^3.3.2",
-    "whatwg-url": "^11.0.0"
-  },
-  "devDependencies": {
-    "@changesets/changelog-github": "^0.5.1",
-    "@changesets/cli": "^2.28.1",
-    "@types/jest": "^29.5.14",
-    "jest": "^29.7.0",
-    "jest-environment-node": "^29.7.0",
-    "mock-fs": "^5.5.0",
-    "supertest": "^7.1.0"
   }
 }

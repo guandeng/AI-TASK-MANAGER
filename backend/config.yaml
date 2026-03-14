@@ -1,0 +1,43 @@
+server:
+  port: 8080
+  mode: debug  # debug/release
+
+database:
+  host: localhost
+  port: 3306
+  database: ai_task
+  username: root
+  password: "123456"
+  table_prefix: task_
+  charset: utf8mb4
+  collation: utf8mb4_unicode_ci
+  pool_size: 10
+
+ai:
+  provider: qwen
+  providers:
+    qwen:
+      enabled: true
+      api_key: "sk-sp-761f792b3df348e1b9d61a378aef7f9f"
+      model: qwen3.5-plus
+      base_url: https://coding.dashscope.aliyuncs.com/v1
+    gemini:
+      enabled: false
+      api_key: ""
+      model: gemini-2.0-flash
+      base_url: ""
+    perplexity:
+      enabled: false
+      api_key: ""
+      model: sonar
+      base_url: https://api.perplexity.ai
+  parameters:
+    max_tokens: 8192
+    temperature: 0.7
+
+general:
+  debug: false
+  log_level: info
+  default_subtasks: 3
+  default_priority: medium
+  project_name: AI Task Manager

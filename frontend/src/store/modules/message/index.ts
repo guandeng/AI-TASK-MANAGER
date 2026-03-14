@@ -25,13 +25,25 @@ export const useMessageStore = defineStore('message-store', () => {
     try {
       const { data, error } = await fetchMessages(params);
       if (!error && data) {
-        messages.value = data.messages;
-        // 更新未读数量（如果返回了总数）
-        if (typeof data.total === 'number') {
-          unreadCount.value = data.total;
-        } else {
-          // 计算本地未读数量
-          unreadCount.value = messages.value.filter(m => !m.isRead).length;
+        // 后端返回格式: { code: 0, message: "success", data: { list, total, page, pageSize } }
+        const responseData = (data as any).data || data;
+
+        if (Array.isArray(responseData)) {
+          messages.value = responseData;
+        } else if (responseData && 'list' in responseData) {
+          messages.value = responseData.list || [];
+          if (typeof responseData.total === 'number') {
+            unreadCount.value = responseData.total;
+          }
+        } else if (responseData && 'messages' in responseData) {
+          messages.value = responseData.messages || [];
+          // 更新未读数量（如果返回了总数）
+          if (typeof responseData.total === 'number') {
+            unreadCount.value = responseData.total;
+          } else {
+            // 计算本地未读数量
+            unreadCount.value = messages.value.filter(m => !m.isRead).length;
+          }
         }
       }
     } catch (error) {

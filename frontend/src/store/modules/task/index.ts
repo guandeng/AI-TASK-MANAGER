@@ -18,6 +18,11 @@ import {
 import type { Task, Subtask, TaskStatus, TaskStatistics, TaskListParams } from '@/typings/api/task';
 import { createLoadingService, LoadingService, LOADING_PRESETS } from '@/utils/loading-service';
 
+// 辅助函数：提取后端返回的 data 字段
+function extractData(responseData: any): any {
+  return responseData?.data || responseData;
+}
+
 export const useTaskStore = defineStore('task-store', () => {
   // 状态
   const tasks = ref<Task[]>([]);
@@ -71,9 +76,21 @@ export const useTaskStore = defineStore('task-store', () => {
     try {
       const { data, error } = await fetchTaskList(params);
       if (!error && data) {
-        tasks.value = data.tasks || [];
-        projectName.value = data.projectName || '';
-        projectVersion.value = data.projectVersion || '';
+        // 后端返回格式: { code: 0, message: "success", data: { list, total, page, pageSize } }
+        // axios transform 返回 response.data，所以 data 是整个响应体
+        const responseData = (data as any).data || data;
+
+        // 提取 list 作为数组
+        if (Array.isArray(responseData)) {
+          tasks.value = responseData;
+        } else if (responseData && 'list' in responseData) {
+          tasks.value = responseData.list || [];
+        } else if (responseData && 'tasks' in responseData) {
+          // 兼容旧格式
+          tasks.value = responseData.tasks || [];
+          projectName.value = responseData.projectName || '';
+          projectVersion.value = responseData.projectVersion || '';
+        }
       }
     } catch (error) {
       window.$message?.error('加载任务列表失败');

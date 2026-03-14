@@ -84,7 +84,16 @@ export const useMenuStore = defineStore('menu-store', () => {
     try {
       const { data, error } = await fetchMenuList();
       if (!error && data) {
-        menus.value = data.menus || [];
+        // 后端返回格式: { code: 0, message: "success", data: { list, total, page, pageSize } }
+        const responseData = (data as any).data || data;
+
+        if (Array.isArray(responseData)) {
+          menus.value = responseData;
+        } else if (responseData && 'list' in responseData) {
+          menus.value = responseData.list || [];
+        } else if (responseData && 'menus' in responseData) {
+          menus.value = responseData.menus || [];
+        }
       }
     } catch (error) {
       window.$message?.error('加载菜单列表失败');

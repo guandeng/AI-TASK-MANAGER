@@ -17,8 +17,8 @@ type Menu struct {
 	Enabled   bool      `gorm:"default:true" json:"enabled"`
 	HideInMenu *bool    `gorm:"default:false" json:"hideInMenu,omitempty"`
 	Fixed     *bool     `gorm:"default:false" json:"fixed,omitempty"`
-	I18nKey   *string   `gorm:"size:100" json:"i18nKey,omitempty"`
-	Href      *string   `gorm:"size:200" json:"href,omitempty"`
+	I18nKey   *string   `gorm:"column:i18n_key;size:100" json:"i18nKey,omitempty"`
+	Href      *string   `gorm:"column:href;size:200" json:"href,omitempty"`
 	NewWindow *bool     `gorm:"default:false" json:"newWindow,omitempty"`
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updatedAt"`

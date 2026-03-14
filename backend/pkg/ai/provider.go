@@ -230,13 +230,31 @@ func (s *Service) buildExpandPrompt(task *models.Task) string {
 
 // parseSubtasks 解析子任务
 func (s *Service) parseSubtasks(response string, taskID uint64) ([]models.Subtask, error) {
+	// 清理响应，移除 Markdown 代码块标记
+	cleanedResponse := response
+
+	// 移除 ```json 和 ``` 标记
+	re := regexp.MustCompile("```(?:json)?\\s*")
+	cleanedResponse = re.ReplaceAllString(cleanedResponse, "")
+	cleanedResponse = strings.TrimSpace(cleanedResponse)
+
+	// 尝试从响应中提取 JSON 数组
+	jsonStart := strings.Index(cleanedResponse, "[")
+	jsonEnd := strings.LastIndex(cleanedResponse, "]")
+
+	if jsonStart == -1 || jsonEnd == -1 || jsonEnd < jsonStart {
+		return nil, fmt.Errorf("could not find valid JSON array in response")
+	}
+
+	jsonStr := cleanedResponse[jsonStart : jsonEnd+1]
+
 	var subtasks []struct {
 		Title       string `json:"title"`
 		Description string `json:"description"`
 		Details     string `json:"details"`
 	}
 
-	if err := json.Unmarshal([]byte(response), &subtasks); err != nil {
+	if err := json.Unmarshal([]byte(jsonStr), &subtasks); err != nil {
 		return nil, fmt.Errorf("failed to parse subtasks: %w", err)
 	}
 

@@ -19,6 +19,17 @@ import {
   deactivateMember
 } from '@/service/api/member';
 
+// 辅助函数：提取后端返回的 data 字段
+// 后端返回格式: { code: 0, message: "success", data: {...} }
+function extractData(responseData: any): any {
+  if (!responseData) return null;
+  // 如果有 data 字段，返回 data 字段内容
+  if (responseData.data !== undefined) {
+    return responseData.data;
+  }
+  return responseData;
+}
+
 /**
  * 成员管理 Store
  */
@@ -60,7 +71,7 @@ export const useMemberStore = defineStore('member-store', () => {
         error.value = err;
       } else if (data) {
         // 后端返回格式: { code: 0, message: "success", data: { list, total, page, pageSize } }
-        const responseData = (data as any).data || data;
+        const responseData = extractData(data);
 
         if (Array.isArray(responseData)) {
           members.value = responseData;
@@ -84,8 +95,8 @@ export const useMemberStore = defineStore('member-store', () => {
       if (err) {
         error.value = err;
         currentMember.value = null;
-      } else {
-        currentMember.value = data;
+      } else if (data) {
+        currentMember.value = extractData(data);
       }
     } finally {
       loading.value = false;
@@ -105,8 +116,11 @@ export const useMemberStore = defineStore('member-store', () => {
         return null;
       }
       if (data) {
-        members.value.push(data);
-        return data;
+        const newMember = extractData(data);
+        if (newMember) {
+          members.value.push(newMember);
+          return newMember;
+        }
       }
       return null;
     } finally {
@@ -127,14 +141,17 @@ export const useMemberStore = defineStore('member-store', () => {
         return null;
       }
       if (data) {
-        const index = members.value.findIndex(m => m.id === id);
-        if (index !== -1) {
-          members.value[index] = data;
+        const updatedMember = extractData(data);
+        if (updatedMember) {
+          const index = members.value.findIndex(m => m.id === id);
+          if (index !== -1) {
+            members.value[index] = updatedMember;
+          }
+          if (currentMember.value?.id === id) {
+            currentMember.value = updatedMember;
+          }
+          return updatedMember;
         }
-        if (currentMember.value?.id === id) {
-          currentMember.value = data;
-        }
-        return data;
       }
       return null;
     } finally {
@@ -149,16 +166,21 @@ export const useMemberStore = defineStore('member-store', () => {
     loading.value = true;
     error.value = null;
     try {
-      const { error: err } = await deleteMember(id);
+      const { data, error: err } = await deleteMember(id);
       if (err) {
         error.value = err;
         return false;
       }
-      members.value = members.value.filter(m => m.id !== id);
-      if (currentMember.value?.id === id) {
-        currentMember.value = null;
+      // 检查响应是否成功 (code === 0)
+      const response = data as any;
+      if (response?.code === 0 || response?.data?.success) {
+        members.value = members.value.filter(m => m.id !== id);
+        if (currentMember.value?.id === id) {
+          currentMember.value = null;
+        }
+        return true;
       }
-      return true;
+      return false;
     } finally {
       loading.value = false;
     }
@@ -171,7 +193,7 @@ export const useMemberStore = defineStore('member-store', () => {
     try {
       const { data, error: err } = await fetchMemberStatistics();
       if (!err && data) {
-        statistics.value = data;
+        statistics.value = extractData(data);
       }
     } catch (e) {
       console.error('Failed to load member statistics:', e);
@@ -190,7 +212,7 @@ export const useMemberStore = defineStore('member-store', () => {
       if (err) {
         return [];
       }
-      return data || [];
+      return extractData(data) || [];
     } catch (e) {
       console.error('Failed to search members:', e);
       return [];
@@ -206,11 +228,14 @@ export const useMemberStore = defineStore('member-store', () => {
       return null;
     }
     if (data) {
-      const index = members.value.findIndex(m => m.id === id);
-      if (index !== -1) {
-        members.value[index] = data;
+      const updatedMember = extractData(data);
+      if (updatedMember) {
+        const index = members.value.findIndex(m => m.id === id);
+        if (index !== -1) {
+          members.value[index] = updatedMember;
+        }
+        return updatedMember;
       }
-      return data;
     }
     return null;
   }
@@ -224,11 +249,14 @@ export const useMemberStore = defineStore('member-store', () => {
       return null;
     }
     if (data) {
-      const index = members.value.findIndex(m => m.id === id);
-      if (index !== -1) {
-        members.value[index] = data;
+      const updatedMember = extractData(data);
+      if (updatedMember) {
+        const index = members.value.findIndex(m => m.id === id);
+        if (index !== -1) {
+          members.value[index] = updatedMember;
+        }
+        return updatedMember;
       }
-      return data;
     }
     return null;
   }

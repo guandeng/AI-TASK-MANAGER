@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/ai-task-manager/backend/internal/services"
 	"github.com/ai-task-manager/backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 // BackupHandler 备份处理器
@@ -117,6 +119,11 @@ func (h *BackupHandler) GetSchedule(c *gin.Context) {
 
 	schedule, err := h.backupService.GetSchedule(requirementID)
 	if err != nil {
+		// 没有备份计划时返回 null，而不是报错
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.Success(c, nil)
+			return
+		}
 		h.logger.Error("获取备份计划失败", zap.Error(err))
 		response.Error(c, 500, "获取备份计划失败")
 		return

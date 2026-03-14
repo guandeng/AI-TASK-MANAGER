@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ai-task-manager/backend/internal/config"
@@ -145,7 +146,10 @@ func TestConfigHandler_Update(t *testing.T) {
 	handler, router := setupConfigTest(t)
 	router.PUT("/config", handler.Update)
 
-	req := httptest.NewRequest(http.MethodPut, "/config", nil)
+	// 需要发送有效的 JSON body
+	body := `{}`
+	req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -159,7 +163,10 @@ func TestConfigHandler_UpdateAIProvider(t *testing.T) {
 	handler, router := setupConfigTest(t)
 	router.PUT("/config/ai/provider", handler.UpdateAIProvider)
 
-	req := httptest.NewRequest(http.MethodPut, "/config/ai/provider", nil)
+	// 需要发送有效的 JSON body
+	body := `{"provider": "qwen"}`
+	req := httptest.NewRequest(http.MethodPut, "/config/ai/provider", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -173,7 +180,10 @@ func TestConfigHandler_UpdateSpecificProvider(t *testing.T) {
 	handler, router := setupConfigTest(t)
 	router.PUT("/config/ai/providers/:provider", handler.UpdateSpecificProvider)
 
-	req := httptest.NewRequest(http.MethodPut, "/config/ai/providers/qwen", nil)
+	// 需要发送有效的 JSON body
+	body := `{"enabled": true}`
+	req := httptest.NewRequest(http.MethodPut, "/config/ai/providers/qwen", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)

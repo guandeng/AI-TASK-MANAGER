@@ -294,3 +294,14 @@ func (h *MenuHandler) Toggle(c *gin.Context) {
 
 	response.SuccessWithMessage(c, "菜单状态已更新", nil)
 }
+
+// SyncFromJSON 从 menu.json 同步菜单到数据库
+func (h *MenuHandler) SyncFromJSON(c *gin.Context) {
+	if err := h.repo.SyncFromJSONFile(); err != nil {
+		h.logger.Error("同步菜单失败", zap.Error(err))
+		response.ServerError(c, "同步菜单失败: "+err.Error())
+		return
+	}
+
+	response.SuccessWithMessage(c, "菜单同步成功", nil)
+}

@@ -34,6 +34,10 @@ export interface Task {
   testStrategy?: string;
   testStrategyTrans?: string;
   subtasks?: Subtask[];
+  /** 子任务总数（列表 API 返回） */
+  subtaskCount?: number;
+  /** 已完成子任务数（列表 API 返回） */
+  subtaskDoneCount?: number;
   assignee?: string; // 负责人
   // 时间管理字段
   startDate?: string;

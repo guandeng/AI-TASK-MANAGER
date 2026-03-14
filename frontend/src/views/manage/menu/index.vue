@@ -395,11 +395,6 @@ onMounted(() => {
       <template #header-extra>
         <NSpace>
           <NButton type="primary" @click="handleCreate">
-            <template #icon>
-              <NIcon>
-                <Icon icon="mdi:plus" />
-              </NIcon>
-            </template>
             新建菜单
           </NButton>
         </NSpace>
@@ -428,11 +423,6 @@ onMounted(() => {
                   type="error"
                   :disabled="checkedKeys.length === 0"
                 >
-                  <template #icon>
-                    <NIcon>
-                      <Icon icon="mdi:delete-outline" />
-                    </NIcon>
-                  </template>
                   批量删除 ({{ checkedKeys.length }})
                 </NButton>
               </template>

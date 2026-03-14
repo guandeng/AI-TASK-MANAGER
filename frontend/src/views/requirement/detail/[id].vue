@@ -30,6 +30,7 @@ import 'md-editor-v3/lib/style.css';
 import { useRequirementStore } from '@/store/modules/requirement';
 import type { RequirementStatus, RequirementPriority, RequirementDocument } from '@/typings/api/requirement';
 import { getDocumentDownloadUrl } from '@/service/api/requirement';
+import BackupModal from '@/components/requirement/BackupModal.vue';
 
 defineOptions({
   name: 'RequirementDetail'
@@ -54,6 +55,9 @@ const formData = ref({
 
 // 预览模式
 const previewMode = ref(false);
+
+// 备份弹框状态
+const showBackupModal = ref(false);
 
 // Markdown 编辑器工具栏配置
 const editorToolbars = [
@@ -335,11 +339,7 @@ onMounted(() => {
             <!-- 标题栏 -->
             <template #header>
               <div class="flex items-center gap-3">
-                <NButton text @click="handleBack">
-                  <template #icon>
-                    <span class="i-mdi:arrow-left text-lg"></span>
-                  </template>
-                </NButton>
+                <NButton text @click="handleBack">返回</NButton>
                 <span class="text-lg font-medium">
                   {{ isNew ? '新建需求' : '编辑需求' }}
                 </span>
@@ -382,21 +382,15 @@ onMounted(() => {
             <NCard title="操作" size="small">
               <NSpace vertical>
                 <NButton type="primary" @click="handleSave" block>
-                  <template #icon>
-                    <span class="i-mdi:content-save"></span>
-                  </template>
                   保存
                 </NButton>
                 <NButton v-if="!isNew" @click="togglePreview" block>
-                  <template #icon>
-                    <span :class="previewMode ? 'i-mdi:pencil' : 'i-mdi:eye'"></span>
-                  </template>
                   {{ previewMode ? '编辑' : '预览' }}
                 </NButton>
+                <NButton v-if="!isNew" type="success" @click="showBackupModal = true" block>
+                  定时备份
+                </NButton>
                 <NButton @click="handleBack" block>
-                  <template #icon>
-                    <span class="i-mdi:arrow-left"></span>
-                  </template>
                   返回列表
                 </NButton>
               </NSpace>
@@ -477,6 +471,12 @@ onMounted(() => {
           </NSpace>
         </NGi>
       </NGrid>
+
+      <!-- 备份弹框 -->
+      <BackupModal
+        v-model:show="showBackupModal"
+        :requirement-id="requirementId"
+      />
     </NSpin>
   </div>
 </template>

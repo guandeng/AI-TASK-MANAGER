@@ -23,6 +23,10 @@ func NewMessageHandler(logger *zap.Logger) *MessageHandler {
 // List 获取消息列表
 func (h *MessageHandler) List(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	// 解析分页参数
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -75,6 +79,10 @@ func (h *MessageHandler) List(c *gin.Context) {
 // UnreadCount 获取未读消息数
 func (h *MessageHandler) UnreadCount(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	var count int64
 	if err := db.Model(&models.Message{}).Where("is_read = ?", false).Count(&count).Error; err != nil {
@@ -89,6 +97,10 @@ func (h *MessageHandler) UnreadCount(c *gin.Context) {
 // MarkRead 标记消息已读
 func (h *MessageHandler) MarkRead(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -108,10 +120,14 @@ func (h *MessageHandler) MarkRead(c *gin.Context) {
 // MarkAllRead 标记全部已读
 func (h *MessageHandler) MarkAllRead(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	if err := db.Model(&models.Message{}).Where("is_read = ?", false).Update("is_read", true).Error; err != nil {
 		h.logger.Error("标记全部已读失败", zap.Error(err))
-		response.Error(c, 500, "标记全部已读失败")
+		response.Error(c, 500, "��记全部已读失败")
 		return
 	}
 

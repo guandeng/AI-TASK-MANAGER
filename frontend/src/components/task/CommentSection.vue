@@ -14,18 +14,31 @@ import {
   NEllipsis
 } from 'naive-ui';
 import { fetchTaskComments, createComment, updateComment, deleteComment, fetchCommentReplies } from '@/service/api/comment';
+import { useMemberStore } from '@/store/modules/member';
 import type { Comment } from '@/typings/api/comment';
 import { formatTimeAgo } from '@/utils/common';
 
 const props = defineProps<{
   taskId: number;
-  memberId?: number; // 当前用户成员ID
+  memberId?: number; // 当前用户成员ID（可选）
 }>();
 
 const emit = defineEmits<{
   (e: 'commented'): void;
   (e: 'deleted'): void;
 }>();
+
+const memberStore = useMemberStore();
+
+// 获取有效的 memberId：优先使用传入的，否则使用第一个成员
+const effectiveMemberId = computed(() => {
+  if (props.memberId) return props.memberId;
+  // 如果没有传入 memberId，使用第一个成员
+  if (memberStore.members.length > 0) {
+    return memberStore.members[0].id;
+  }
+  return 1; // 默认使用 ID 1
+});
 
 // 状态
 const loading = ref(false);
@@ -102,7 +115,7 @@ async function handleSubmitComment() {
   try {
     const { error } = await createComment(props.taskId, {
       content: newCommentContent.value.trim(),
-      memberId: props.memberId || 0
+      memberId: effectiveMemberId.value
     });
 
     if (error) {
@@ -142,7 +155,7 @@ async function handleSubmitReply() {
   try {
     const { error } = await createComment(props.taskId, {
       content: replyContent.value.trim(),
-      memberId: props.memberId || 0,
+      memberId: effectiveMemberId.value,
       parentId: replyTo.value.id
     });
 
@@ -185,7 +198,7 @@ async function handleSaveEdit(comment: Comment) {
   try {
     const { error } = await updateComment(props.taskId, comment.id, {
       content: editContent.value.trim(),
-      memberId: props.memberId
+      memberId: effectiveMemberId.value
     });
 
     if (error) {
@@ -203,7 +216,7 @@ async function handleSaveEdit(comment: Comment) {
 // 删除评论
 async function handleDelete(comment: Comment) {
   try {
-    const { error } = await deleteComment(props.taskId, comment.id, props.memberId || 0);
+    const { error } = await deleteComment(props.taskId, comment.id, effectiveMemberId.value);
     if (error) {
       window.$message?.error('删除失败');
     } else {

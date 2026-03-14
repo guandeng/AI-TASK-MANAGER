@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NTabs, NTabPane } from 'naive-ui';
 import type { SelectOption } from 'naive-ui';
@@ -13,7 +13,6 @@ import type { TaskStatus, Subtask } from '@/typings/api/task';
 import CommentSection from '@/components/task/CommentSection.vue';
 import AssignmentPanel from '@/components/task/AssignmentPanel.vue';
 import ActivityTimeline from '@/components/task/ActivityTimeline.vue';
-import BackupModal from '@/components/requirement/BackupModal.vue';
 import DependencyGraph from '@/components/task/DependencyGraph.vue';
 
 const route = useRoute();
@@ -66,12 +65,6 @@ function getSubtaskStatusClass(status: TaskStatus): string {
 
 const taskId = computed(() => Number(route.params.id));
 const task = computed(() => taskStore.currentTask);
-
-// 备份弹框状态
-const showBackupModal = ref(false);
-
-// 获取需求 ID（从任务中获取）
-const requirementId = computed(() => task.value?.requirementId);
 
 // 独立的 loading 状态
 const expandLoading = ref(false);
@@ -177,16 +170,20 @@ async function saveEdit() {
         updateData = { title: editingValue.value };
       } else if (field === 'details') {
         updateData = { details: editingValue.value };
-      } else {
+      } else if (field === 'testStrategy') {
         updateData = { testStrategy: editingValue.value };
+      } else {
+        // 不应该到达这里
+        return;
       }
       const success = await taskStore.updateTask(taskId.value, updateData);
       if (success) {
+        // 先取消编辑状态，再切换预览模式
+        cancelEdit();
         // 切回预览模式
         if (field === 'details' || field === 'testStrategy') {
           togglePreview('task', field);
         }
-        cancelEdit();
         window.$message?.success('保存成功');
       } else {
         window.$message?.error('保存失败');
@@ -202,11 +199,12 @@ async function saveEdit() {
       }
       const success = await taskStore.updateSubtask(taskId.value, editingSubtaskId.value, updateData);
       if (success) {
+        // 先取消编辑状态，再切换预览模式
+        cancelEdit();
         // 切回预览模式
         if (field === 'description') {
           togglePreview('subtask', field, editingSubtaskId.value);
         }
-        cancelEdit();
         window.$message?.success('保存成功');
       } else {
         window.$message?.error('保存失败');
@@ -223,6 +221,8 @@ async function saveEdit() {
 const showRegenerateModal = ref(false);
 const regeneratePrompt = ref('');
 const regeneratingSubtaskId = ref<number | null>(null);
+const regeneratingSubtaskIds = ref<Set<number>>(new Set());
+const deletingSubtaskIds = ref<Set<number>>(new Set());
 
 // 轮询相关状态
 const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null);
@@ -340,7 +340,12 @@ async function handleDeleteSubtask(subtaskId: number) {
 
   if (!window.confirm(`确认删除子任务吗？`)) return;
 
-  await taskStore.deleteSubtask(taskId.value, subtaskId);
+  deletingSubtaskIds.value.add(subtaskId);
+  try {
+    await taskStore.deleteSubtask(taskId.value, subtaskId);
+  } finally {
+    deletingSubtaskIds.value.delete(subtaskId);
+  }
 }
 
 // 返回列表页面
@@ -363,27 +368,60 @@ function handleCloseRegenerateModal() {
 async function handleConfirmRegenerate() {
   if (!taskId.value || regeneratingSubtaskId.value === null) return;
 
-  await taskStore.regenerateSubtask(
-    taskId.value,
-    regeneratingSubtaskId.value,
-    regeneratePrompt.value || undefined
-  );
+  const subtaskId = regeneratingSubtaskId.value;
+  regeneratingSubtaskIds.value.add(subtaskId);
+
+  try {
+    await taskStore.regenerateSubtask(
+      taskId.value,
+      subtaskId,
+      regeneratePrompt.value || undefined
+    );
+  } finally {
+    regeneratingSubtaskIds.value.delete(subtaskId);
+  }
 
   handleCloseRegenerateModal();
 }
 
-// 子任务拖拽排序
-const subtaskList = computed({
-  get: () => task.value?.subtasks || [],
-  set: () => {
-    // 拖拽后由 onDragEnd 处理
-  }
-});
+// 子任务列表 - 使用 ref 配合智能同步
+const localSubtasks = ref<Subtask[]>([]);
+
+// 监听 task.subtasks 变化，但只在必要时更新
+watch(
+  () => task.value?.subtasks,
+  (newSubtasks) => {
+    if (!newSubtasks) {
+      localSubtasks.value = [];
+      return;
+    }
+
+    // 检查是否是真正的数据变化（通过比较 JSON）
+    const newJson = JSON.stringify(newSubtasks.map((s: Subtask) => ({ id: s.id, status: s.status, title: s.title, description: s.description })));
+    const currentJson = JSON.stringify(localSubtasks.value.map((s: Subtask) => ({ id: s.id, status: s.status, title: s.title, description: s.description })));
+
+    if (newJson !== currentJson) {
+      // 数据确实变了，更新本地列表
+      // 但尽量保持相同 ID 的对象引用
+      const currentMap = new Map(localSubtasks.value.map(s => [s.id, s]));
+      localSubtasks.value = newSubtasks.map((newSubtask: Subtask) => {
+        const existing = currentMap.get(newSubtask.id);
+        if (existing) {
+          // 合并更新，保持引用
+          Object.assign(existing, newSubtask);
+          return existing;
+        }
+        return newSubtask;
+      });
+    }
+  },
+  { immediate: true }
+);
 
 async function handleDragEnd() {
-  if (!taskId.value || !task.value?.subtasks) return;
+  if (!taskId.value || localSubtasks.value.length === 0) return;
 
-  const subtaskIds = task.value.subtasks.map(st => st.id);
+  const subtaskIds = localSubtasks.value.map(st => st.id);
   await taskStore.reorderSubtasks(taskId.value, subtaskIds);
 }
 
@@ -431,9 +469,6 @@ onUnmounted(() => {
         <NButton type="error" :loading="deleteLoading" @click="handleDeleteTask">
           删除任务
         </NButton>
-        <NButton type="success" :disabled="!requirementId" @click="showBackupModal = true">
-          定时备份
-        </NButton>
       </NSpace>
     </div>
 
@@ -458,9 +493,7 @@ onUnmounted(() => {
                 </div>
                 <div v-else class="editable-title" @click="startEditTask('title')">
                   {{ task.titleTrans || task.title }}
-                  <NButton text type="primary" size="small" class="edit-btn">
-                    <template #icon><span class="i-mdi:pencil text-14px"></span></template>
-                  </NButton>
+                  <NButton text type="primary" size="small" class="edit-btn">编辑</NButton>
                 </div>
               </template>
 
@@ -506,9 +539,7 @@ onUnmounted(() => {
                           class="markdown-preview-wrapper"
                         />
                         <span v-else class="text-gray-400">点击编辑实现细节</span>
-                        <NButton text type="primary" size="small" class="edit-btn">
-                          <template #icon><span class="i-mdi:pencil text-14px"></span></template>
-                        </NButton>
+                        <NButton text type="primary" size="small" class="edit-btn">编辑</NButton>
                       </div>
                     </div>
                   </NDescriptionsItem>
@@ -535,9 +566,7 @@ onUnmounted(() => {
                           class="markdown-preview-wrapper"
                         />
                         <span v-else class="text-gray-400">点击编辑测试策略</span>
-                        <NButton text type="primary" size="small" class="edit-btn">
-                          <template #icon><span class="i-mdi:pencil text-14px"></span></template>
-                        </NButton>
+                        <NButton text type="primary" size="small" class="edit-btn">编辑</NButton>
                       </div>
                     </div>
                   </NDescriptionsItem>
@@ -546,15 +575,15 @@ onUnmounted(() => {
                 <!-- 子任务列表 -->
                 <NCard title="子任务" size="small">
                   <VueDraggable
-                    v-if="task.subtasks?.length"
-                    v-model="subtaskList"
+                    v-if="localSubtasks.length"
+                    v-model="localSubtasks"
                     :animation="150"
                     handle=".drag-handle"
                     class="subtask-list"
                     @end="handleDragEnd"
                   >
                     <div
-                      v-for="subtask in task.subtasks"
+                      v-for="subtask in localSubtasks"
                       :key="subtask.id"
                       class="subtask-item"
                     >
@@ -575,9 +604,7 @@ onUnmounted(() => {
                         </div>
                         <div v-else class="editable-inline" @click="startEditSubtask(subtask.id, 'title')">
                           {{ task.id }}.{{ subtask.id }} {{ subtask.titleTrans || subtask.title }}
-                          <NButton text type="primary" size="tiny" class="edit-btn-inline">
-                            <span class="i-mdi:pencil text-12px"></span>
-                          </NButton>
+                          <NButton text type="primary" size="tiny" class="edit-btn-inline">编辑</NButton>
                         </div>
                       </div>
                       <div class="subtask-content">
@@ -603,9 +630,7 @@ onUnmounted(() => {
                               class="markdown-preview-wrapper"
                             />
                             <span v-else class="text-gray-400">点击编辑子任务描述</span>
-                            <NButton text type="primary" size="small" class="edit-btn">
-                              <template #icon><span class="i-mdi:pencil text-14px"></span></template>
-                            </NButton>
+                            <NButton text type="primary" size="small" class="edit-btn">编辑</NButton>
                           </div>
                         </div>
                       </div>
@@ -623,7 +648,7 @@ onUnmounted(() => {
                             type="warning"
                             size="small"
                             ghost
-                            :loading="taskStore.loading"
+                            :loading="regeneratingSubtaskIds.has(subtask.id)"
                             @click="handleOpenRegenerateModal(subtask.id)"
                           >
                             重写
@@ -632,7 +657,7 @@ onUnmounted(() => {
                             type="error"
                             size="small"
                             ghost
-                            :loading="taskStore.loading"
+                            :loading="deletingSubtaskIds.has(subtask.id)"
                             @click="handleDeleteSubtask(subtask.id)"
                           >
                             删除
@@ -706,12 +731,6 @@ onUnmounted(() => {
           />
         </NSpace>
       </NModal>
-
-      <!-- 备份弹框 -->
-      <BackupModal
-        v-model:show="showBackupModal"
-        :requirement-id="requirementId"
-      />
     </div>
   </div>
 </template>

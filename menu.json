@@ -33,6 +33,27 @@
     "i18nKey": "route.requirement_task-list"
   },
   {
+    "key": "message",
+    "label": "消息中心",
+    "icon": "mdi:message-outline",
+    "order": 2,
+    "enabled": true,
+    "hideInMenu": false,
+    "parentKey": null
+  },
+  {
+    "key": "message_list",
+    "label": "消息列表",
+    "icon": "mdi:inbox",
+    "path": "/message/list",
+    "routeName": "message_list",
+    "order": 1,
+    "enabled": true,
+    "hideInMenu": false,
+    "parentKey": "message",
+    "i18nKey": "route.message_list"
+  },
+  {
     "key": "manage",
     "label": "系统管理",
     "icon": "mdi:cog",

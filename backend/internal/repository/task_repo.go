@@ -22,6 +22,7 @@ type TaskRepository interface {
 	GetSubtasks(taskID uint64) ([]models.Subtask, error)
 	CreateSubtask(subtask *models.Subtask) error
 	UpdateSubtask(subtask *models.Subtask) error
+	UpdateSubtaskWithMap(taskID, subtaskID uint64, updates map[string]interface{}) error
 	DeleteSubtask(taskID, subtaskID uint64) error
 	DeleteAllSubtasks(taskID uint64) error
 	ReorderSubtasks(taskID uint64, subtaskIDs []uint64) error
@@ -70,12 +71,15 @@ func (r *taskRepository) List(filters map[string]interface{}, page, pageSize int
 		return nil, 0, err
 	}
 
-	// 分页查询，使用 LEFT JOIN 获取需求标题
+	// 分页查询，使用 LEFT JOIN 获取需求标题和子任务统计
 	offset := (page - 1) * pageSize
 
-	// 构建查询
+	// 构建查询 - 添加子任务统计子查询
 	query := r.db.Table("task_task").
-		Select("task_task.*, task_requirement.title as requirement_title").
+		Select(`task_task.*,
+			task_requirement.title as requirement_title,
+			(SELECT COUNT(*) FROM task_subtask WHERE task_subtask.task_id = task_task.id) as subtask_count,
+			(SELECT COUNT(*) FROM task_subtask WHERE task_subtask.task_id = task_task.id AND task_subtask.status = 'done') as subtask_done_count`).
 		Joins("LEFT JOIN task_requirement ON task_task.requirement_id = task_requirement.id")
 
 	// 应用相同的筛选条件
@@ -121,6 +125,8 @@ func (r *taskRepository) List(filters map[string]interface{}, page, pageSize int
 		ActualHours      *float64   `gorm:"column:actual_hours" json:"actualHours"`
 		CreatedAt        time.Time  `gorm:"column:created_at" json:"createdAt"`
 		UpdatedAt        time.Time  `gorm:"column:updated_at" json:"updatedAt"`
+		SubtaskCount     int        `gorm:"column:subtask_count" json:"subtaskCount"`
+		SubtaskDoneCount int        `gorm:"column:subtask_done_count" json:"subtaskDoneCount"`
 	}
 
 	var scannedTasks []TaskScan
@@ -157,6 +163,8 @@ func (r *taskRepository) List(filters map[string]interface{}, page, pageSize int
 			ActualHours:      st.ActualHours,
 			CreatedAt:        st.CreatedAt,
 			UpdatedAt:        st.UpdatedAt,
+			SubtaskCount:     st.SubtaskCount,
+			SubtaskDoneCount: st.SubtaskDoneCount,
 		})
 	}
 
@@ -230,7 +238,15 @@ func (r *taskRepository) CreateSubtask(subtask *models.Subtask) error {
 
 // UpdateSubtask 更新子任务
 func (r *taskRepository) UpdateSubtask(subtask *models.Subtask) error {
-	return r.db.Save(subtask).Error
+	return r.db.Model(&models.Subtask{}).Where("id = ? AND task_id = ?", subtask.ID, subtask.TaskID).Updates(subtask).Error
+}
+
+// UpdateSubtaskWithMap 使用 map 更新子任务（只更新传入的字段）
+func (r *taskRepository) UpdateSubtaskWithMap(taskID, subtaskID uint64, updates map[string]interface{}) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	return r.db.Model(&models.Subtask{}).Where("id = ? AND task_id = ?", subtaskID, taskID).Updates(updates).Error
 }
 
 // DeleteSubtask 删除子任务

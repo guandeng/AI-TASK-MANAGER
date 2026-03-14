@@ -30,6 +30,10 @@ type Task struct {
 	CreatedAt        time.Time  `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt        time.Time  `gorm:"autoUpdateTime" json:"updatedAt"`
 
+	// 子任务统计（通过子查询获取）
+	SubtaskCount     int `gorm:"-" json:"subtaskCount"`
+	SubtaskDoneCount int `gorm:"-" json:"subtaskDoneCount"`
+
 	// 关联
 	Subtasks     []Subtask       `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"subtasks,omitempty"`
 	Dependencies []TaskDependency `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"dependencies,omitempty"`

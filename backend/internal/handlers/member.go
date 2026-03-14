@@ -23,6 +23,10 @@ func NewMemberHandler(logger *zap.Logger) *MemberHandler {
 // List 获取成员列表
 func (h *MemberHandler) List(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	// 解析筛选条件
 	query := db.Model(&models.Member{})
@@ -73,6 +77,10 @@ func (h *MemberHandler) List(c *gin.Context) {
 // Get 获取成员详情
 func (h *MemberHandler) Get(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -103,6 +111,10 @@ type CreateMemberRequest struct {
 // Create 创建成员
 func (h *MemberHandler) Create(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	var req CreateMemberRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -151,6 +163,10 @@ type UpdateMemberRequest struct {
 // Update 更新成员
 func (h *MemberHandler) Update(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -210,6 +226,10 @@ func (h *MemberHandler) Update(c *gin.Context) {
 // Delete 删除成员
 func (h *MemberHandler) Delete(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -248,6 +268,10 @@ type MemberAssignment struct {
 // GetAssignments 获取成员的任务分配
 func (h *MemberHandler) GetAssignments(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -341,6 +365,10 @@ type MemberWorkload struct {
 // GetWorkload 获取成员工作量
 func (h *MemberHandler) GetWorkload(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {

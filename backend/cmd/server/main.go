@@ -101,12 +101,20 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 		taskHandler := handlers.NewTaskHandler(logger, cfg)
 		tasks := api.Group("/tasks")
 		{
+			// 静态路由 - 必须放在参数路由之前
 			tasks.GET("", taskHandler.List)
+			tasks.POST("/batch-delete", taskHandler.BatchDelete)
+			tasks.GET("/dependencies", taskHandler.GetAllDependencies)
+			tasks.GET("/dependencies/validate", taskHandler.ValidateDependencies)
+			tasks.GET("/ready", taskHandler.GetReadyTasks)
+
+			// 参数路由
 			tasks.GET("/:taskId", taskHandler.Get)
 			tasks.POST("/:taskId/update", taskHandler.Update)
 			tasks.POST("/:taskId/delete", taskHandler.Delete)
-			tasks.POST("/batch-delete", taskHandler.BatchDelete)
 			tasks.POST("/:taskId/time", taskHandler.UpdateTime)
+			tasks.POST("/:taskId/dependencies", taskHandler.AddDependency)
+			tasks.DELETE("/:taskId/dependencies/:dependsOnTaskId", taskHandler.RemoveDependency)
 
 			// 子任务
 			tasks.POST("/:taskId/subtasks/:subtaskId/update", taskHandler.UpdateSubtask)
@@ -207,6 +215,7 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			menus.POST("/reorder", menuHandler.Reorder)
 			menus.POST("/:key/move", menuHandler.Move)
 			menus.POST("/:key/toggle", menuHandler.Toggle)
+			menus.POST("/sync", menuHandler.SyncFromJSON)
 		}
 
 		// 配置管理
@@ -252,11 +261,11 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 		{
 			backupGroup.GET("", backupHandler.List)
 			backupGroup.POST("/create", backupHandler.Create)
-			backupGroup.POST("/:backupId/restore", backupHandler.Restore)
-			backupGroup.POST("/:backupId/delete", backupHandler.Delete)
 			backupGroup.GET("/schedule", backupHandler.GetSchedule)
 			backupGroup.POST("/schedule/update", backupHandler.UpdateSchedule)
 			backupGroup.POST("/schedule/disable", backupHandler.DisableSchedule)
+			backupGroup.POST("/:backupId/restore", backupHandler.Restore)
+			backupGroup.POST("/:backupId/delete", backupHandler.Delete)
 		}
 
 		// 启动备份调度器

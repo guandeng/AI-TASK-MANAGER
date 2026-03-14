@@ -109,25 +109,8 @@ func (s *taskService) BatchDelete(ids []uint64) error {
 
 // UpdateSubtask 更新子任务
 func (s *taskService) UpdateSubtask(taskID, subtaskID uint64, updates map[string]interface{}) error {
-	subtask := &models.Subtask{
-		ID:     subtaskID,
-		TaskID: taskID,
-	}
-
-	if title, ok := updates["title"].(string); ok {
-		subtask.Title = title
-	}
-	if description, ok := updates["description"].(string); ok {
-		subtask.Description = description
-	}
-	if status, ok := updates["status"].(string); ok {
-		subtask.Status = status
-	}
-	if details, ok := updates["details"].(string); ok {
-		subtask.Details = details
-	}
-
-	return s.repo.UpdateSubtask(subtask)
+	// 直接传递 updates map 给 repository，只更新传入的字段
+	return s.repo.UpdateSubtaskWithMap(taskID, subtaskID, updates)
 }
 
 // DeleteSubtask 删除子任务

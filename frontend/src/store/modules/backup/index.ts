@@ -11,6 +11,16 @@ import {
 } from '@/service/api/backup';
 import type { BackupRecord, BackupSchedule } from '@/service/api/backup';
 
+// 辅助函数：提取后端返回的 data 字段
+// 后端返回格式: { code: 0, message: "success", data: {...} }
+function extractData(responseData: any): any {
+  if (!responseData) return null;
+  if (responseData.data !== undefined) {
+    return responseData.data;
+  }
+  return responseData;
+}
+
 export const useBackupStore = defineStore('backup-store', () => {
   // 状态
   const backups = ref<BackupRecord[]>([]);
@@ -24,7 +34,7 @@ export const useBackupStore = defineStore('backup-store', () => {
     try {
       const { data, error } = await fetchBackupList(requirementId, params);
       if (!error && data) {
-        const responseData = (data as any).data || data;
+        const responseData = extractData(data);
         if (responseData && 'list' in responseData) {
           backups.value = responseData.list || [];
           total.value = responseData.total || 0;
@@ -45,7 +55,7 @@ export const useBackupStore = defineStore('backup-store', () => {
     try {
       const { data, error } = await fetchBackupSchedule(requirementId);
       if (!error && data) {
-        schedule.value = data;
+        schedule.value = extractData(data);
       }
     } catch (error) {
       console.error('Failed to load schedule:', error);
@@ -57,13 +67,15 @@ export const useBackupStore = defineStore('backup-store', () => {
     try {
       const { data, error } = await createBackup(requirementId);
       if (!error && data) {
-        window.$message?.success('备份创建成功');
-        // 重新加载列表
-        await loadBackups(requirementId);
-        return true;
-      } else {
-        window.$message?.error('备份创建失败');
+        const response = data as any;
+        if (response?.code === 0) {
+          window.$message?.success('备份创建成功');
+          // 重新加载列表
+          await loadBackups(requirementId);
+          return true;
+        }
       }
+      window.$message?.error('备份创建失败');
     } catch (error: any) {
       console.error('Failed to create backup:', error);
       window.$message?.error(error?.response?.data?.message || '备份创建失败');
@@ -77,11 +89,13 @@ export const useBackupStore = defineStore('backup-store', () => {
     try {
       const { data, error } = await restoreBackup(requirementId, backupId);
       if (!error && data) {
-        window.$message?.success('恢复成功');
-        return true;
-      } else {
-        window.$message?.error('恢复失败');
+        const response = data as any;
+        if (response?.code === 0) {
+          window.$message?.success('恢复成功');
+          return true;
+        }
       }
+      window.$message?.error('恢复失败');
     } catch (error: any) {
       console.error('Failed to restore backup:', error);
       window.$message?.error(error?.response?.data?.message || '恢复失败');
@@ -93,13 +107,15 @@ export const useBackupStore = defineStore('backup-store', () => {
     try {
       const { data, error } = await deleteBackup(requirementId, backupId);
       if (!error && data) {
-        window.$message?.success('删除成功');
-        // 重新加载列表
-        await loadBackups(requirementId);
-        return true;
-      } else {
-        window.$message?.error('删除失败');
+        const response = data as any;
+        if (response?.code === 0) {
+          window.$message?.success('删除成功');
+          // 重新加载列表
+          await loadBackups(requirementId);
+          return true;
+        }
       }
+      window.$message?.error('删除失败');
     } catch (error: any) {
       console.error('Failed to delete backup:', error);
       window.$message?.error(error?.response?.data?.message || '删除失败');
@@ -107,17 +123,19 @@ export const useBackupStore = defineStore('backup-store', () => {
     return false;
   }
 
-  async function updateScheduleAction(requirementId: number, data: Partial<BackupSchedule>) {
+  async function updateScheduleAction(requirementId: number, scheduleData: Partial<BackupSchedule>) {
     try {
-      const result = await updateBackupSchedule(requirementId, data);
-      if (result && !result.error) {
-        window.$message?.success('保存成功');
-        // 重新加载计划
-        await loadSchedule(requirementId);
-        return true;
-      } else {
-        window.$message?.error('保存失败');
+      const result = await updateBackupSchedule(requirementId, scheduleData);
+      if (result && !result.error && result.data) {
+        const response = result.data as any;
+        if (response?.code === 0) {
+          window.$message?.success('保存成功');
+          // 重新加载计划
+          await loadSchedule(requirementId);
+          return true;
+        }
       }
+      window.$message?.error('保存失败');
     } catch (error: any) {
       console.error('Failed to update schedule:', error);
       window.$message?.error(error?.response?.data?.message || '保存失败');
@@ -129,13 +147,15 @@ export const useBackupStore = defineStore('backup-store', () => {
     try {
       const { data, error } = await disableBackupSchedule(requirementId);
       if (!error && data) {
-        window.$message?.success('已禁用备份计划');
-        // 重新加载计划
-        await loadSchedule(requirementId);
-        return true;
-      } else {
-        window.$message?.error('禁用失败');
+        const response = data as any;
+        if (response?.code === 0) {
+          window.$message?.success('已禁用备份计划');
+          // 重新加载计划
+          await loadSchedule(requirementId);
+          return true;
+        }
       }
+      window.$message?.error('禁用失败');
     } catch (error: any) {
       console.error('Failed to disable schedule:', error);
       window.$message?.error(error?.response?.data?.message || '禁用失败');

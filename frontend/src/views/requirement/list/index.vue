@@ -422,9 +422,6 @@ onActivated(() => {
     <NCard title="需求列表">
       <template #header-extra>
         <NButton @click="loadData">
-          <template #icon>
-            <span class="i-mdi:refresh"></span>
-          </template>
           刷新
         </NButton>
       </template>

@@ -108,8 +108,9 @@ export const useMenuStore = defineStore('menu-store', () => {
     try {
       const { data, error } = await createMenuApi(formData);
       if (!error && data) {
+        // 后端返回格式: { code: 0, message: "success", data: { menu: {...} } }
         const responseData = (data as any).data;
-        if (responseData?.success) {
+        if (responseData?.menu) {
           await loadMenus();
           window.$message?.success('菜单创建成功');
           return responseData.menu;
@@ -130,8 +131,9 @@ export const useMenuStore = defineStore('menu-store', () => {
     try {
       const { data, error } = await updateMenuApi(key, formData);
       if (!error && data) {
+        // 后端返回格式: { code: 0, message: "success", data: { menu: {...} } }
         const responseData = (data as any).data;
-        if (responseData?.success) {
+        if (responseData?.menu) {
           await loadMenus();
           window.$message?.success('菜单更新成功');
           return responseData.menu;
@@ -152,8 +154,9 @@ export const useMenuStore = defineStore('menu-store', () => {
     try {
       const { data, error } = await deleteMenuApi(key);
       if (!error && data) {
-        const responseData = (data as any).data;
-        if (responseData?.success) {
+        // 后端返回格式: { code: 0, message: "删除菜单成功" }
+        const response = data as any;
+        if (response?.code === 0) {
           await loadMenus();
           window.$message?.success('菜单删除成功');
           return true;
@@ -198,8 +201,9 @@ export const useMenuStore = defineStore('menu-store', () => {
     try {
       const { data, error } = await reorderMenusApi(orderData);
       if (!error && data) {
-        const responseData = (data as any).data;
-        if (responseData?.success) {
+        // 后端返回格式: { code: 0, message: "菜单排序成功" }
+        const response = data as any;
+        if (response?.code === 0) {
           await loadMenus();
           window.$message?.success('菜单排序更新成功');
           return true;
@@ -217,10 +221,14 @@ export const useMenuStore = defineStore('menu-store', () => {
     loading.value = true;
     try {
       const { data, error } = await moveMenuApi(key, targetParentKey);
-      if (!error && data?.success) {
-        await loadMenus();
-        window.$message?.success('菜单移动成功');
-        return true;
+      if (!error && data) {
+        // 后端返回格式: { code: 0, message: "移动菜单成功" }
+        const response = data as any;
+        if (response?.code === 0) {
+          await loadMenus();
+          window.$message?.success('菜单移动成功');
+          return true;
+        }
       }
       return false;
     } catch (error) {
@@ -236,8 +244,9 @@ export const useMenuStore = defineStore('menu-store', () => {
     try {
       const { data, error } = await toggleMenuEnabledApi(key, enabled);
       if (!error && data) {
-        const responseData = (data as any).data;
-        if (responseData?.success) {
+        // 后端返回格式: { code: 0, message: "菜单状态已更新" }
+        const response = data as any;
+        if (response?.code === 0) {
           const menu = menus.value.find(m => m.key === key);
           if (menu) {
             menu.enabled = enabled;

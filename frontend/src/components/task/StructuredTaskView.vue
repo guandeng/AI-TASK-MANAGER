@@ -188,7 +188,6 @@ function getStatusIcon(status: string): string {
                   size="small"
                   @click="startEditCodeHints"
                 >
-                  <template #icon><span class="i-mdi:pencil" /></template>
                   编辑
                 </NButton>
               </NSpace>
@@ -246,7 +245,7 @@ function getStatusIcon(status: string): string {
                     size="small"
                     @click="startEditSubtaskCodeHints(subtask.id)"
                   >
-                    <template #icon><span class="i-mdi:pencil text-12px" /></template>
+                    编辑
                   </NButton>
                 </div>
               </div>

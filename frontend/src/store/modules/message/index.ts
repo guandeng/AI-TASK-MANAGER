@@ -8,6 +8,16 @@ import {
 } from '@/service/api/message';
 import type { Message, MessageListParams } from '@/typings/api/message';
 
+// 辅助函数：提取后端返回的 data 字段
+// 后端返回格式: { code: 0, message: "success", data: {...} }
+function extractData(responseData: any): any {
+  if (!responseData) return null;
+  if (responseData.data !== undefined) {
+    return responseData.data;
+  }
+  return responseData;
+}
+
 export const useMessageStore = defineStore('message-store', () => {
   // 状态
   const messages = ref<Message[]>([]);
@@ -26,7 +36,7 @@ export const useMessageStore = defineStore('message-store', () => {
       const { data, error } = await fetchMessages(params);
       if (!error && data) {
         // 后端返回格式: { code: 0, message: "success", data: { list, total, page, pageSize } }
-        const responseData = (data as any).data || data;
+        const responseData = extractData(data);
 
         if (Array.isArray(responseData)) {
           messages.value = responseData;
@@ -58,7 +68,10 @@ export const useMessageStore = defineStore('message-store', () => {
     try {
       const { data, error } = await fetchUnreadCount();
       if (!error && data) {
-        unreadCount.value = data.count;
+        const responseData = extractData(data);
+        if (responseData && typeof responseData.count === 'number') {
+          unreadCount.value = responseData.count;
+        }
       }
     } catch (error) {
       console.error('Failed to load unread count:', error);
@@ -67,12 +80,17 @@ export const useMessageStore = defineStore('message-store', () => {
 
   async function markAsRead(id: number) {
     try {
-      await markMessageRead(id);
-      // 更新本地状态
-      const message = messages.value.find(m => m.id === id);
-      if (message) {
-        message.isRead = true;
-        unreadCount.value = Math.max(0, unreadCount.value - 1);
+      const { data, error } = await markMessageRead(id);
+      if (!error && data) {
+        const response = data as any;
+        if (response?.code === 0) {
+          // 更新本地状态
+          const message = messages.value.find(m => m.id === id);
+          if (message) {
+            message.isRead = true;
+            unreadCount.value = Math.max(0, unreadCount.value - 1);
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to mark message as read:', error);
@@ -82,9 +100,14 @@ export const useMessageStore = defineStore('message-store', () => {
 
   async function deleteMessageById(id: number) {
     try {
-      await deleteMessage(id);
-      messages.value = messages.value.filter(m => m.id !== id);
-      unreadCount.value = Math.max(0, unreadCount.value - 1);
+      const { data, error } = await deleteMessage(id);
+      if (!error && data) {
+        const response = data as any;
+        if (response?.code === 0) {
+          messages.value = messages.value.filter(m => m.id !== id);
+          unreadCount.value = Math.max(0, unreadCount.value - 1);
+        }
+      }
     } catch (error) {
       console.error('Failed to delete message:', error);
       window.$message?.error('删除消息失败');
@@ -105,21 +128,25 @@ export const useMessageStore = defineStore('message-store', () => {
       const { data, error } = await fetchMessages({ taskId: parseInt(key, 10) });
 
       if (!error && data) {
-        messages.value = data.messages;
-        unreadCount.value = data.total || 0;
+        const responseData = extractData(data);
+        if (responseData) {
+          const messagesList = responseData.messages || responseData.list || responseData || [];
+          messages.value = Array.isArray(messagesList) ? messagesList : [];
+          unreadCount.value = responseData.total || 0;
 
-        const message = data.messages[0];
+          const message = messages.value[0];
 
-        // 检查是否有状态变化
-        if (message && (message.status === 'success' || message.status === 'failed')) {
-          // 完成/失败时停止轮询
-          stopPollingMessageStatus();
+          // 检查是否有状态变化
+          if (message && (message.status === 'success' || message.status === 'failed')) {
+            // 完成/失败时停止轮询
+            stopPollingMessageStatus();
 
-          // 通知UI
-          if (message.status === 'success') {
-            window.$message?.success(message.resultSummary || '任务拆分完成');
-          } else if (message.status === 'failed') {
-            window.$message?.error(`任务拆分失败: ${message.errorMessage}`);
+            // 通知UI
+            if (message.status === 'success') {
+              window.$message?.success(message.resultSummary || '任务拆分完成');
+            } else if (message.status === 'failed') {
+              window.$message?.error(`任务拆分失败: ${message.errorMessage}`);
+            }
           }
         }
       }

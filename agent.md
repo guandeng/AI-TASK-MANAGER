@@ -336,6 +336,16 @@ export const useTaskStore = defineStore('task-store', () => {
 - 数据库：`ai_task`
 - 用户名：`root`
 - 密码：`123456`
+- 时区：`Asia/Shanghai (+08:00)`
+
+### 连接字符串
+
+后端 DSN 格式：
+```
+root:123456@tcp(localhost:3306)/ai_task?charset=utf8mb4&collation=utf8mb4_unicode_ci&parseTime=True&loc=Asia%2FShanghai
+```
+
+> 注意：使用 `--default-character-set=utf8mb4` 避免中文乱码
 
 ### 执行 SQL 脚本
 
@@ -356,11 +366,11 @@ docker ps | grep mysql
 # 进入 MySQL 容器
 docker exec -it mysql bash
 
-# 执行 SQL 查询
-docker exec -i mysql mysql -h localhost -u root -p123456 ai_task -e "SELECT * FROM task_menu"
+# 执行 SQL 查询（使用 utf8mb4 字符集避免中文乱码）
+docker exec -i mysql mysql -h localhost -u root -p123456 --default-character-set=utf8mb4 ai_task -e "SELECT * FROM task_menu"
 
 # 注意：key 是 MySQL 保留字，查询时需用反引号包裹
-docker exec -i mysql mysql -h localhost -u root -p123456 ai_task -e "SELECT \`key\`, title FROM task_menu"
+docker exec -i mysql mysql -h localhost -u root -p123456 --default-character-set=utf8mb4 ai_task -e "SELECT \`key\`, title FROM task_menu"
 ```
 
 ### 注意事项
@@ -368,3 +378,25 @@ docker exec -i mysql mysql -h localhost -u root -p123456 ai_task -e "SELECT \`ke
 1. 执行 SQL 脚本时，字段名 `key` 是 MySQL 保留字，在查询时必须使用反引号包裹：\`key\`
 2. 使用 `-p` 参数传递密码时会有安全警告，建议使用配置文件或环境变量
 3. SQL 文件路径必须是容器内可访问的路径，使用 `-i` 参数通过 stdin 传入
+4. **必须使用 `--default-character-set=utf8mb4` 参数**，否则中文会显示乱码
+
+---
+
+## 前端 UI 规范
+
+### 按钮规范
+
+- **按钮不加 icon**：生成前端代码时，按钮不需要添加图标（icon），保持简洁
+- 示例：
+  ```vue
+  <!-- ✅ 正确：按钮无图标 -->
+  <n-button type="primary" @click="handleSubmit">提交</n-button>
+
+  <!-- ❌ 错误：按钮有图标 -->
+  <n-button type="primary" @click="handleSubmit">
+    <template #icon>
+      <icon-ic-round-check />
+    </template>
+    提交
+  </n-button>
+  ```

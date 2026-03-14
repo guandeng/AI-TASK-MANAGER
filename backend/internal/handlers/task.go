@@ -226,7 +226,9 @@ func (h *TaskHandler) UpdateSubtask(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, nil)
+	// 返回更新后的任务（包含子任务列表）
+	task, _ := h.service.GetByID(taskID)
+	response.Success(c, task)
 }
 
 // DeleteSubtask 删除子任务
@@ -248,7 +250,9 @@ func (h *TaskHandler) DeleteSubtask(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, nil)
+	// 返回更新后的任务（包含子任务列表）
+	task, _ := h.service.GetByID(taskID)
+	response.Success(c, task)
 }
 
 // DeleteAllSubtasks 删除所有子任务
@@ -265,7 +269,9 @@ func (h *TaskHandler) DeleteAllSubtasks(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, nil)
+	// 返回更新后的任务
+	task, _ := h.service.GetByID(taskID)
+	response.Success(c, task)
 }
 
 // ReorderSubtasks 重新排序子任务
@@ -290,7 +296,9 @@ func (h *TaskHandler) ReorderSubtasks(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, nil)
+	// 返回更新后的任务（包含子任务列表）
+	task, _ := h.service.GetByID(taskID)
+	response.Success(c, task)
 }
 
 // RegenerateSubtask 重新生成子任务
@@ -312,7 +320,9 @@ func (h *TaskHandler) RegenerateSubtask(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, nil)
+	// 返回更新后的任务（包含子任务列表）
+	task, _ := h.service.GetByID(taskID)
+	response.Success(c, task)
 }
 
 // ExpandTask 同步展开任务（AI 生成子任务）
@@ -705,4 +715,213 @@ func (h *TaskHandler) DeleteSubtaskAssignment(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"success": true, "message": "删除成功"})
+}
+
+// GetAllDependencies 获取所有任务依赖关系
+func (h *TaskHandler) GetAllDependencies(c *gin.Context) {
+	db := database.GetDB()
+	var dependencies []models.TaskDependency
+	if err := db.Find(&dependencies).Error; err != nil {
+		h.logger.Error("获取任务依赖关系失败", zap.Error(err))
+		response.Error(c, 500, "获取任务依赖关系失败")
+		return
+	}
+	response.Success(c, dependencies)
+}
+
+// AddDependency 添加任务依赖
+func (h *TaskHandler) AddDependency(c *gin.Context) {
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+
+	var req struct {
+		DependsOnTaskID uint64 `json:"dependsOnTaskId" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请求参数格式错误")
+		return
+	}
+
+	// 不能依赖自己
+	if taskID == req.DependsOnTaskID {
+		response.BadRequest(c, "任务不能依赖自己")
+		return
+	}
+
+	db := database.GetDB()
+
+	// 检查任务是否存在
+	var task models.Task
+	if err := db.First(&task, taskID).Error; err != nil {
+		response.NotFound(c, "任务不存在")
+		return
+	}
+
+	// 检查依赖的任务是否存在
+	var dependsOnTask models.Task
+	if err := db.First(&dependsOnTask, req.DependsOnTaskID).Error; err != nil {
+		response.NotFound(c, "依赖的任务不存在")
+		return
+	}
+
+	// 检查是否已存在相同的依赖
+	var existingCount int64
+	db.Model(&models.TaskDependency{}).Where("task_id = ? AND depends_on_task_id = ?", taskID, req.DependsOnTaskID).Count(&existingCount)
+	if existingCount > 0 {
+		response.BadRequest(c, "该依赖关系已存在")
+		return
+	}
+
+	dependency := models.TaskDependency{
+		TaskID:         taskID,
+		DependsOnTaskID: req.DependsOnTaskID,
+	}
+
+	if err := db.Create(&dependency).Error; err != nil {
+		h.logger.Error("添加任务依赖失败", zap.Error(err))
+		response.Error(c, 500, "添加任务依赖失败")
+		return
+	}
+
+	response.Success(c, dependency)
+}
+
+// RemoveDependency 删除任务依赖
+func (h *TaskHandler) RemoveDependency(c *gin.Context) {
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+	dependsOnTaskID, err := strconv.ParseUint(c.Param("dependsOnTaskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的依赖任务 ID")
+		return
+	}
+
+	db := database.GetDB()
+	if err := db.Where("task_id = ? AND depends_on_task_id = ?", taskID, dependsOnTaskID).Delete(&models.TaskDependency{}).Error; err != nil {
+		h.logger.Error("删除任务依赖失败", zap.Error(err))
+		response.Error(c, 500, "删除任务依赖失败")
+		return
+	}
+
+	response.Success(c, gin.H{"success": true, "message": "删除成功"})
+}
+
+// ValidateDependencies 验证依赖关系（检查循环依赖）
+func (h *TaskHandler) ValidateDependencies(c *gin.Context) {
+	db := database.GetDB()
+	var dependencies []models.TaskDependency
+	if err := db.Find(&dependencies).Error; err != nil {
+		h.logger.Error("获取任务依赖关系失败", zap.Error(err))
+		response.Error(c, 500, "获取任务依赖关系失败")
+		return
+	}
+
+	// 构建依赖图
+	graph := make(map[uint64][]uint64)
+	for _, dep := range dependencies {
+		graph[dep.TaskID] = append(graph[dep.TaskID], dep.DependsOnTaskID)
+	}
+
+	// 检测循环依赖
+	visited := make(map[uint64]bool)
+	recStack := make(map[uint64]bool)
+	var cycle []uint64
+
+	var hasCycle func(node uint64) bool
+	hasCycle = func(node uint64) bool {
+		visited[node] = true
+		recStack[node] = true
+
+		for _, neighbor := range graph[node] {
+			if !visited[neighbor] {
+				if hasCycle(neighbor) {
+					cycle = append(cycle, node)
+					return true
+				}
+			} else if recStack[neighbor] {
+				cycle = append(cycle, node)
+				return true
+			}
+		}
+
+		recStack[node] = false
+		return false
+	}
+
+	for node := range graph {
+		if !visited[node] {
+			if hasCycle(node) {
+				response.Success(c, gin.H{
+					"valid":   false,
+					"message": "检测到循环依赖",
+					"cycle":   cycle,
+				})
+				return
+			}
+		}
+	}
+
+	response.Success(c, gin.H{
+		"valid":   true,
+		"message": "依赖关系有效，无循环依赖",
+	})
+}
+
+// GetReadyTasks 获取可开始的任务（所有依赖已完成）
+func (h *TaskHandler) GetReadyTasks(c *gin.Context) {
+	db := database.GetDB()
+
+	// 获取所有待处理的任务
+	var pendingTasks []models.Task
+	if err := db.Where("status = ?", "pending").Find(&pendingTasks).Error; err != nil {
+		h.logger.Error("获取待处理任务失败", zap.Error(err))
+		response.Error(c, 500, "获取待处理任务失败")
+		return
+	}
+
+	// 获取所有依赖关系
+	var dependencies []models.TaskDependency
+	if err := db.Find(&dependencies).Error; err != nil {
+		h.logger.Error("获取依赖关系失败", zap.Error(err))
+		response.Error(c, 500, "获取依赖关系失败")
+		return
+	}
+
+	// 构建依赖映射
+	depMap := make(map[uint64][]uint64)
+	for _, dep := range dependencies {
+		depMap[dep.TaskID] = append(depMap[dep.TaskID], dep.DependsOnTaskID)
+	}
+
+	// 获取已完成的任务 ID
+	var completedTasks []models.Task
+	db.Where("status = ?", "done").Find(&completedTasks)
+	completedIDs := make(map[uint64]bool)
+	for _, t := range completedTasks {
+		completedIDs[t.ID] = true
+	}
+
+	// 找出可开始的任务
+	var readyTasks []models.Task
+	for _, task := range pendingTasks {
+		deps := depMap[task.ID]
+		allDepsCompleted := true
+		for _, depID := range deps {
+			if !completedIDs[depID] {
+				allDepsCompleted = false
+				break
+			}
+		}
+		if allDepsCompleted {
+			readyTasks = append(readyTasks, task)
+		}
+	}
+
+	response.Success(c, readyTasks)
 }

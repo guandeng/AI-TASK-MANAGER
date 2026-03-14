@@ -205,9 +205,10 @@ export const useTaskStore = defineStore('task-store', () => {
         if (index !== -1) {
           tasks.value[index] = { ...tasks.value[index], ...updatedTask };
         }
-        // 如果是当前任务，也更新
+        // 如果是当前任务，完全替换对象以触发响应式更新
         if (currentTask.value?.id === id) {
-          currentTask.value = { ...currentTask.value, ...updatedTask };
+          currentTask.value = null;
+          currentTask.value = updatedTask;
         }
         return true;
       }
@@ -222,26 +223,17 @@ export const useTaskStore = defineStore('task-store', () => {
     try {
       const { data: responseData, error } = await updateSubtaskApi(taskId, subtaskId, { status });
       if (!error && responseData) {
-        const updatedSubtask = extractData(responseData);
-        // 更新列表中任务的子任务
-        const taskIndex = tasks.value.findIndex(t => t.id === taskId);
-        if (taskIndex !== -1 && tasks.value[taskIndex].subtasks) {
-          const subtaskIndex = tasks.value[taskIndex].subtasks!.findIndex(st => st.id === subtaskId);
-          if (subtaskIndex !== -1) {
-            tasks.value[taskIndex].subtasks![subtaskIndex] = {
-              ...tasks.value[taskIndex].subtasks![subtaskIndex],
-              ...updatedSubtask
-            };
+        const updatedTask = extractData(responseData);
+        // 后端返回的是整个 task 对象（包含更新后的 subtasks）
+        if (updatedTask && updatedTask.subtasks) {
+          // 更新列表中的任务
+          const taskIndex = tasks.value.findIndex(t => t.id === taskId);
+          if (taskIndex !== -1) {
+            tasks.value[taskIndex] = { ...tasks.value[taskIndex], ...updatedTask };
           }
-        }
-        // 如果是当前任务，也更新
-        if (currentTask.value?.id === taskId && currentTask.value.subtasks) {
-          const subtaskIndex = currentTask.value.subtasks.findIndex(st => st.id === subtaskId);
-          if (subtaskIndex !== -1) {
-            currentTask.value.subtasks[subtaskIndex] = {
-              ...currentTask.value.subtasks[subtaskIndex],
-              ...updatedSubtask
-            };
+          // 如果是当前任务，直接替换
+          if (currentTask.value?.id === taskId) {
+            currentTask.value = { ...currentTask.value, ...updatedTask };
           }
         }
         window.$message?.success('子任务状态更新成功');
@@ -260,26 +252,17 @@ export const useTaskStore = defineStore('task-store', () => {
     try {
       const { data: responseData, error } = await updateSubtaskApi(taskId, subtaskId, updateData);
       if (!error && responseData) {
-        const updatedSubtask = extractData(responseData);
-        // 更新列表中任务的子任务
-        const taskIndex = tasks.value.findIndex(t => t.id === taskId);
-        if (taskIndex !== -1 && tasks.value[taskIndex].subtasks) {
-          const subtaskIndex = tasks.value[taskIndex].subtasks!.findIndex(st => st.id === subtaskId);
-          if (subtaskIndex !== -1) {
-            tasks.value[taskIndex].subtasks![subtaskIndex] = {
-              ...tasks.value[taskIndex].subtasks![subtaskIndex],
-              ...updatedSubtask
-            };
+        const updatedTask = extractData(responseData);
+        // 后端返回的是整个 task 对象（包含更新后的 subtasks）
+        if (updatedTask && updatedTask.subtasks) {
+          // 更新列表中的任务
+          const taskIndex = tasks.value.findIndex(t => t.id === taskId);
+          if (taskIndex !== -1) {
+            tasks.value[taskIndex] = { ...tasks.value[taskIndex], ...updatedTask };
           }
-        }
-        // 如果是当前任务，也更新
-        if (currentTask.value?.id === taskId && currentTask.value.subtasks) {
-          const subtaskIndex = currentTask.value.subtasks.findIndex(st => st.id === subtaskId);
-          if (subtaskIndex !== -1) {
-            currentTask.value.subtasks[subtaskIndex] = {
-              ...currentTask.value.subtasks[subtaskIndex],
-              ...updatedSubtask
-            };
+          // 如果是当前任务，直接替换
+          if (currentTask.value?.id === taskId) {
+            currentTask.value = { ...currentTask.value, ...updatedTask };
           }
         }
         return true;
@@ -454,12 +437,17 @@ export const useTaskStore = defineStore('task-store', () => {
       const { data: responseData, error } = await deleteSubtaskApi(taskId, subtaskId);
       if (!error && responseData) {
         const updatedTask = extractData(responseData);
-        const index = tasks.value.findIndex(t => t.id === taskId);
-        if (index !== -1) {
-          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+        // 后端返回的是整个 task 对象
+        if (updatedTask) {
+          const index = tasks.value.findIndex(t => t.id === taskId);
+          if (index !== -1) {
+            tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+          }
+          // 更新当前任务
+          if (currentTask.value?.id === taskId) {
+            currentTask.value = { ...currentTask.value, ...updatedTask };
+          }
         }
-        currentTask.value = updatedTask;
-        await loadTasks();
         window.$message?.success('子任务已删除');
         return true;
       }
@@ -494,11 +482,17 @@ export const useTaskStore = defineStore('task-store', () => {
 
       if (!error && responseData) {
         const updatedTask = extractData(responseData);
-        const index = tasks.value.findIndex(t => t.id === taskId);
-        if (index !== -1) {
-          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+        // 后端返回的是整个 task 对象
+        if (updatedTask) {
+          const index = tasks.value.findIndex(t => t.id === taskId);
+          if (index !== -1) {
+            tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+          }
+          // 更新当前任务
+          if (currentTask.value?.id === taskId) {
+            currentTask.value = { ...currentTask.value, ...updatedTask };
+          }
         }
-        currentTask.value = updatedTask;
 
         if (shouldManageLoading) {
           ls.success('子任务重写成功');
@@ -529,14 +523,17 @@ export const useTaskStore = defineStore('task-store', () => {
       const { data: responseData, error } = await reorderSubtasksApi(taskId, subtaskIds);
       if (!error && responseData) {
         const updatedTask = extractData(responseData);
-        // 更新列表中的任务
-        const index = tasks.value.findIndex(t => t.id === taskId);
-        if (index !== -1) {
-          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
-        }
-        // 更新当前任务
-        if (currentTask.value?.id === taskId) {
-          currentTask.value = updatedTask;
+        // 后端返回的是整个 task 对象
+        if (updatedTask) {
+          // 更新列表中的任务
+          const index = tasks.value.findIndex(t => t.id === taskId);
+          if (index !== -1) {
+            tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+          }
+          // 更新当前任务
+          if (currentTask.value?.id === taskId) {
+            currentTask.value = { ...currentTask.value, ...updatedTask };
+          }
         }
         return true;
       }
@@ -710,7 +707,7 @@ export const useTaskStore = defineStore('task-store', () => {
     loadTaskDetail,
     setTaskStatus,
     setTaskAssignee,
-    updateTask,
+    updateTask: updateTaskById,
     setSubtaskStatus,
     updateSubtask,
     expandTask,

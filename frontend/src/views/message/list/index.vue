@@ -6,7 +6,7 @@ import { useRouter } from 'vue-router'
 import type { Message } from '@/typings/api/message'
 
 defineOptions({
-  name: 'MessageList'
+  name: 'message_list'
 })
 
 const messageStore = useMessageStore()
@@ -169,6 +169,7 @@ onUnmounted(() => {
               <div class="message-content">
                 <div class="message-header">
                   <NSpace align="center" :size="8">
+                    <span class="message-id">#{{ message.id }}</span>
                     <NTag type="info" size="small">{{ getMessageTypeText(message.type) }}</NTag>
                     <NTag :type="getMessageStatusType(message.status)" size="small">
                       {{ getMessageStatusText(message.status) }}
@@ -236,6 +237,12 @@ onUnmounted(() => {
   height: 8px;
   border-radius: 50%;
   background-color: #f0a020;
+}
+
+.message-id {
+  font-size: 12px;
+  color: #999;
+  font-family: monospace;
 }
 
 .message-title {

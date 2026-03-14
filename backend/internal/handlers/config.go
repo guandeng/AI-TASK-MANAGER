@@ -34,26 +34,23 @@ func (h *ConfigHandler) SetConfigPath(path string) {
 
 // Get 获取配置
 func (h *ConfigHandler) Get(c *gin.Context) {
-	// 返回安全配置（包含 API Key 用于编辑）
+	// 返回安全配置（不包含敏感信息如 API Key）
 	safeConfig := gin.H{
 		"ai": gin.H{
 			"provider": h.config.AI.Provider,
 			"providers": gin.H{
 				"qwen": gin.H{
 					"enabled": h.config.AI.Providers["qwen"].Enabled,
-					"apiKey":  h.config.AI.Providers["qwen"].APIKey,
 					"model":   h.config.AI.Providers["qwen"].Model,
 					"baseUrl": h.config.AI.Providers["qwen"].BaseURL,
 				},
 				"gemini": gin.H{
 					"enabled": h.config.AI.Providers["gemini"].Enabled,
-					"apiKey":  h.config.AI.Providers["gemini"].APIKey,
 					"model":   h.config.AI.Providers["gemini"].Model,
 					"baseUrl": h.config.AI.Providers["gemini"].BaseURL,
 				},
 				"perplexity": gin.H{
 					"enabled": h.config.AI.Providers["perplexity"].Enabled,
-					"apiKey":  h.config.AI.Providers["perplexity"].APIKey,
 					"model":   h.config.AI.Providers["perplexity"].Model,
 					"baseUrl": h.config.AI.Providers["perplexity"].BaseURL,
 				},

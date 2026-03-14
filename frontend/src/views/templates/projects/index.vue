@@ -167,13 +167,23 @@ const formRules: FormRules = {
   name: { required: true, message: '请输入模板名称', trigger: 'blur' }
 };
 
+// 辅助函数：提取后端返回的 data 字段
+// 后端返回格式: { code: 0, message: "success", data: {...} }
+function extractData(responseData: any): any {
+  if (!responseData) return null;
+  if (responseData.data !== undefined) {
+    return responseData.data;
+  }
+  return responseData;
+}
+
 // 加载模板列表
 async function loadTemplates() {
   loading.value = true;
   try {
     const { data, error } = await fetchProjectTemplates();
     if (!error && data) {
-      templates.value = data;
+      templates.value = extractData(data) || [];
     }
   } finally {
     loading.value = false;
@@ -184,7 +194,7 @@ async function loadTemplates() {
 async function handleView(template: ProjectTemplate) {
   const { data } = await fetchProjectTemplate(template.id);
   if (data) {
-    editingTemplate.value = data;
+    editingTemplate.value = extractData(data);
     modalType.value = 'view';
     showModal.value = true;
   }
@@ -209,22 +219,23 @@ function handleCreate() {
 async function handleEdit(template: ProjectTemplate) {
   const { data } = await fetchProjectTemplate(template.id);
   if (data) {
+    const templateData = extractData(data);
     modalType.value = 'edit';
-    editingTemplate.value = data;
+    editingTemplate.value = templateData;
     formData.value = {
-      name: data.name,
-      description: data.description || '',
-      category: data.category || 'other',
-      isPublic: data.isPublic,
-      tags: data.tags || [],
-      tasks: data.tasks?.map(t => ({
+      name: templateData.name,
+      description: templateData.description || '',
+      category: templateData.category || 'other',
+      isPublic: templateData.isPublic,
+      tags: templateData.tags || [],
+      tasks: templateData.tasks?.map((t: any) => ({
         title: t.title,
         description: t.description || '',
         priority: t.priority,
         order: t.order,
         estimatedHours: t.estimatedHours,
         dependencies: t.dependencies,
-        subtasks: t.subtasks?.map(s => ({
+        subtasks: t.subtasks?.map((s: any) => ({
           title: s.title,
           description: s.description || '',
           order: s.order,
@@ -302,7 +313,8 @@ async function handleInstantiate() {
     if (error) {
       message.error('创建失败');
     } else {
-      message.success(`已创建项目，包含 ${data?.taskIds?.length || 0} 个任务`);
+      const result = extractData(data);
+      message.success(`已创建项目，包含 ${result?.taskIds?.length || 0} 个任务`);
       showInstantiateModal.value = false;
       await loadTemplates();
     }

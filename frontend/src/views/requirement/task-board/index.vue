@@ -63,9 +63,6 @@ onMounted(async () => {
       <template #header-extra>
         <NSpace>
           <NButton size="small" @click="refresh">
-            <template #icon>
-              <span class="i-mdi:refresh"></span>
-            </template>
             刷新
           </NButton>
           <NButton
@@ -73,9 +70,6 @@ onMounted(async () => {
             type="primary"
             @click="router.push('/requirement/task-create')"
           >
-            <template #icon>
-              <span class="i-mdi:plus"></span>
-            </template>
             新建任务
           </NButton>
         </NSpace>

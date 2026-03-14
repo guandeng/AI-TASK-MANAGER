@@ -85,7 +85,7 @@ const requirementOptions = computed<SelectOption[]>(() => {
 
     seen.add(task.requirementId);
     options.push({
-      label: task.requirementTitle || `需求 #${task.requirementId}`,
+      label: task.requirementTitle || '(需求已删除)',
       value: task.requirementId
     });
   });
@@ -108,25 +108,22 @@ const columns: DataTableColumns<Task> = [
     key: 'requirementTitle',
     width: 150,
     render(row) {
-      if (!row.requirementId && !row.requirementTitle) {
+      if (!row.requirementId) {
         return '-';
       }
 
-      if (!row.requirementId) {
-        return row.requirementTitle;
-      }
+      // 如果有关联需求ID但没有标题，说明需求可能已被删除
+      const displayText = row.requirementTitle || '(需求已删除)';
 
       return h(
         'a',
         {
           class: 'cursor-pointer hover:text-primary transition-colors',
           onClick: () => {
-            if (row.requirementId) {
-              router.push(`/requirement/detail/${row.requirementId}`);
-            }
+            router.push(`/requirement/detail/${row.requirementId}`);
           }
         },
-        row.requirementTitle || `需求 #${row.requirementId}`
+        displayText
       );
     }
   },
@@ -142,6 +139,12 @@ const columns: DataTableColumns<Task> = [
     key: 'subtasks',
     width: 100,
     render(row) {
+      // 优先使用后端返回的统计字段
+      if (row.subtaskCount !== undefined) {
+        if (row.subtaskCount === 0) return '-';
+        return `${row.subtaskDoneCount || 0}/${row.subtaskCount}`;
+      }
+      // 兼容旧数据：从 subtasks 数组计算
       if (!row.subtasks || row.subtasks.length === 0) return '-';
       const doneCount = row.subtasks.filter(st => st.status === 'done').length;
       return `${doneCount}/${row.subtasks.length}`;
@@ -395,15 +398,9 @@ watch(
       <template #header-extra>
         <NSpace>
           <NButton type="primary" @click="$router.push('/requirement/task-create')">
-            <template #icon>
-              <span class="i-mdi:plus"></span>
-            </template>
             新建任务
           </NButton>
           <NButton @click="loadTaskListData">
-            <template #icon>
-              <span class="i-mdi:refresh"></span>
-            </template>
             刷新
           </NButton>
           <NSelect

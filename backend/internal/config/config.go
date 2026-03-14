@@ -152,7 +152,7 @@ func setDefaults(v *viper.Viper) {
 
 // GetDSN 获取数据库连接字符串
 func (c *DatabaseConfig) GetDSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&collation=%s&parseTime=True&loc=Local",
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&collation=%s&parseTime=True&loc=Asia%%2FShanghai",
 		c.Username,
 		c.Password,
 		c.Host,

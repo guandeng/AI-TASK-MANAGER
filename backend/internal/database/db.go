@@ -75,6 +75,10 @@ func autoMigrate() error {
 		&models.Message{},
 		&models.Menu{},
 		&models.Config{},
+		&models.ProjectTemplate{},
+		&models.ProjectTemplateTask{},
+		&models.ProjectTemplateSubtask{},
+		&models.TaskTemplate{},
 	)
 }
 

@@ -398,7 +398,7 @@ type SplitTasksRequest struct {
 	TaskType string `json:"taskType"` // frontend, backend, fullstack
 }
 
-// SplitTasks 需求拆分为任务（AI）
+// SplitTasks 需求拆分为任务（AI）- 同步版本
 func (h *RequirementHandler) SplitTasks(c *gin.Context) {
 	db := database.GetDB()
 
@@ -457,5 +457,102 @@ func (h *RequirementHandler) SplitTasks(c *gin.Context) {
 		"success": true,
 		"message": "成功拆分为任务",
 		"tasks":   tasks,
+	})
+}
+
+// SplitTasksAsync 需求拆分为任务（AI）- 异步版本
+func (h *RequirementHandler) SplitTasksAsync(c *gin.Context) {
+	db := database.GetDB()
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求 ID")
+		return
+	}
+
+	// 解析请求体
+	var req SplitTasksRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// 如果没有请求体，使用默认值
+		req.TaskType = "backend"
+	}
+
+	// 验证任务类型
+	if req.TaskType != "frontend" && req.TaskType != "backend" && req.TaskType != "fullstack" {
+		req.TaskType = "backend"
+	}
+
+	// 获取需求详情
+	var requirement models.Requirement
+	if err := db.First(&requirement, id).Error; err != nil {
+		response.NotFound(c, "需求不存在")
+		return
+	}
+
+	// 检查 AI 服务是否可用
+	if h.aiService == nil {
+		response.Error(c, 500, "AI 服务未配置")
+		return
+	}
+
+	// 创建消息记录
+	title := "需求拆分任务"
+	content := requirement.Title
+	message := models.Message{
+		TaskID:  0, // 需求拆分没有关联的任务，设为 0
+		Type:    "split_requirement",
+		Status:  "processing",
+		Title:   title,
+		Content: &content,
+	}
+	if err := db.Create(&message).Error; err != nil {
+		h.logger.Error("创建消息记录失败", zap.Error(err))
+		response.Error(c, 500, "创建消息记录失败")
+		return
+	}
+
+	// 异步执行拆分
+	go func() {
+		// 调用 AI 服务拆分需求
+		tasks, err := h.aiService.SplitRequirement(&requirement, req.TaskType)
+		if err != nil {
+			h.logger.Error("AI 拆分需求失败", zap.Error(err))
+			// 更新消息状态为失败
+			errMsg := err.Error()
+			db.Model(&message).Updates(map[string]interface{}{
+				"status":        "failed",
+				"error_message": &errMsg,
+			})
+			return
+		}
+
+		// 保存任务到数据库
+		if len(tasks) > 0 {
+			if err := db.Create(&tasks).Error; err != nil {
+				h.logger.Error("保存任务失败", zap.Error(err))
+				// 更新消息状态为失败
+				errMsg := "保存任务失败"
+				db.Model(&message).Updates(map[string]interface{}{
+					"status":        "failed",
+					"error_message": &errMsg,
+				})
+				return
+			}
+		}
+
+		// 更新需求状态为已拆分
+		db.Model(&requirement).Update("status", "active")
+
+		// 更新消息状态为成功
+		resultSummary := fmt.Sprintf("成功拆分为 %d 个任务", len(tasks))
+		db.Model(&message).Updates(map[string]interface{}{
+			"status":         "success",
+			"result_summary": &resultSummary,
+		})
+	}()
+
+	response.Success(c, gin.H{
+		"messageId": message.ID,
+		"message":   "需求拆分已开始，完成后会通知您",
 	})
 }

@@ -46,8 +46,8 @@ export function assignTaskToMember(taskId: number, data: CreateAssignmentRequest
  */
 export function unassignTaskFromMember(taskId: number, assignmentId: number) {
   return request<{ success: boolean; message: string }>({
-    url: `${API_BASE}/tasks/${taskId}/assignments/${assignmentId}`,
-    method: 'DELETE'
+    url: `${API_BASE}/tasks/${taskId}/assignments/${assignmentId}/delete`,
+    method: 'POST'
   });
 }
 
@@ -77,8 +77,8 @@ export function assignSubtaskToMember(taskId: number, subtaskId: number, data: C
  */
 export function unassignSubtaskFromMember(taskId: number, subtaskId: number, assignmentId: number) {
   return request<{ success: boolean; message: string }>({
-    url: `${API_BASE}/tasks/${taskId}/subtasks/${subtaskId}/assignments/${assignmentId}`,
-    method: 'DELETE'
+    url: `${API_BASE}/tasks/${taskId}/subtasks/${subtaskId}/assignments/${assignmentId}/delete`,
+    method: 'POST'
   });
 }
 
@@ -109,7 +109,7 @@ export function fetchMemberWorkload(memberId: number) {
 export function updateTaskTime(taskId: number, data: TaskTimeInfo) {
   return request<{ success: boolean; message: string }>({
     url: `${API_BASE}/tasks/${taskId}/time`,
-    method: 'PUT',
+    method: 'POST',
     data
   });
 }

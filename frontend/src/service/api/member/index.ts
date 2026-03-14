@@ -58,8 +58,8 @@ export function createMember(data: MemberCreateRequest) {
  */
 export function updateMember(id: number, data: MemberUpdateRequest) {
   return request<Member>({
-    url: `${API_BASE}/members/${id}`,
-    method: 'PUT',
+    url: `${API_BASE}/members/${id}/update`,
+    method: 'POST',
     data
   });
 }
@@ -69,8 +69,8 @@ export function updateMember(id: number, data: MemberUpdateRequest) {
  */
 export function deleteMember(id: number) {
   return request<{ success: boolean; message: string }>({
-    url: `${API_BASE}/members/${id}`,
-    method: 'DELETE'
+    url: `${API_BASE}/members/${id}/delete`,
+    method: 'POST'
   });
 }
 

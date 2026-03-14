@@ -44,8 +44,8 @@ export function createRequirement(data: RequirementFormData) {
 /** 更新需求 */
 export function updateRequirement(id: number, data: Partial<RequirementFormData>) {
   return request<Requirement>({
-    url: `/api/requirements/${id}`,
-    method: 'put',
+    url: `/api/requirements/${id}/update`,
+    method: 'post',
     data
   });
 }
@@ -53,8 +53,8 @@ export function updateRequirement(id: number, data: Partial<RequirementFormData>
 /** 删除需求 */
 export function deleteRequirement(id: number) {
   return request<{ success: boolean; message: string }>({
-    url: `/api/requirements/${id}`,
-    method: 'delete'
+    url: `/api/requirements/${id}/delete`,
+    method: 'post'
   });
 }
 
@@ -79,8 +79,8 @@ export function uploadDocument(requirementId: number, file: File, uploadedBy?: s
 /** 删除文档 */
 export function deleteDocument(requirementId: number, documentId: number) {
   return request<{ success: boolean; message: string }>({
-    url: `/api/requirements/${requirementId}/documents/${documentId}`,
-    method: 'delete'
+    url: `/api/requirements/${requirementId}/documents/${documentId}/delete`,
+    method: 'post'
   });
 }
 
@@ -108,6 +108,18 @@ export function splitRequirementToTasks(requirementId: number, taskType: TaskTyp
     }>;
   }>({
     url: `/api/requirements/${requirementId}/split-tasks`,
+    method: 'post',
+    data: { taskType }
+  });
+}
+
+/** 将需求拆分为任务（异步） */
+export function splitRequirementToTasksAsync(requirementId: number, taskType: TaskType = 'backend') {
+  return request<{
+    messageId: number;
+    message: string;
+  }>({
+    url: `/api/requirements/${requirementId}/split-tasks-async`,
     method: 'post',
     data: { taskType }
   });

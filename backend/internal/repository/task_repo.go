@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/ai-task-manager/backend/internal/database"
 	"github.com/ai-task-manager/backend/internal/models"
 	"gorm.io/gorm"
@@ -70,6 +72,8 @@ func (r *taskRepository) List(filters map[string]interface{}, page, pageSize int
 
 	// 分页查询，使用 LEFT JOIN 获取需求标题
 	offset := (page - 1) * pageSize
+
+	// 构建查询
 	query := r.db.Table("task_task").
 		Select("task_task.*, task_requirement.title as requirement_title").
 		Joins("LEFT JOIN task_requirement ON task_task.requirement_id = task_requirement.id")
@@ -91,11 +95,69 @@ func (r *taskRepository) List(filters map[string]interface{}, page, pageSize int
 		query = query.Where("task_task.title LIKE ? OR task_task.description LIKE ?", "%"+keyword.(string)+"%", "%"+keyword.(string)+"%")
 	}
 
+	// 使用 Scan 扫描结果，确保 requirement_title 被正确映射
+	// 注意：gorm tag 用于数据库列映射，json tag 用于 JSON 序列化
+	type TaskScan struct {
+		ID               uint64     `gorm:"column:id" json:"id"`
+		RequirementID    *uint64    `gorm:"column:requirement_id" json:"requirementId"`
+		RequirementTitle string     `gorm:"column:requirement_title" json:"requirementTitle"`
+		Title            string     `gorm:"column:title" json:"title"`
+		TitleTrans       *string    `gorm:"column:title_trans" json:"titleTrans"`
+		Description      string     `gorm:"column:description" json:"description"`
+		DescriptionTrans *string    `gorm:"column:description_trans" json:"descriptionTrans"`
+		Status           string     `gorm:"column:status" json:"status"`
+		Priority         string     `gorm:"column:priority" json:"priority"`
+		Details          string     `gorm:"column:details" json:"details"`
+		DetailsTrans     *string    `gorm:"column:details_trans" json:"detailsTrans"`
+		TestStrategy     string     `gorm:"column:test_strategy" json:"testStrategy"`
+		TestStrategyTrans *string   `gorm:"column:test_strategy_trans" json:"testStrategyTrans"`
+		Assignee         *string    `gorm:"column:assignee" json:"assignee"`
+		IsExpanding      bool       `gorm:"column:is_expanding" json:"isExpanding"`
+		ExpandMessageID  *uint64    `gorm:"column:expand_message_id" json:"expandMessageId"`
+		StartDate        *time.Time `gorm:"column:start_date" json:"startDate"`
+		DueDate          *time.Time `gorm:"column:due_date" json:"dueDate"`
+		CompletedAt      *time.Time `gorm:"column:completed_at" json:"completedAt"`
+		EstimatedHours   *float64   `gorm:"column:estimated_hours" json:"estimatedHours"`
+		ActualHours      *float64   `gorm:"column:actual_hours" json:"actualHours"`
+		CreatedAt        time.Time  `gorm:"column:created_at" json:"createdAt"`
+		UpdatedAt        time.Time  `gorm:"column:updated_at" json:"updatedAt"`
+	}
+
+	var scannedTasks []TaskScan
 	if err := query.Order("task_task.created_at DESC").
 		Offset(offset).
 		Limit(pageSize).
-		Find(&tasks).Error; err != nil {
+		Scan(&scannedTasks).Error; err != nil {
 		return nil, 0, err
+	}
+
+	// 转换为 []models.Task
+	for _, st := range scannedTasks {
+		tasks = append(tasks, models.Task{
+			ID:               st.ID,
+			RequirementID:    st.RequirementID,
+			RequirementTitle: st.RequirementTitle,
+			Title:            st.Title,
+			TitleTrans:       st.TitleTrans,
+			Description:      st.Description,
+			DescriptionTrans: st.DescriptionTrans,
+			Status:           st.Status,
+			Priority:         st.Priority,
+			Details:          st.Details,
+			DetailsTrans:     st.DetailsTrans,
+			TestStrategy:     st.TestStrategy,
+			TestStrategyTrans: st.TestStrategyTrans,
+			Assignee:         st.Assignee,
+			IsExpanding:      st.IsExpanding,
+			ExpandMessageID:  st.ExpandMessageID,
+			StartDate:        st.StartDate,
+			DueDate:          st.DueDate,
+			CompletedAt:      st.CompletedAt,
+			EstimatedHours:   st.EstimatedHours,
+			ActualHours:      st.ActualHours,
+			CreatedAt:        st.CreatedAt,
+			UpdatedAt:        st.UpdatedAt,
+		})
 	}
 
 	return tasks, total, nil

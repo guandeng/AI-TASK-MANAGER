@@ -97,20 +97,20 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 	api := r.Group("/api")
 	{
 		// 任务管理
-		taskHandler := handlers.NewTaskHandler(logger)
+		taskHandler := handlers.NewTaskHandler(logger, cfg)
 		tasks := api.Group("/tasks")
 		{
 			tasks.GET("", taskHandler.List)
 			tasks.GET("/:taskId", taskHandler.Get)
-			tasks.PUT("/:taskId", taskHandler.Update)
-			tasks.DELETE("/:taskId", taskHandler.Delete)
+			tasks.POST("/:taskId/update", taskHandler.Update)
+			tasks.POST("/:taskId/delete", taskHandler.Delete)
 			tasks.POST("/batch-delete", taskHandler.BatchDelete)
-			tasks.PUT("/:taskId/time", taskHandler.UpdateTime)
+			tasks.POST("/:taskId/time", taskHandler.UpdateTime)
 
 			// 子任务
-			tasks.PUT("/:taskId/subtasks/:subtaskId", taskHandler.UpdateSubtask)
-			tasks.DELETE("/:taskId/subtasks/:subtaskId", taskHandler.DeleteSubtask)
-			tasks.DELETE("/:taskId/subtasks", taskHandler.DeleteAllSubtasks)
+			tasks.POST("/:taskId/subtasks/:subtaskId/update", taskHandler.UpdateSubtask)
+			tasks.POST("/:taskId/subtasks/:subtaskId/delete", taskHandler.DeleteSubtask)
+			tasks.POST("/:taskId/subtasks/delete", taskHandler.DeleteAllSubtasks)
 			tasks.POST("/:taskId/subtasks/reorder", taskHandler.ReorderSubtasks)
 			tasks.POST("/:taskId/subtasks/:subtaskId/regenerate", taskHandler.RegenerateSubtask)
 
@@ -122,12 +122,12 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			tasks.GET("/:taskId/assignments", taskHandler.GetAssignments)
 			tasks.GET("/:taskId/assignments/overview", taskHandler.GetAssignmentOverview)
 			tasks.POST("/:taskId/assignments", taskHandler.CreateAssignment)
-			tasks.DELETE("/:taskId/assignments/:assignmentId", taskHandler.DeleteAssignment)
+			tasks.POST("/:taskId/assignments/:assignmentId/delete", taskHandler.DeleteAssignment)
 
 			// 子任务分配
 			tasks.GET("/:taskId/subtasks/:subtaskId/assignments", taskHandler.GetSubtaskAssignments)
 			tasks.POST("/:taskId/subtasks/:subtaskId/assignments", taskHandler.CreateSubtaskAssignment)
-			tasks.DELETE("/:taskId/subtasks/:subtaskId/assignments/:assignmentId", taskHandler.DeleteSubtaskAssignment)
+			tasks.POST("/:taskId/subtasks/:subtaskId/assignments/:assignmentId/delete", taskHandler.DeleteSubtaskAssignment)
 
 			// 评论管理
 			commentHandler := handlers.NewCommentHandler(logger)
@@ -136,8 +136,8 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			tasks.GET("/:taskId/comments/statistics", commentHandler.GetStatistics)
 			tasks.GET("/:taskId/comments/:commentId", commentHandler.Get)
 			tasks.POST("/:taskId/comments", commentHandler.Create)
-			tasks.PUT("/:taskId/comments/:commentId", commentHandler.Update)
-			tasks.DELETE("/:taskId/comments/:commentId", commentHandler.Delete)
+			tasks.POST("/:taskId/comments/:commentId/update", commentHandler.Update)
+			tasks.POST("/:taskId/comments/:commentId/delete", commentHandler.Delete)
 			tasks.GET("/:taskId/comments/:commentId/replies", commentHandler.GetReplies)
 		}
 
@@ -149,12 +149,13 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			requirements.GET("/statistics", requirementHandler.Statistics)
 			requirements.GET("/:id", requirementHandler.Get)
 			requirements.POST("", requirementHandler.Create)
-			requirements.PUT("/:id", requirementHandler.Update)
-			requirements.DELETE("/:id", requirementHandler.Delete)
+			requirements.POST("/:id/update", requirementHandler.Update)
+			requirements.POST("/:id/delete", requirementHandler.Delete)
 			requirements.POST("/:id/documents", requirementHandler.UploadDocument)
-			requirements.DELETE("/:id/documents/:docId", requirementHandler.DeleteDocument)
+			requirements.POST("/:id/documents/:docId/delete", requirementHandler.DeleteDocument)
 			requirements.GET("/:id/documents/:docId/download", requirementHandler.DownloadDocument)
 			requirements.POST("/:id/split-tasks", requirementHandler.SplitTasks)
+			requirements.POST("/:id/split-tasks-async", requirementHandler.SplitTasksAsync)
 		}
 
 		// 成员管理
@@ -164,8 +165,8 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			members.GET("", memberHandler.List)
 			members.GET("/:id", memberHandler.Get)
 			members.POST("", memberHandler.Create)
-			members.PUT("/:id", memberHandler.Update)
-			members.DELETE("/:id", memberHandler.Delete)
+			members.POST("/:id/update", memberHandler.Update)
+			members.POST("/:id/delete", memberHandler.Delete)
 			members.GET("/:id/assignments", memberHandler.GetAssignments)
 			members.GET("/:id/workload", memberHandler.GetWorkload)
 		}
@@ -186,9 +187,9 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 		{
 			messages.GET("", messageHandler.List)
 			messages.GET("/unread-count", messageHandler.UnreadCount)
-			messages.PUT("/:id/read", messageHandler.MarkRead)
-			messages.PUT("/read-all", messageHandler.MarkAllRead)
-			messages.DELETE("/:id", messageHandler.Delete)
+			messages.POST("/:id/read", messageHandler.MarkRead)
+			messages.POST("/read-all", messageHandler.MarkAllRead)
+			messages.POST("/:id/delete", messageHandler.Delete)
 		}
 
 		// 菜单管理
@@ -199,12 +200,12 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			menus.GET("/tree", menuHandler.Tree)
 			menus.GET("/:key", menuHandler.Get)
 			menus.POST("", menuHandler.Create)
-			menus.PUT("/:key", menuHandler.Update)
-			menus.DELETE("/:key", menuHandler.Delete)
+			menus.POST("/:key/update", menuHandler.Update)
+			menus.POST("/:key/delete", menuHandler.Delete)
 			menus.POST("/batch-delete", menuHandler.BatchDelete)
-			menus.PUT("/reorder", menuHandler.Reorder)
-			menus.PUT("/:key/move", menuHandler.Move)
-			menus.PUT("/:key/toggle", menuHandler.Toggle)
+			menus.POST("/reorder", menuHandler.Reorder)
+			menus.POST("/:key/move", menuHandler.Move)
+			menus.POST("/:key/toggle", menuHandler.Toggle)
 		}
 
 		// 配置管理
@@ -212,10 +213,35 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 		configGroup := api.Group("/config")
 		{
 			configGroup.GET("", configHandler.Get)
-			configGroup.PUT("", configHandler.Update)
-			configGroup.PUT("/ai-provider", configHandler.UpdateAIProvider)
-			configGroup.PUT("/ai-provider/:provider", configHandler.UpdateSpecificProvider)
+			configGroup.POST("/update", configHandler.Update)
+			configGroup.POST("/ai-provider", configHandler.UpdateAIProvider)
+			configGroup.POST("/ai-provider/:provider", configHandler.UpdateSpecificProvider)
 			configGroup.POST("/reset", configHandler.Reset)
+		}
+
+		// 模板管理
+		templateHandler := handlers.NewTemplateHandler(logger)
+
+		// 项目模板
+		projectTemplates := api.Group("/templates/projects")
+		{
+			projectTemplates.GET("", templateHandler.ListProjectTemplates)
+			projectTemplates.GET("/:id", templateHandler.GetProjectTemplate)
+			projectTemplates.POST("", templateHandler.CreateProjectTemplate)
+			projectTemplates.POST("/:id/update", templateHandler.UpdateProjectTemplate)
+			projectTemplates.POST("/:id/delete", templateHandler.DeleteProjectTemplate)
+			projectTemplates.POST("/:id/instantiate", templateHandler.InstantiateProjectTemplate)
+		}
+
+		// 任务模板
+		taskTemplates := api.Group("/templates/tasks")
+		{
+			taskTemplates.GET("", templateHandler.ListTaskTemplates)
+			taskTemplates.GET("/:id", templateHandler.GetTaskTemplate)
+			taskTemplates.POST("", templateHandler.CreateTaskTemplate)
+			taskTemplates.POST("/:id/update", templateHandler.UpdateTaskTemplate)
+			taskTemplates.POST("/:id/delete", templateHandler.DeleteTaskTemplate)
+			taskTemplates.POST("/:id/instantiate", templateHandler.InstantiateTaskTemplate)
 		}
 	}
 }

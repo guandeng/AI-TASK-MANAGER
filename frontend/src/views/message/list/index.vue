@@ -159,27 +159,21 @@ onUnmounted(() => {
       </div>
 
       <NSpin :show="loading">
-        <div v-if="messageStore.messages.length > 0">
+        <div v-if="messageStore.messages.length > 0" class="message-list-container">
           <NList hoverable clickable>
-            <NListItem v-for="message in messageStore.messages" :key="message.id">
-              <div class="message-item" @click="viewMessage(message)">
+            <NListItem v-for="message in messageStore.messages" :key="message.id" @click="viewMessage(message)">
+              <template #prefix>
+                <!-- 处理中显示进度指示 -->
+                <NSpin v-if="message.status === 'processing' || message.status === 'pending'" size="small" />
+              </template>
+              <div class="message-content">
                 <div class="message-header">
-                  <NSpace align="center">
-                    <NTag type="info">{{ getMessageTypeText(message.type) }}</NTag>
-                    <NTag :type="getMessageStatusType(message.status)">
+                  <NSpace align="center" :size="8">
+                    <NTag type="info" size="small">{{ getMessageTypeText(message.type) }}</NTag>
+                    <NTag :type="getMessageStatusType(message.status)" size="small">
                       {{ getMessageStatusText(message.status) }}
                     </NTag>
                     <span v-if="!message.isRead && message.status !== 'processing' && message.status !== 'pending'" class="unread-dot"></span>
-                  </NSpace>
-                  <NSpace align="center">
-                    <!-- 处理中显示进度指示 -->
-                    <NSpin v-if="message.status === 'processing' || message.status === 'pending'" size="small" />
-                    <NPopconfirm @positive-click="handleDelete(message.id)">
-                      <template #trigger>
-                        <NButton text type="error" size="small" @click.stop>删除</NButton>
-                      </template>
-                      确定要删除这条消息吗？
-                    </NPopconfirm>
                   </NSpace>
                 </div>
                 <div class="message-title">{{ message.title }}</div>
@@ -189,6 +183,14 @@ onUnmounted(() => {
                   <span v-else-if="message.resultSummary" class="message-result">{{ message.resultSummary }}</span>
                 </div>
               </div>
+              <template #suffix>
+                <NPopconfirm @positive-click="handleDelete(message.id)">
+                  <template #trigger>
+                    <NButton text type="error" size="small" @click.stop>删除</NButton>
+                  </template>
+                  确定要删除这条消息吗？
+                </NPopconfirm>
+              </template>
             </NListItem>
           </NList>
         </div>
@@ -212,14 +214,18 @@ onUnmounted(() => {
   border: 1px solid #91d5ff;
 }
 
-.message-item {
-  padding: 12px 0;
-  cursor: pointer;
+.message-list-container {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.message-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .message-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
 }
@@ -233,16 +239,17 @@ onUnmounted(() => {
 }
 
 .message-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
   color: #333;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  word-wrap: break-word;
 }
 
 .message-footer {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
   font-size: 12px;
   color: #999;
 }

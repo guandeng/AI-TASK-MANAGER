@@ -4,9 +4,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ai-task-manager/backend/internal/config"
 	"github.com/ai-task-manager/backend/internal/database"
 	"github.com/ai-task-manager/backend/internal/models"
 	"github.com/ai-task-manager/backend/internal/services"
+	"github.com/ai-task-manager/backend/pkg/ai"
 	"github.com/ai-task-manager/backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -19,9 +21,13 @@ type TaskHandler struct {
 }
 
 // NewTaskHandler 创建任务处理器
-func NewTaskHandler(logger *zap.Logger) *TaskHandler {
+func NewTaskHandler(logger *zap.Logger, cfg *config.Config) *TaskHandler {
+	var aiSvc services.AIService
+	if cfg != nil && cfg.AI.Provider != "" {
+		aiSvc = ai.NewService(&cfg.AI)
+	}
 	return &TaskHandler{
-		service: services.NewTaskService(nil), // 暂时不注入 AI 服务
+		service: services.NewTaskService(aiSvc),
 		logger:  logger,
 	}
 }
@@ -329,20 +335,75 @@ func (h *TaskHandler) ExpandTask(c *gin.Context) {
 
 // ExpandTaskAsync 异步展开任务
 func (h *TaskHandler) ExpandTaskAsync(c *gin.Context) {
+	db := database.GetDB()
+
 	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
 	if err != nil {
 		response.BadRequest(c, "无效的任务 ID")
 		return
 	}
 
-	// TODO: 实现异步展开（使用 goroutine + 消息队列）
+	// 检查任务是否存在
+	task, err := h.service.GetByID(taskID)
+	if err != nil {
+		response.NotFound(c, "任务不存在")
+		return
+	}
+
+	// 检查任务是否已在拆分中
+	if task.IsExpanding {
+		response.Error(c, 400, "任务正在拆分中")
+		return
+	}
+
+	// 创建消息记录
+	title := "子任务拆分"
+	content := task.Title
+	message := models.Message{
+		TaskID:  taskID,
+		Type:    "expand_task",
+		Status:  "processing",
+		Title:   title,
+		Content: &content,
+	}
+	if err := db.Create(&message).Error; err != nil {
+		h.logger.Error("创建消息记录失败", zap.Error(err))
+		response.Error(c, 500, "创建消息记录失败")
+		return
+	}
+
+	// 标记任务正在拆分
+	db.Model(&models.Task{}).Where("id = ?", taskID).Update("is_expanding", true)
+
+	// 异步执行拆分
 	go func() {
+		defer func() {
+			// 完成后标记任务不在拆分中
+			db.Model(&models.Task{}).Where("id = ?", taskID).Update("is_expanding", false)
+		}()
+
 		if err := h.service.ExpandTask(taskID, false); err != nil {
 			h.logger.Error("异步展开任务失败", zap.Error(err))
+			// 更新消息状态为失败
+			errMsg := err.Error()
+			db.Model(&message).Updates(map[string]interface{}{
+				"status":        "failed",
+				"error_message": &errMsg,
+			})
+		} else {
+			// 更新消息状态为成功
+			resultSummary := "子任务拆分完成"
+			db.Model(&message).Updates(map[string]interface{}{
+				"status":         "success",
+				"result_summary": &resultSummary,
+			})
 		}
 	}()
 
-	response.Success(c, gin.H{"message": "任务展开已开始"})
+	response.Success(c, gin.H{
+		"messageId": message.ID,
+		"message":   "任务拆分已开始，完成后会通知您",
+	})
 }
 
 // GetAssignments 获取任务分配列表

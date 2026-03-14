@@ -48,8 +48,8 @@ export function createProjectTemplate(data: CreateProjectTemplateRequest) {
  */
 export function updateProjectTemplate(id: number, data: Partial<CreateProjectTemplateRequest>) {
   return request<ProjectTemplate>({
-    url: `${API_BASE}/templates/projects/${id}`,
-    method: 'PUT',
+    url: `${API_BASE}/templates/projects/${id}/update`,
+    method: 'POST',
     data
   });
 }
@@ -59,8 +59,8 @@ export function updateProjectTemplate(id: number, data: Partial<CreateProjectTem
  */
 export function deleteProjectTemplate(id: number) {
   return request<{ success: boolean; message: string }>({
-    url: `${API_BASE}/templates/projects/${id}`,
-    method: 'DELETE'
+    url: `${API_BASE}/templates/projects/${id}/delete`,
+    method: 'POST'
   });
 }
 
@@ -125,8 +125,8 @@ export function createTaskTemplate(data: CreateTaskTemplateRequest) {
  */
 export function updateTaskTemplate(id: number, data: Partial<CreateTaskTemplateRequest>) {
   return request<TaskTemplate>({
-    url: `${API_BASE}/templates/tasks/${id}`,
-    method: 'PUT',
+    url: `${API_BASE}/templates/tasks/${id}/update`,
+    method: 'POST',
     data
   });
 }
@@ -136,8 +136,8 @@ export function updateTaskTemplate(id: number, data: Partial<CreateTaskTemplateR
  */
 export function deleteTaskTemplate(id: number) {
   return request<{ success: boolean; message: string }>({
-    url: `${API_BASE}/templates/tasks/${id}`,
-    method: 'DELETE'
+    url: `${API_BASE}/templates/tasks/${id}/delete`,
+    method: 'POST'
   });
 }
 

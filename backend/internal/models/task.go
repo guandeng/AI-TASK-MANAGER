@@ -8,7 +8,7 @@ import (
 type Task struct {
 	ID               uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
 	RequirementID    *uint64    `gorm:"index:idx_requirement_id" json:"requirementId,omitempty"`
-	RequirementTitle string     `gorm:"column:requirement_title" json:"requirementTitle,omitempty"` // JOIN 查询时从 requirement 表获取
+	RequirementTitle string     `json:"requirementTitle,omitempty"` // JOIN 查询时从 requirement 表获取
 	Title            string     `gorm:"size:500;not null" json:"title"`
 	TitleTrans       *string    `gorm:"size:500" json:"titleTrans,omitempty"`
 	Description      string     `gorm:"type:text" json:"description"`
@@ -45,7 +45,7 @@ func (Task) TableName() string {
 // Subtask 子任务模型
 type Subtask struct {
 	ID               uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	TaskID           uint64    `gorm:"not null;index:idx_task_id;uniqueIndex:uk_task_subtask" json:"taskId"`
+	TaskID           uint64    `gorm:"not null;index:idx_task_id" json:"taskId"`
 	Title            string    `gorm:"size:500;not null" json:"title"`
 	TitleTrans       *string   `gorm:"size:500" json:"titleTrans,omitempty"`
 	Description      string    `gorm:"type:text" json:"description"`

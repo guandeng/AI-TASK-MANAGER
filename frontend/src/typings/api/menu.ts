@@ -59,12 +59,23 @@ export interface MenuFormData {
 
 /** 菜单列表响应 */
 export interface MenuListResponse {
-  menus: MenuItem[];
+  code: number;
+  message: string;
+  data: {
+    list: MenuItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+  };
 }
 
 /** 菜单操作响应 */
 export interface MenuOperationResponse {
-  success: boolean;
+  code: number;
   message: string;
-  menu?: MenuItem;
+  data: {
+    success: boolean;
+    menu?: MenuItem;
+    deletedKeys?: string[];
+  };
 }

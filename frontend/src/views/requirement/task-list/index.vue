@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { NCard, NDataTable, NTag, NSpace, NButton, NInput, NSelect, NStatistic, NGrid, NGi, NProgress, NEmpty, NSpin } from 'naive-ui';
 import type { DataTableColumns, DataTableRowKey, SelectOption } from 'naive-ui';
 import { useTaskStore } from '@/store/modules/task';
-import type { Task, TaskStatus } from '@/typings/api/task';
+import type { Task, TaskStatus, TaskListParams } from '@/typings/api/task';
 
 const route = useRoute();
 const router = useRouter();

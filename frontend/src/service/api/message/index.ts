@@ -24,15 +24,15 @@ export function fetchMessage(id: number) {
 export function markMessageRead(id: number) {
   return request<void>({
     url: `${API_BASE}/messages/${id}/read`,
-    method: 'PUT'
+    method: 'POST'
   });
 }
 
 /** 删除消息 */
 export function deleteMessage(id: number) {
   return request<void>({
-    url: `${API_BASE}/messages/${id}`,
-    method: 'DELETE'
+    url: `${API_BASE}/messages/${id}/delete`,
+    method: 'POST'
   });
 }
 

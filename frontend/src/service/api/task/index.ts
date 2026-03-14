@@ -12,11 +12,11 @@ export function fetchTaskDetail(id: number, locale: string = 'zh') {
 }
 
 export function updateTask(id: number, data: Record<string, any>) {
-  return request({ url: `${API_BASE}/tasks/${id}`, method: 'PUT', data });
+  return request({ url: `${API_BASE}/tasks/${id}/update`, method: 'POST', data });
 }
 
 export function deleteTask(id: number) {
-  return request({ url: `${API_BASE}/tasks/${id}`, method: 'DELETE' });
+  return request({ url: `${API_BASE}/tasks/${id}/delete`, method: 'POST' });
 }
 
 export function batchDeleteTasks(ids: number[]) {
@@ -24,7 +24,7 @@ export function batchDeleteTasks(ids: number[]) {
 }
 
 export function updateSubtask(taskId: number, subtaskId: number, data: Record<string, any>) {
-  return request({ url: `${API_BASE}/tasks/${taskId}/subtasks/${subtaskId}`, method: 'PUT', data });
+  return request({ url: `${API_BASE}/tasks/${taskId}/subtasks/${subtaskId}/update`, method: 'POST', data });
 }
 
 export function expandTask(id: number, data: Record<string, any> = {}) {
@@ -32,11 +32,11 @@ export function expandTask(id: number, data: Record<string, any> = {}) {
 }
 
 export function clearTaskSubtasks(taskId: number) {
-  return request({ url: `${API_BASE}/tasks/${taskId}/subtasks`, method: 'DELETE' });
+  return request({ url: `${API_BASE}/tasks/${taskId}/subtasks/delete`, method: 'POST' });
 }
 
 export function deleteSubtask(taskId: number, subtaskId: number) {
-  return request({ url: `${API_BASE}/tasks/${taskId}/subtasks/${subtaskId}`, method: 'DELETE' });
+  return request({ url: `${API_BASE}/tasks/${taskId}/subtasks/${subtaskId}/delete`, method: 'POST' });
 }
 
 export function regenerateSubtask(taskId: number, subtaskId: number, data: { prompt?: string } = {}) {

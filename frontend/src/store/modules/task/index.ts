@@ -37,6 +37,9 @@ export const useTaskStore = defineStore('task-store', () => {
   const loading = ref(false);
   const projectName = ref('');
   const projectVersion = ref('');
+  const total = ref(0);
+  const page = ref(1);
+  const pageSize = ref(20);
 
   // 计算属性：任务统计
   const statistics = computed<TaskStatistics>(() => {
@@ -81,19 +84,32 @@ export const useTaskStore = defineStore('task-store', () => {
   async function loadTasks(params?: TaskListParams) {
     loading.value = true;
     try {
-      const { data, error } = await fetchTaskList(params);
+      const queryParams = {
+        page: params?.page || 1,
+        pageSize: params?.pageSize || 20,
+        ...params
+      };
+
+      const { data, error } = await fetchTaskList(queryParams);
       if (!error && data) {
         const responseData = extractData(data);
 
-        if (Array.isArray(responseData)) {
-          tasks.value = responseData;
-        } else if (responseData && 'list' in responseData) {
+        if (responseData && 'list' in responseData && 'total' in responseData) {
+          // 分页响应格式
           tasks.value = responseData.list || [];
+          total.value = responseData.total || 0;
+          page.value = responseData.page || 1;
+          pageSize.value = responseData.pageSize || 20;
+        } else if (Array.isArray(responseData)) {
+          // 数组格式（兼容旧接口）
+          tasks.value = responseData;
+          total.value = responseData.length;
         } else if (responseData && 'tasks' in responseData) {
           // 兼容旧格式
           tasks.value = responseData.tasks || [];
           projectName.value = responseData.projectName || '';
           projectVersion.value = responseData.projectVersion || '';
+          total.value = responseData.tasks?.length || 0;
         }
       }
     } catch (error) {
@@ -581,6 +597,9 @@ export const useTaskStore = defineStore('task-store', () => {
     loading,
     projectName,
     projectVersion,
+    total,
+    page,
+    pageSize,
     // 计算属性
     statistics,
     tasksByStatus,

@@ -39,13 +39,20 @@ export interface Task {
 
 /** 任务列表响应 */
 export interface TaskListResponse {
-  projectName: string;
-  projectVersion: string;
-  tasks: Task[];
+  list: Task[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface TaskListParams {
+  page?: number;
+  pageSize?: number;
   requirementId?: number;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  assignee?: string;
+  keyword?: string;
 }
 
 /** 任务更新请求 */

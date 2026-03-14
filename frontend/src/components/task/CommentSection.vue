@@ -97,16 +97,12 @@ async function handleSubmitComment() {
     window.$message?.warning('请输入评论内容');
     return;
   }
-  if (!props.memberId) {
-    window.$message?.warning('请先选择成员身份');
-    return;
-  }
 
   submitLoading.value = true;
   try {
     const { error } = await createComment(props.taskId, {
       content: newCommentContent.value.trim(),
-      memberId: props.memberId
+      memberId: props.memberId || 0
     });
 
     if (error) {
@@ -140,13 +136,13 @@ async function handleSubmitReply() {
     window.$message?.warning('请输入回复内容');
     return;
   }
-  if (!props.memberId || !replyTo.value) return;
+  if (!replyTo.value) return;
 
   replyLoading.value = true;
   try {
     const { error } = await createComment(props.taskId, {
       content: replyContent.value.trim(),
-      memberId: props.memberId,
+      memberId: props.memberId || 0,
       parentId: replyTo.value.id
     });
 
@@ -206,10 +202,8 @@ async function handleSaveEdit(comment: Comment) {
 
 // 删除评论
 async function handleDelete(comment: Comment) {
-  if (!props.memberId) return;
-
   try {
-    const { error } = await deleteComment(props.taskId, comment.id, props.memberId);
+    const { error } = await deleteComment(props.taskId, comment.id, props.memberId || 0);
     if (error) {
       window.$message?.error('删除失败');
     } else {
@@ -253,14 +247,13 @@ watch(() => props.taskId, () => {
             type="textarea"
             placeholder="写下你的评论..."
             :autosize="{ minRows: 2, maxRows: 4 }"
-            :disabled="!memberId"
           />
           <div class="input-actions">
             <NButton
               type="primary"
               size="small"
               :loading="submitLoading"
-              :disabled="!newCommentContent.trim() || !memberId"
+              :disabled="!newCommentContent.trim()"
               @click="handleSubmitComment"
             >
               发表评论
@@ -310,15 +303,13 @@ watch(() => props.taskId, () => {
             <!-- 评论操作 -->
             <div class="comment-actions">
               <NButton text size="small" @click="startReply(comment)">回复</NButton>
-              <template v-if="memberId === comment.memberId">
-                <NButton text size="small" @click="startEdit(comment)">编辑</NButton>
-                <NPopconfirm @positive-click="handleDelete(comment)">
-                  <template #trigger>
-                    <NButton text type="error" size="small">删除</NButton>
-                  </template>
-                  确认删除此评论？
-                </NPopconfirm>
-              </template>
+              <NButton text size="small" @click="startEdit(comment)">编辑</NButton>
+              <NPopconfirm @positive-click="handleDelete(comment)">
+                <template #trigger>
+                  <NButton text type="error" size="small">删除</NButton>
+                </template>
+                确认删除此评论？
+              </NPopconfirm>
               <!-- 回复数量提示 -->
               <NButton
                 v-if="comment.replyCount && comment.replyCount > 0"
@@ -377,14 +368,12 @@ watch(() => props.taskId, () => {
                 </div>
                 <div class="reply-content">{{ reply.content }}</div>
                 <div class="comment-actions">
-                  <template v-if="memberId === reply.memberId">
-                    <NPopconfirm @positive-click="handleDelete(reply)">
-                      <template #trigger>
-                        <NButton text type="error" size="tiny">删除</NButton>
-                      </template>
-                      确认删除此回复？
-                    </NPopconfirm>
-                  </template>
+                  <NPopconfirm @positive-click="handleDelete(reply)">
+                    <template #trigger>
+                      <NButton text type="error" size="tiny">删除</NButton>
+                    </template>
+                    确认删除此回复？
+                  </NPopconfirm>
                 </div>
               </div>
             </div>

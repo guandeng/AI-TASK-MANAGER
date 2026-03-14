@@ -5,8 +5,7 @@ import { NButton, NCard, NDataTable, NGrid, NGi, NInput, NSelect, NSpace, NStati
 import type { DataTableColumns, SelectOption } from 'naive-ui';
 import { useRequirementStore } from '@/store/modules/requirement';
 import type { Requirement, RequirementStatus, RequirementPriority } from '@/typings/api/requirement';
-import { splitRequirementToTasks, type TaskType } from '@/service/api/requirement';
-import { createLoadingService, LOADING_PRESETS } from '@/utils/loading-service';
+import { splitRequirementToTasksAsync, type TaskType } from '@/service/api/requirement';
 
 defineOptions({
   name: 'RequirementList'
@@ -282,7 +281,7 @@ function openTaskTypeModal(row: Requirement) {
   showTaskTypeModal.value = true;
 }
 
-// 确认拆分任务
+// 确认拆分任务 - 异步版本
 async function confirmSplitTasks() {
   if (!currentSplittingRequirement.value) return;
 
@@ -292,41 +291,28 @@ async function confirmSplitTasks() {
   showTaskTypeModal.value = false;
 
   if (splittingTaskIds.value.has(row.id)) {
+    window.$message?.info('需求正在拆分中，完成后会通知您');
     return;
   }
 
   splittingTaskIds.value.add(row.id);
 
-  // 创建加载服务实例
-  const loadingService = createLoadingService();
-  loadingService.start(LOADING_PRESETS.splitRequirement);
-
   try {
-    // 步骤1: 解析需求文档
-    loadingService.nextStep();
+    const { data, error } = await splitRequirementToTasksAsync(row.id, taskType);
 
-    // 步骤2: AI 分析
-    loadingService.nextStep();
-
-    const { data, error } = await splitRequirementToTasks(row.id, taskType);
-
-    // 步骤3: 生成任务列表
-    loadingService.nextStep();
-
-    // 后端返回格式: { code: 0, message: "success", data: { success: true, tasks: [...] } }
-    // isBackendSuccess 已检查 code === 0，所以 error 为 null 时表示成功
     if (!error && data) {
-      // 步骤4: 保存完成
-      loadingService.nextStep();
       const responseData = (data as any)?.data || data;
-      const tasks = responseData?.tasks || [];
-      loadingService.success(responseData?.message || `成功拆分为 ${tasks.length} 个任务`);
+      if (responseData?.messageId) {
+        window.$message?.success('拆分任务已提交，正在后台处理，完成后会通知您');
+      } else {
+        window.$message?.error('提交拆分任务失败');
+      }
     } else {
-      const errorMessage = error?.message || (data as any)?.message || '拆分任务失败';
-      loadingService.error(errorMessage);
+      const errorMessage = error?.message || '拆分任务失败';
+      window.$message?.error(errorMessage);
     }
   } catch (err: any) {
-    loadingService.error(err.message || '拆分任务失败');
+    window.$message?.error(err.message || '拆分任务失败');
   } finally {
     splittingTaskIds.value.delete(row.id);
     currentSplittingRequirement.value = null;

@@ -25,12 +25,12 @@ export function createMenu(data: MenuFormData) {
 
 /** 更新菜单 */
 export function updateMenu(key: string, data: Partial<MenuFormData>) {
-  return request<MenuOperationResponse>({ url: `${API_BASE}/menus/${key}`, method: 'PUT', data });
+  return request<MenuOperationResponse>({ url: `${API_BASE}/menus/${key}/update`, method: 'POST', data });
 }
 
 /** 删除菜单 */
 export function deleteMenu(key: string) {
-  return request<MenuOperationResponse>({ url: `${API_BASE}/menus/${key}`, method: 'DELETE' });
+  return request<MenuOperationResponse>({ url: `${API_BASE}/menus/${key}/delete`, method: 'POST' });
 }
 
 /** 批量删除菜单 */
@@ -44,14 +44,14 @@ export function batchDeleteMenus(keys: string[]) {
 
 /** 更新菜单排序 */
 export function reorderMenus(data: { key: string; order: number }[]) {
-  return request<{ success: boolean }>({ url: `${API_BASE}/menus/reorder`, method: 'PUT', data });
+  return request<{ success: boolean }>({ url: `${API_BASE}/menus/reorder`, method: 'POST', data });
 }
 
 /** 移动菜单 */
 export function moveMenu(key: string, targetParentKey: string | null) {
   return request<MenuOperationResponse>({
     url: `${API_BASE}/menus/${key}/move`,
-    method: 'PUT',
+    method: 'POST',
     data: { targetParentKey }
   });
 }
@@ -60,7 +60,7 @@ export function moveMenu(key: string, targetParentKey: string | null) {
 export function toggleMenuEnabled(key: string, enabled: boolean) {
   return request<MenuOperationResponse>({
     url: `${API_BASE}/menus/${key}/toggle`,
-    method: 'PUT',
+    method: 'POST',
     data: { enabled }
   });
 }

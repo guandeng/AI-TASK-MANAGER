@@ -60,8 +60,8 @@ export function createComment(taskId: number, data: CreateCommentRequest) {
  */
 export function updateComment(taskId: number, commentId: number, data: UpdateCommentRequest) {
   return request<Comment>({
-    url: `${API_BASE}/tasks/${taskId}/comments/${commentId}`,
-    method: 'PUT',
+    url: `${API_BASE}/tasks/${taskId}/comments/${commentId}/update`,
+    method: 'POST',
     data
   });
 }
@@ -71,8 +71,8 @@ export function updateComment(taskId: number, commentId: number, data: UpdateCom
  */
 export function deleteComment(taskId: number, commentId: number, memberId: number) {
   return request<{ success: boolean; message: string }>({
-    url: `${API_BASE}/tasks/${taskId}/comments/${commentId}`,
-    method: 'DELETE',
+    url: `${API_BASE}/tasks/${taskId}/comments/${commentId}/delete`,
+    method: 'POST',
     data: { memberId }
   });
 }

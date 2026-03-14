@@ -68,14 +68,14 @@ export function fetchConfig() {
 
 // 更新配置
 export function updateConfig(data: Partial<AppConfig>) {
-  return request({ url: `${API_BASE}/config`, method: 'PUT', data });
+  return request({ url: `${API_BASE}/config/update`, method: 'POST', data });
 }
 
 // 切换 AI 提供商
 export function switchAIProvider(provider: string) {
   return request({
     url: `${API_BASE}/config/ai-provider`,
-    method: 'PUT',
+    method: 'POST',
     data: { provider }
   });
 }
@@ -84,7 +84,7 @@ export function switchAIProvider(provider: string) {
 export function updateProviderConfig(provider: string, data: Partial<AIProviderConfig>) {
   return request({
     url: `${API_BASE}/config/ai-provider/${provider}`,
-    method: 'PUT',
+    method: 'POST',
     data
   });
 }

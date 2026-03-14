@@ -1,5 +1,5 @@
 import { request } from '@/service/request';
-import type { TaskListParams } from '@/typings/api/task';
+import type { TaskListParams, TaskCreateRequest } from '@/typings/api/task';
 
 const API_BASE = '/api';
 
@@ -9,6 +9,11 @@ export function fetchTaskList(params?: TaskListParams) {
 
 export function fetchTaskDetail(id: number, locale: string = 'zh') {
   return request({ url: `${API_BASE}/tasks/${id}`, method: 'GET', params: { locale } });
+}
+
+/** 创建任务 */
+export function createTask(data: TaskCreateRequest) {
+  return request({ url: `${API_BASE}/tasks`, method: 'POST', data });
 }
 
 export function updateTask(id: number, data: Record<string, any>) {

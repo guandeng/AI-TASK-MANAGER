@@ -35,6 +35,16 @@ export interface Task {
   testStrategyTrans?: string;
   subtasks?: Subtask[];
   assignee?: string; // 负责人
+  // 时间管理字段
+  startDate?: string;
+  dueDate?: string;
+  completedAt?: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  // 扩展字段
+  tags?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /** 任务列表响应 */
@@ -55,6 +65,21 @@ export interface TaskListParams {
   keyword?: string;
 }
 
+/** 任务创建请求 */
+export interface TaskCreateRequest {
+  title: string;
+  description?: string;
+  details?: string;
+  testStrategy?: string;
+  priority?: TaskPriority;
+  assignee?: string;
+  requirementId?: number;
+  dependencies?: number[];
+  startDate?: string;
+  dueDate?: string;
+  estimatedHours?: number;
+}
+
 /** 任务更新请求 */
 export interface TaskUpdateRequest {
   status?: TaskStatus;
@@ -64,6 +89,12 @@ export interface TaskUpdateRequest {
   testStrategy?: string;
   priority?: TaskPriority;
   assignee?: string;
+  startDate?: string;
+  dueDate?: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  completedAt?: string;
+  tags?: string[];
 }
 
 /** 子任务更新请求 */

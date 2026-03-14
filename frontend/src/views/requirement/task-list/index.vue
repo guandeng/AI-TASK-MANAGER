@@ -394,6 +394,12 @@ watch(
     <NCard title="任务列表">
       <template #header-extra>
         <NSpace>
+          <NButton type="primary" @click="$router.push('/requirement/task-create')">
+            <template #icon>
+              <span class="i-mdi:plus"></span>
+            </template>
+            新建任务
+          </NButton>
           <NButton @click="loadTaskListData">
             <template #icon>
               <span class="i-mdi:refresh"></span>

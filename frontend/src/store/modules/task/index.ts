@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import {
   batchDeleteTasks as batchDeleteTasksApi,
   clearTaskSubtasks as clearTaskSubtasksApi,
+  createTask as createTaskApi,
   deleteTask as deleteTaskApi,
   deleteSubtask as deleteSubtaskApi,
   expandTask as expandTaskApi,
@@ -15,7 +16,7 @@ import {
   updateSubtask as updateSubtaskApi,
   copyTask as copyTaskApi
 } from '@/service/api/task';
-import type { Task, Subtask, TaskStatus, TaskStatistics, TaskListParams } from '@/typings/api/task';
+import type { Task, Subtask, TaskStatus, TaskStatistics, TaskListParams, TaskCreateRequest } from '@/typings/api/task';
 import { createLoadingService, LoadingService, LOADING_PRESETS } from '@/utils/loading-service';
 
 // 辅助函数：提取后端返回的 data 字段
@@ -586,6 +587,28 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
+  async function createTask(formData: TaskCreateRequest) {
+    loading.value = true;
+    try {
+      const { data, error } = await createTaskApi(formData);
+      if (!error && data) {
+        const newTask = extractData(data);
+        // 添加到列表开头
+        tasks.value.unshift(newTask);
+        total.value += 1;
+        window.$message?.success('任务创建成功');
+        return { success: true, data: newTask };
+      }
+      return { success: false, error };
+    } catch (err) {
+      window.$message?.error('创建任务失败');
+      console.error('Failed to create task:', err);
+      return { success: false, error: err };
+    } finally {
+      loading.value = false;
+    }
+  }
+
   function clearCurrentTask() {
     currentTask.value = null;
   }
@@ -620,6 +643,7 @@ export const useTaskStore = defineStore('task-store', () => {
     regenerateSubtask,
     reorderSubtasks,
     clearCurrentTask,
-    copyTask
+    copyTask,
+    createTask
   };
 });

@@ -85,6 +85,34 @@ func (s *Server) registerTools() {
 		mcp.WithString("description", mcp.Description("任务描述")),
 		mcp.WithString("priority", mcp.Description("优先级 (high/medium/low)")),
 	), s.handleAddTask)
+
+	// update_task 工具
+	s.server.AddTool(mcp.NewTool("update_task",
+		mcp.WithDescription("更新任务信息"),
+		mcp.WithNumber("task_id", mcp.Required(), mcp.Description("任务 ID")),
+		mcp.WithString("title", mcp.Description("任务标题")),
+		mcp.WithString("description", mcp.Description("任务描述")),
+		mcp.WithString("priority", mcp.Description("优先级")),
+		mcp.WithString("due_date", mcp.Description("截止日期")),
+		mcp.WithString("start_date", mcp.Description("开始日期")),
+		mcp.WithNumber("estimated_hours", mcp.Description("预估工时（小时）")),
+	), s.handleUpdateTask)
+
+	// get_task_with_comments 工具
+	s.server.AddTool(mcp.NewTool("get_task_with_comments",
+		mcp.WithDescription("获取任务及评论"),
+		mcp.WithNumber("task_id", mcp.Required(), mcp.Description("任务 ID")),
+	), s.handleGetTaskWithComments)
+
+	// validate_dependencies 工具
+	s.server.AddTool(mcp.NewTool("validate_dependencies",
+		mcp.WithDescription("验证任务依赖关系（检查循环依赖）"),
+	), s.handleValidateDependencies)
+
+	// get_ready_tasks 工具
+	s.server.AddTool(mcp.NewTool("get_ready_tasks",
+		mcp.WithDescription("获取所有依赖已满足的可执行任务"),
+	), s.handleGetReadyTasks)
 }
 
 // 处理函数
@@ -197,4 +225,167 @@ func (s *Server) handleAddTask(ctx context.Context, request mcp.CallToolRequest)
 	}
 
 	return mcp.NewToolResultText(fmt.Sprintf("Task created: %s (ID: %d)", task.Title, task.ID)), nil
+}
+
+func (s *Server) handleUpdateTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	taskID := request.GetInt("task_id", 0)
+	if taskID == 0 {
+		return nil, fmt.Errorf("invalid task_id")
+	}
+
+	updates := make(map[string]interface{})
+
+	if title := request.GetString("title", ""); title != "" {
+		updates["title"] = title
+	}
+	if description := request.GetString("description", ""); description != "" {
+		updates["description"] = description
+	}
+	if priority := request.GetString("priority", ""); priority != "" {
+		updates["priority"] = priority
+	}
+	if dueDate := request.GetString("due_date", ""); dueDate != "" {
+		updates["due_date"] = dueDate
+	}
+	if startDate := request.GetString("start_date", ""); startDate != "" {
+		updates["start_date"] = startDate
+	}
+	if estimatedHours := request.GetFloat("estimated_hours", 0); estimatedHours > 0 {
+		updates["estimated_hours"] = estimatedHours
+	}
+
+	if err := s.db.Model(&models.Task{}).Where("id = ?", uint64(taskID)).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("Task %d updated", taskID)), nil
+}
+
+func (s *Server) handleGetTaskWithComments(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	taskID := request.GetInt("task_id", 0)
+	if taskID == 0 {
+		return nil, fmt.Errorf("invalid task_id")
+	}
+
+	var task models.Task
+	if err := s.db.First(&task, uint64(taskID)).Error; err != nil {
+		return nil, err
+	}
+
+	var comments []models.Comment
+	if err := s.db.Where("task_id = ?", uint64(taskID)).Order("created_at DESC").Find(&comments).Error; err != nil {
+		return nil, err
+	}
+
+	result := fmt.Sprintf("Task: %s (ID: %d, Status: %s)\nComments (%d):\n", task.Title, task.ID, task.Status, len(comments))
+	for _, comment := range comments {
+		result += fmt.Sprintf("  - [%d] Member%d: %s\n", comment.ID, comment.MemberID, comment.Content)
+	}
+
+	return mcp.NewToolResultText(result), nil
+}
+
+func (s *Server) handleValidateDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var dependencies []models.TaskDependency
+	if err := s.db.Find(&dependencies).Error; err != nil {
+		return nil, err
+	}
+
+	// 构建邻接表
+	graph := make(map[uint64][]uint64)
+	for _, dep := range dependencies {
+		graph[dep.TaskID] = append(graph[dep.TaskID], dep.DependsOnTaskID)
+	}
+
+	// DFS 检测循环依赖
+	visited := make(map[uint64]int) // 0: unvisited, 1: visiting, 2: visited
+	var hasCycle bool
+	var cyclePath []uint64
+
+	var dfs func(node uint64, path []uint64) bool
+	dfs = func(node uint64, path []uint64) bool {
+		if visited[node] == 1 {
+			hasCycle = true
+			cyclePath = append(path, node)
+			return true
+		}
+		if visited[node] == 2 {
+			return false
+		}
+
+		visited[node] = 1
+		path = append(path, node)
+
+		for _, neighbor := range graph[node] {
+			if dfs(neighbor, path) {
+				return true
+			}
+		}
+
+		visited[node] = 2
+		return false
+	}
+
+	for node := range graph {
+		if visited[node] == 0 {
+			if dfs(node, []uint64{}) {
+				break
+			}
+		}
+	}
+
+	if hasCycle {
+		return mcp.NewToolResultText(fmt.Sprintf("Circular dependency detected: %v", cyclePath)), nil
+	}
+	return mcp.NewToolResultText("No circular dependencies found. All dependencies are valid."), nil
+}
+
+func (s *Server) handleGetReadyTasks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	// 获取所有 pending 状态的任务
+	var pendingTasks []models.Task
+	if err := s.db.Where("status = ?", "pending").Find(&pendingTasks).Error; err != nil {
+		return nil, err
+	}
+
+	// 获取所有依赖关系
+	var dependencies []models.TaskDependency
+	if err := s.db.Find(&dependencies).Error; err != nil {
+		return nil, err
+	}
+
+	// 构建任务 ID 到状态的映射
+	taskStatuses := make(map[uint64]string)
+	var allTasks []models.Task
+	if err := s.db.Find(&allTasks).Error; err != nil {
+		return nil, err
+	}
+	for _, t := range allTasks {
+		taskStatuses[t.ID] = t.Status
+	}
+
+	// 过滤出依赖已满足的任务
+	var readyTasks []models.Task
+	for _, task := range pendingTasks {
+		isReady := true
+
+		for _, dep := range dependencies {
+			if dep.TaskID == task.ID {
+				if status, ok := taskStatuses[dep.DependsOnTaskID]; ok && status != "done" {
+					isReady = false
+					break
+				}
+			}
+		}
+
+		if isReady {
+			readyTasks = append(readyTasks, task)
+		}
+	}
+
+	result := fmt.Sprintf("Ready tasks (%d):\n", len(readyTasks))
+	for _, task := range readyTasks {
+		result += fmt.Sprintf("  - [%d] %s (Priority: %s)\n", task.ID, task.Title, task.Priority)
+	}
+
+	return mcp.NewToolResultText(result), nil
 }

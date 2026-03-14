@@ -43,33 +43,55 @@ func (r *taskRepository) List(filters map[string]interface{}, page, pageSize int
 	var tasks []models.Task
 	var total int64
 
-	query := r.db.Model(&models.Task{})
+	// 构建基础查询
+	baseQuery := r.db.Model(&models.Task{})
 
-	// 应用筛选条件
+	// 应用筛选条件到基础查询
 	if status, ok := filters["status"]; ok {
-		query = query.Where("status = ?", status)
+		baseQuery = baseQuery.Where("status = ?", status)
 	}
 	if priority, ok := filters["priority"]; ok {
-		query = query.Where("priority = ?", priority)
+		baseQuery = baseQuery.Where("priority = ?", priority)
 	}
 	if requirementID, ok := filters["requirementId"]; ok {
-		query = query.Where("requirement_id = ?", requirementID)
+		baseQuery = baseQuery.Where("requirement_id = ?", requirementID)
 	}
 	if assignee, ok := filters["assignee"]; ok {
-		query = query.Where("assignee = ?", assignee)
+		baseQuery = baseQuery.Where("assignee = ?", assignee)
 	}
 	if keyword, ok := filters["keyword"]; ok {
-		query = query.Where("title LIKE ? OR description LIKE ?", "%"+keyword.(string)+"%", "%"+keyword.(string)+"%")
+		baseQuery = baseQuery.Where("title LIKE ? OR description LIKE ?", "%"+keyword.(string)+"%", "%"+keyword.(string)+"%")
 	}
 
 	// 计算总数
-	if err := query.Count(&total).Error; err != nil {
+	if err := baseQuery.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// 分页查询
+	// 分页查询，使用 LEFT JOIN 获取需求标题
 	offset := (page - 1) * pageSize
-	if err := query.Order("created_at DESC").
+	query := r.db.Table("task_task").
+		Select("task_task.*, task_requirement.title as requirement_title").
+		Joins("LEFT JOIN task_requirement ON task_task.requirement_id = task_requirement.id")
+
+	// 应用相同的筛选条件
+	if status, ok := filters["status"]; ok {
+		query = query.Where("task_task.status = ?", status)
+	}
+	if priority, ok := filters["priority"]; ok {
+		query = query.Where("task_task.priority = ?", priority)
+	}
+	if requirementID, ok := filters["requirementId"]; ok {
+		query = query.Where("task_task.requirement_id = ?", requirementID)
+	}
+	if assignee, ok := filters["assignee"]; ok {
+		query = query.Where("task_task.assignee = ?", assignee)
+	}
+	if keyword, ok := filters["keyword"]; ok {
+		query = query.Where("task_task.title LIKE ? OR task_task.description LIKE ?", "%"+keyword.(string)+"%", "%"+keyword.(string)+"%")
+	}
+
+	if err := query.Order("task_task.created_at DESC").
 		Offset(offset).
 		Limit(pageSize).
 		Find(&tasks).Error; err != nil {

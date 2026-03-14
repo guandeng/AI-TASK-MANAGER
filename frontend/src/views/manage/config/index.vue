@@ -56,22 +56,6 @@ const providerForms = ref({
   perplexity: { enabled: false, apiKey: '', model: '', baseUrl: '' }
 });
 
-// 存储配置表单
-const storageForm = ref({
-  type: 'json',
-  database: {
-    connection: 'mysql',
-    host: '127.0.0.1',
-    hostSlave: '127.0.0.1',
-    port: 3306,
-    database: '',
-    username: 'root',
-    password: '',
-    charset: 'utf8mb4',
-    collation: 'utf8mb4_unicode_ci'
-  }
-});
-
 // 提供商选项
 const providerOptions = [
   { label: '通义千问 (Qwen)', value: 'qwen' },
@@ -88,24 +72,6 @@ const logLevelOptions = [
 ];
 
 // 优先级选项
-const priorityOptions = [
-  { label: '高', value: 'high' },
-  { label: '中', value: 'medium' },
-  { label: '低', value: 'low' }
-];
-
-// 存储类型选项
-const storageTypeOptions = [
-  { label: 'JSON 文件', value: 'json' },
-  { label: '数据库', value: 'db' }
-];
-
-// 数据库连接类型选项
-const dbConnectionOptions = [
-  { label: 'MySQL', value: 'mysql' },
-  { label: 'PostgreSQL', value: 'pgsql' },
-  { label: 'SQLite', value: 'sqlite' }
-];
 
 // 加载配置
 async function loadConfig() {
@@ -132,13 +98,6 @@ async function loadConfig() {
       }
       if (cfg.ai.providers.perplexity) {
         providerForms.value.perplexity = { ...cfg.ai.providers.perplexity };
-      }
-
-      if (cfg.storage) {
-        storageForm.value.type = cfg.storage.type || 'json';
-        if (cfg.storage.database) {
-          storageForm.value.database = { ...storageForm.value.database, ...cfg.storage.database };
-        }
       }
     }
   } catch (err) {
@@ -175,36 +134,6 @@ async function saveAIConfig() {
 }
 
 // 保存通用配置
-async function saveGeneralConfig() {
-  loading.value = true;
-  try {
-    await updateConfig({
-      general: generalForm.value
-    });
-    message.success('通用配置保存成功');
-  } catch {
-    message.error('保存失败');
-  } finally {
-    loading.value = false;
-  }
-}
-
-// 保存存储配置
-async function saveStorageConfig() {
-  loading.value = true;
-  try {
-    await updateConfig({
-      storage: storageForm.value
-    } as Partial<AppConfig>);
-    message.success('存储配置保存成功');
-  } catch {
-    message.error('保存失败');
-  } finally {
-    loading.value = false;
-  }
-}
-
-// 重置配置
 async function handleReset() {
   if (!window.confirm('确认重置所有配置吗？这将恢复默认设置。')) {
     return;
@@ -362,97 +291,6 @@ onMounted(() => {
           <NSpace class="mt-16px">
             <NButton type="primary" :loading="loading" @click="saveAIConfig">
               保存 AI 配置
-            </NButton>
-          </NSpace>
-        </NTabPane>
-
-        <!-- 存储配置 -->
-        <NTabPane name="storage" tab="存储配置">
-          <NForm label-placement="left" label-width="120px">
-            <NFormItem label="存储类型">
-              <NSelect
-                v-model:value="storageForm.type"
-                :options="storageTypeOptions"
-                style="width: 200px"
-              />
-            </NFormItem>
-          </NForm>
-
-          <template v-if="storageForm.type === 'db'">
-            <NDivider>数据库配置</NDivider>
-            <NForm label-placement="left" label-width="120px">
-              <NFormItem label="数据库类型">
-                <NSelect
-                  v-model:value="storageForm.database.connection"
-                  :options="dbConnectionOptions"
-                  style="width: 200px"
-                />
-              </NFormItem>
-              <NFormItem label="主库地址">
-                <NInput
-                  v-model:value="storageForm.database.host"
-                  placeholder="127.0.0.1"
-                  style="width: 300px"
-                />
-              </NFormItem>
-              <NFormItem label="从库地址">
-                <NInput
-                  v-model:value="storageForm.database.hostSlave"
-                  placeholder="127.0.0.1"
-                  style="width: 300px"
-                />
-              </NFormItem>
-              <NFormItem label="端口">
-                <NInputNumber
-                  v-model:value="storageForm.database.port"
-                  :min="1"
-                  :max="65535"
-                  style="width: 150px"
-                />
-              </NFormItem>
-              <NFormItem label="数据库名">
-                <NInput
-                  v-model:value="storageForm.database.database"
-                  placeholder="ai_task"
-                  style="width: 300px"
-                />
-              </NFormItem>
-              <NFormItem label="用户名">
-                <NInput
-                  v-model:value="storageForm.database.username"
-                  placeholder="root"
-                  style="width: 300px"
-                />
-              </NFormItem>
-              <NFormItem label="密码">
-                <NInput
-                  v-model:value="storageForm.database.password"
-                  type="password"
-                  show-password-on="click"
-                  placeholder="请输入密码"
-                  style="width: 300px"
-                />
-              </NFormItem>
-              <NFormItem label="字符集">
-                <NInput
-                  v-model:value="storageForm.database.charset"
-                  placeholder="utf8mb4"
-                  style="width: 200px"
-                />
-              </NFormItem>
-              <NFormItem label="排序规则">
-                <NInput
-                  v-model:value="storageForm.database.collation"
-                  placeholder="utf8mb4_unicode_ci"
-                  style="width: 300px"
-                />
-              </NFormItem>
-            </NForm>
-          </template>
-
-          <NSpace class="mt-16px">
-            <NButton type="primary" :loading="loading" @click="saveStorageConfig">
-              保存存储配置
             </NButton>
           </NSpace>
         </NTabPane>

@@ -70,6 +70,7 @@ func autoMigrate() error {
 		&models.Member{},
 		&models.Assignment{},
 		&models.SubtaskAssignment{},
+		&models.Comment{},
 		&models.ActivityLog{},
 		&models.Message{},
 		&models.Menu{},

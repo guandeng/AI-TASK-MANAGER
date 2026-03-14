@@ -89,8 +89,11 @@ export function getDocumentDownloadUrl(requirementId: number, documentId: number
   return `/api/requirements/${requirementId}/documents/${documentId}/download`;
 }
 
+/** 任务类型 */
+export type TaskType = 'frontend' | 'backend' | 'fullstack';
+
 /** 将需求拆分为任务 */
-export function splitRequirementToTasks(requirementId: number) {
+export function splitRequirementToTasks(requirementId: number, taskType: TaskType = 'backend') {
   return request<{
     success: boolean;
     message: string;
@@ -105,6 +108,7 @@ export function splitRequirementToTasks(requirementId: number) {
     }>;
   }>({
     url: `/api/requirements/${requirementId}/split-tasks`,
-    method: 'post'
+    method: 'post',
+    data: { taskType }
   });
 }

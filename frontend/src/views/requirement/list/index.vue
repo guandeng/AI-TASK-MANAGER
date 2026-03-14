@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { onMounted, onActivated, ref, computed, h } from 'vue';
 import { useRouter } from 'vue-router';
-import { NButton, NCard, NDataTable, NGrid, NGi, NInput, NSelect, NSpace, NStatistic, NTag, NPopconfirm, NProgress, NSpin, NEmpty } from 'naive-ui';
+import { NButton, NCard, NDataTable, NGrid, NGi, NInput, NSelect, NSpace, NStatistic, NTag, NPopconfirm, NProgress, NSpin, NEmpty, NModal, NRadioGroup, NRadio } from 'naive-ui';
 import type { DataTableColumns, SelectOption } from 'naive-ui';
 import { useRequirementStore } from '@/store/modules/requirement';
 import type { Requirement, RequirementStatus, RequirementPriority } from '@/typings/api/requirement';
-import { splitRequirementToTasks } from '@/service/api/requirement';
+import { splitRequirementToTasks, type TaskType } from '@/service/api/requirement';
 import { createLoadingService, LOADING_PRESETS } from '@/utils/loading-service';
 
 defineOptions({
@@ -19,6 +19,18 @@ const requirementStore = useRequirementStore();
 const searchKeyword = ref('');
 const filterStatus = ref<RequirementStatus | null>(null);
 const filterPriority = ref<RequirementPriority | null>(null);
+
+// 任务类型选择弹框
+const showTaskTypeModal = ref(false);
+const selectedTaskType = ref<TaskType>('backend');
+const currentSplittingRequirement = ref<Requirement | null>(null);
+
+// 任务类型选项
+const taskTypeOptions = [
+  { label: '后端', value: 'backend' as TaskType },
+  { label: '前端', value: 'frontend' as TaskType },
+  { label: '前后端', value: 'fullstack' as TaskType }
+];
 
 // 状态选项
 const statusOptions: SelectOption[] = [
@@ -206,7 +218,7 @@ const columns: DataTableColumns<Requirement> = [
             text: true,
             loading: isSplitting,
             disabled: isSplitting,
-            onClick: () => handleSplitTasks(row)
+            onClick: () => openTaskTypeModal(row)
           },
           () => isSplitting ? '拆分中...' : '拆分任务'
         ),
@@ -263,8 +275,22 @@ async function handleDelete(id: number) {
   }
 }
 
-// 拆分任务
-async function handleSplitTasks(row: Requirement) {
+// 打开任务类型选择弹框
+function openTaskTypeModal(row: Requirement) {
+  currentSplittingRequirement.value = row;
+  selectedTaskType.value = 'backend'; // 默认选择后端
+  showTaskTypeModal.value = true;
+}
+
+// 确认拆分任务
+async function confirmSplitTasks() {
+  if (!currentSplittingRequirement.value) return;
+
+  const row = currentSplittingRequirement.value;
+  const taskType = selectedTaskType.value;
+
+  showTaskTypeModal.value = false;
+
   if (splittingTaskIds.value.has(row.id)) {
     return;
   }
@@ -282,22 +308,28 @@ async function handleSplitTasks(row: Requirement) {
     // 步骤2: AI 分析
     loadingService.nextStep();
 
-    const { data, error } = await splitRequirementToTasks(row.id);
+    const { data, error } = await splitRequirementToTasks(row.id, taskType);
 
     // 步骤3: 生成任务列表
     loadingService.nextStep();
 
-    if (!error && data?.success) {
+    // 后端返回格式: { code: 0, message: "success", data: { success: true, tasks: [...] } }
+    // isBackendSuccess 已检查 code === 0，所以 error 为 null 时表示成功
+    if (!error && data) {
       // 步骤4: 保存完成
       loadingService.nextStep();
-      loadingService.success(data.message || `成功拆分为 ${data.tasks?.length || 0} 个任务`);
+      const responseData = (data as any)?.data || data;
+      const tasks = responseData?.tasks || [];
+      loadingService.success(responseData?.message || `成功拆分为 ${tasks.length} 个任务`);
     } else {
-      loadingService.error(error?.message || '拆分任务失败');
+      const errorMessage = error?.message || (data as any)?.message || '拆分任务失败';
+      loadingService.error(errorMessage);
     }
   } catch (err: any) {
     loadingService.error(err.message || '拆分任务失败');
   } finally {
     splittingTaskIds.value.delete(row.id);
+    currentSplittingRequirement.value = null;
   }
 }
 
@@ -424,6 +456,28 @@ onActivated(() => {
         <NEmpty v-if="filteredRequirements.length === 0 && !requirementStore.loading" description="暂无需求数据" />
       </NSpin>
     </NCard>
+
+    <!-- 任务类型选择弹框 -->
+    <NModal
+      v-model:show="showTaskTypeModal"
+      preset="dialog"
+      title="选择任务类型"
+      positive-text="确认拆分"
+      negative-text="取消"
+      @positive-click="confirmSplitTasks"
+    >
+      <div class="py-4">
+        <p class="mb-4 text-gray-600">请选择需要生成的任务类型：</p>
+        <NRadioGroup v-model:value="selectedTaskType" class="flex flex-col gap-3">
+          <NRadio
+            v-for="option in taskTypeOptions"
+            :key="option.value"
+            :value="option.value"
+            :label="option.label"
+          />
+        </NRadioGroup>
+      </div>
+    </NModal>
   </div>
 </template>
 
@@ -432,6 +486,27 @@ onActivated(() => {
   padding: 16px;
 }
 
+/* 统计卡片样式 - 更紧凑 */
+:deep(.n-grid .n-card) {
+  --n-padding-top: 12px;
+  --n-padding-bottom: 12px;
+  --n-padding-left: 16px;
+  --n-padding-right: 16px;
+}
+
+:deep(.n-grid .n-statistic) {
+  --n-label-font-size: 13px;
+}
+
+:deep(.n-grid .n-statistic .n-statistic-value) {
+  font-size: 24px;
+}
+
+:deep(.n-grid .n-statistic .n-statistic-label) {
+  margin-bottom: 4px;
+}
+
+/* 其他卡片保持原样 */
 :deep(.n-card) {
   --n-padding-top: 16px;
   --n-padding-bottom: 16px;

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ai-task-manager/backend/internal/database"
 	"github.com/ai-task-manager/backend/internal/models"
 	"github.com/ai-task-manager/backend/internal/services"
 	"github.com/ai-task-manager/backend/pkg/response"
@@ -346,42 +347,301 @@ func (h *TaskHandler) ExpandTaskAsync(c *gin.Context) {
 
 // GetAssignments 获取任务分配列表
 func (h *TaskHandler) GetAssignments(c *gin.Context) {
-	// TODO: 实现
-	response.Success(c, []models.Assignment{})
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+
+	db := database.GetDB()
+	var assignments []models.Assignment
+	if err := db.Where("task_id = ?", taskID).Preload("Member").Find(&assignments).Error; err != nil {
+		h.logger.Error("获取任务分配列表失败", zap.Error(err))
+		response.Error(c, 500, "获取任务分配列表失败")
+		return
+	}
+
+	response.Success(c, assignments)
 }
 
 // GetAssignmentOverview 获取分配概览
 func (h *TaskHandler) GetAssignmentOverview(c *gin.Context) {
-	// TODO: 实现
-	response.Success(c, gin.H{})
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+
+	db := database.GetDB()
+	var assignments []models.Assignment
+	if err := db.Where("task_id = ?", taskID).Preload("Member").Find(&assignments).Error; err != nil {
+		h.logger.Error("获取任务分配概览失败", zap.Error(err))
+		response.Error(c, 500, "获取任务分配概览失败")
+		return
+	}
+
+	// 统计各角色数量
+	overview := gin.H{
+		"total":        len(assignments),
+		"assignees":    0,
+		"reviewers":    0,
+		"collaborators": 0,
+		"members":      []gin.H{},
+	}
+
+	membersMap := make(map[uint64]gin.H)
+	for _, a := range assignments {
+		switch a.Role {
+		case "assignee":
+			overview["assignees"] = overview["assignees"].(int) + 1
+		case "reviewer":
+			overview["reviewers"] = overview["reviewers"].(int) + 1
+		case "collaborator":
+			overview["collaborators"] = overview["collaborators"].(int) + 1
+		}
+
+		if _, ok := membersMap[a.MemberID]; !ok {
+			memberInfo := gin.H{
+				"id":     a.MemberID,
+				"name":   "",
+				"avatar": nil,
+				"roles":  []string{a.Role},
+			}
+			if a.Member.ID != 0 {
+				memberInfo["name"] = a.Member.Name
+				memberInfo["avatar"] = a.Member.Avatar
+			}
+			membersMap[a.MemberID] = memberInfo
+		} else {
+			memberInfo := membersMap[a.MemberID]
+			roles := memberInfo["roles"].([]string)
+			roles = append(roles, a.Role)
+			memberInfo["roles"] = roles
+			membersMap[a.MemberID] = memberInfo
+		}
+	}
+
+	// 转换为数组
+	members := make([]gin.H, 0, len(membersMap))
+	for _, m := range membersMap {
+		members = append(members, m)
+	}
+	overview["members"] = members
+
+	response.Success(c, overview)
 }
 
 // CreateAssignment 创建任务分配
 func (h *TaskHandler) CreateAssignment(c *gin.Context) {
-	// TODO: 实现
-	response.Success(c, nil)
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+
+	var req struct {
+		MemberID       uint64   `json:"memberId" binding:"required"`
+		Role           string   `json:"role" binding:"required"`
+		EstimatedHours *float64 `json:"estimatedHours"`
+		ActualHours    *float64 `json:"actualHours"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请求参数格式错误")
+		return
+	}
+
+	// 验证角色
+	validRoles := map[string]bool{"assignee": true, "reviewer": true, "collaborator": true}
+	if !validRoles[req.Role] {
+		response.BadRequest(c, "无效的角色类型")
+		return
+	}
+
+	db := database.GetDB()
+
+	// 检查是否已存在相同的分配
+	var existingCount int64
+	db.Model(&models.Assignment{}).Where("task_id = ? AND member_id = ? AND role = ?", taskID, req.MemberID, req.Role).Count(&existingCount)
+	if existingCount > 0 {
+		response.BadRequest(c, "该成员已被分配此角色")
+		return
+	}
+
+	assignment := models.Assignment{
+		TaskID:         taskID,
+		MemberID:       req.MemberID,
+		Role:           req.Role,
+		EstimatedHours: req.EstimatedHours,
+		ActualHours:    req.ActualHours,
+	}
+
+	if err := db.Create(&assignment).Error; err != nil {
+		h.logger.Error("创建任务分配失败", zap.Error(err))
+		response.Error(c, 500, "创建任务分配失败")
+		return
+	}
+
+	// 加载成员信息
+	db.Preload("Member").First(&assignment, assignment.ID)
+
+	response.Success(c, assignment)
 }
 
 // DeleteAssignment 删除任务分配
 func (h *TaskHandler) DeleteAssignment(c *gin.Context) {
-	// TODO: 实现
-	response.Success(c, nil)
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+	assignmentID, err := strconv.ParseUint(c.Param("assignmentId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的分配 ID")
+		return
+	}
+
+	db := database.GetDB()
+	if err := db.Where("id = ? AND task_id = ?", assignmentID, taskID).Delete(&models.Assignment{}).Error; err != nil {
+		h.logger.Error("删除任务分配失败", zap.Error(err))
+		response.Error(c, 500, "删除任务分配失败")
+		return
+	}
+
+	response.Success(c, gin.H{"success": true, "message": "删除成功"})
 }
 
 // GetSubtaskAssignments 获取子任务分配
 func (h *TaskHandler) GetSubtaskAssignments(c *gin.Context) {
-	// TODO: 实现
-	response.Success(c, []models.SubtaskAssignment{})
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+	subtaskID, err := strconv.ParseUint(c.Param("subtaskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的子任务 ID")
+		return
+	}
+
+	db := database.GetDB()
+
+	// 验证子任务属于该任务
+	var subtask models.Subtask
+	if err := db.Where("id = ? AND task_id = ?", subtaskID, taskID).First(&subtask).Error; err != nil {
+		response.NotFound(c, "子任务不存在")
+		return
+	}
+
+	var assignments []models.SubtaskAssignment
+	if err := db.Where("subtask_id = ?", subtaskID).Preload("Member").Find(&assignments).Error; err != nil {
+		h.logger.Error("获取子任务分配列表失败", zap.Error(err))
+		response.Error(c, 500, "获取子任务分配列表失败")
+		return
+	}
+
+	response.Success(c, assignments)
 }
 
 // CreateSubtaskAssignment 创建子任务分配
 func (h *TaskHandler) CreateSubtaskAssignment(c *gin.Context) {
-	// TODO: 实现
-	response.Success(c, nil)
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+	subtaskID, err := strconv.ParseUint(c.Param("subtaskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的子任务 ID")
+		return
+	}
+
+	var req struct {
+		MemberID       uint64   `json:"memberId" binding:"required"`
+		Role           string   `json:"role" binding:"required"`
+		EstimatedHours *float64 `json:"estimatedHours"`
+		ActualHours    *float64 `json:"actualHours"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请求参数格式错误")
+		return
+	}
+
+	// 验证角色
+	validRoles := map[string]bool{"assignee": true, "reviewer": true, "collaborator": true}
+	if !validRoles[req.Role] {
+		response.BadRequest(c, "无效的角色类型")
+		return
+	}
+
+	db := database.GetDB()
+
+	// 验证子任务属于该任务
+	var subtask models.Subtask
+	if err := db.Where("id = ? AND task_id = ?", subtaskID, taskID).First(&subtask).Error; err != nil {
+		response.NotFound(c, "子任务不存在")
+		return
+	}
+
+	// 检查是否已存在相同的分配
+	var existingCount int64
+	db.Model(&models.SubtaskAssignment{}).Where("subtask_id = ? AND member_id = ? AND role = ?", subtaskID, req.MemberID, req.Role).Count(&existingCount)
+	if existingCount > 0 {
+		response.BadRequest(c, "该成员已被分配此角色")
+		return
+	}
+
+	assignment := models.SubtaskAssignment{
+		SubtaskID:      subtaskID,
+		MemberID:       req.MemberID,
+		Role:           req.Role,
+		EstimatedHours: req.EstimatedHours,
+		ActualHours:    req.ActualHours,
+	}
+
+	if err := db.Create(&assignment).Error; err != nil {
+		h.logger.Error("创建子任务分配失败", zap.Error(err))
+		response.Error(c, 500, "创建子任务分配失败")
+		return
+	}
+
+	// 加载成员信息
+	db.Preload("Member").First(&assignment, assignment.ID)
+
+	response.Success(c, assignment)
 }
 
 // DeleteSubtaskAssignment 删除子任务分配
 func (h *TaskHandler) DeleteSubtaskAssignment(c *gin.Context) {
-	// TODO: 实现
-	response.Success(c, nil)
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+	subtaskID, err := strconv.ParseUint(c.Param("subtaskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的子任务 ID")
+		return
+	}
+	assignmentID, err := strconv.ParseUint(c.Param("assignmentId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的分配 ID")
+		return
+	}
+
+	db := database.GetDB()
+
+	// 验证子任务属于该任务
+	var subtask models.Subtask
+	if err := db.Where("id = ? AND task_id = ?", subtaskID, taskID).First(&subtask).Error; err != nil {
+		response.NotFound(c, "子任务不存在")
+		return
+	}
+
+	if err := db.Where("id = ? AND subtask_id = ?", assignmentID, subtaskID).Delete(&models.SubtaskAssignment{}).Error; err != nil {
+		h.logger.Error("删除子任务分配失败", zap.Error(err))
+		response.Error(c, 500, "删除子任务分配失败")
+		return
+	}
+
+	response.Success(c, gin.H{"success": true, "message": "删除成功"})
 }

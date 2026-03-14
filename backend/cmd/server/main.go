@@ -128,10 +128,21 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			tasks.GET("/:taskId/subtasks/:subtaskId/assignments", taskHandler.GetSubtaskAssignments)
 			tasks.POST("/:taskId/subtasks/:subtaskId/assignments", taskHandler.CreateSubtaskAssignment)
 			tasks.DELETE("/:taskId/subtasks/:subtaskId/assignments/:assignmentId", taskHandler.DeleteSubtaskAssignment)
+
+			// 评论管理
+			commentHandler := handlers.NewCommentHandler(logger)
+			tasks.GET("/:taskId/comments", commentHandler.List)
+			tasks.GET("/:taskId/comments/tree", commentHandler.GetTree)
+			tasks.GET("/:taskId/comments/statistics", commentHandler.GetStatistics)
+			tasks.GET("/:taskId/comments/:commentId", commentHandler.Get)
+			tasks.POST("/:taskId/comments", commentHandler.Create)
+			tasks.PUT("/:taskId/comments/:commentId", commentHandler.Update)
+			tasks.DELETE("/:taskId/comments/:commentId", commentHandler.Delete)
+			tasks.GET("/:taskId/comments/:commentId/replies", commentHandler.GetReplies)
 		}
 
 		// 需求管理
-		requirementHandler := handlers.NewRequirementHandler(logger)
+		requirementHandler := handlers.NewRequirementHandler(logger, cfg)
 		requirements := api.Group("/requirements")
 		{
 			requirements.GET("", requirementHandler.List)

@@ -19,8 +19,15 @@ import type { Task, Subtask, TaskStatus, TaskStatistics, TaskListParams } from '
 import { createLoadingService, LoadingService, LOADING_PRESETS } from '@/utils/loading-service';
 
 // 辅助函数：提取后端返回的 data 字段
+// 后端返回格式: { code: 0, message: "success", data: {...} }
 function extractData(responseData: any): any {
-  return responseData?.data || responseData;
+  if (!responseData) return null;
+  // 如果有 data 字段，返回 data 字段内容
+  if (responseData.data !== undefined) {
+    return responseData.data;
+  }
+  // 否则返回原始数据
+  return responseData;
 }
 
 export const useTaskStore = defineStore('task-store', () => {
@@ -76,11 +83,8 @@ export const useTaskStore = defineStore('task-store', () => {
     try {
       const { data, error } = await fetchTaskList(params);
       if (!error && data) {
-        // 后端返回格式: { code: 0, message: "success", data: { list, total, page, pageSize } }
-        // axios transform 返回 response.data，所以 data 是整个响应体
-        const responseData = (data as any).data || data;
+        const responseData = extractData(data);
 
-        // 提取 list 作为数组
         if (Array.isArray(responseData)) {
           tasks.value = responseData;
         } else if (responseData && 'list' in responseData) {
@@ -105,9 +109,9 @@ export const useTaskStore = defineStore('task-store', () => {
     try {
       const { data, error } = await fetchTaskDetail(id, locale);
       if (!error && data) {
-        currentTask.value = data;
+        currentTask.value = extractData(data);
       }
-      return data;
+      return extractData(data);
     } catch (error) {
       window.$message?.error('加载任务详情失败');
       console.error('Failed to load task detail:', error);
@@ -119,8 +123,9 @@ export const useTaskStore = defineStore('task-store', () => {
 
   async function setTaskStatus(id: number, status: TaskStatus) {
     try {
-      const { data: updatedTask, error } = await updateTask(id, { status });
-      if (!error && updatedTask) {
+      const { data: responseData, error } = await updateTask(id, { status });
+      if (!error && responseData) {
+        const updatedTask = extractData(responseData);
         // 更新列表中的任务
         const index = tasks.value.findIndex(t => t.id === id);
         if (index !== -1) {
@@ -143,8 +148,9 @@ export const useTaskStore = defineStore('task-store', () => {
 
   async function setTaskAssignee(id: number, assignee: string) {
     try {
-      const { data: updatedTask, error } = await updateTask(id, { assignee });
-      if (!error && updatedTask) {
+      const { data: responseData, error } = await updateTask(id, { assignee });
+      if (!error && responseData) {
+        const updatedTask = extractData(responseData);
         // 更新列表中的任务
         const index = tasks.value.findIndex(t => t.id === id);
         if (index !== -1) {
@@ -166,10 +172,11 @@ export const useTaskStore = defineStore('task-store', () => {
   }
 
   // 通用更新任务方法
-  async function updateTaskById(id: number, data: Record<string, any>) {
+  async function updateTaskById(id: number, updateData: Record<string, any>) {
     try {
-      const { data: updatedTask, error } = await updateTask(id, data);
-      if (!error && updatedTask) {
+      const { data: responseData, error } = await updateTask(id, updateData);
+      if (!error && responseData) {
+        const updatedTask = extractData(responseData);
         // 更新列表中的任务
         const index = tasks.value.findIndex(t => t.id === id);
         if (index !== -1) {
@@ -190,8 +197,9 @@ export const useTaskStore = defineStore('task-store', () => {
 
   async function setSubtaskStatus(taskId: number, subtaskId: number, status: TaskStatus) {
     try {
-      const { data: updatedSubtask, error } = await updateSubtask(taskId, subtaskId, { status });
-      if (!error && updatedSubtask) {
+      const { data: responseData, error } = await updateSubtaskApi(taskId, subtaskId, { status });
+      if (!error && responseData) {
+        const updatedSubtask = extractData(responseData);
         // 更新列表中任务的子任务
         const taskIndex = tasks.value.findIndex(t => t.id === taskId);
         if (taskIndex !== -1 && tasks.value[taskIndex].subtasks) {
@@ -225,10 +233,11 @@ export const useTaskStore = defineStore('task-store', () => {
   }
 
   // 通用子任务更新方法
-  async function updateSubtask(taskId: number, subtaskId: number, data: Record<string, any>) {
+  async function updateSubtask(taskId: number, subtaskId: number, updateData: Record<string, any>) {
     try {
-      const { data: updatedSubtask, error } = await updateSubtaskApi(taskId, subtaskId, data);
-      if (!error && updatedSubtask) {
+      const { data: responseData, error } = await updateSubtaskApi(taskId, subtaskId, updateData);
+      if (!error && responseData) {
+        const updatedSubtask = extractData(responseData);
         // 更新列表中任务的子任务
         const taskIndex = tasks.value.findIndex(t => t.id === taskId);
         if (taskIndex !== -1 && tasks.value[taskIndex].subtasks) {
@@ -273,12 +282,13 @@ export const useTaskStore = defineStore('task-store', () => {
       // 步骤1: 分析任务内容
       if (shouldManageLoading) ls.nextStep();
 
-      const { data: updatedTask, error } = await expandTaskApi(id);
+      const { data: responseData, error } = await expandTaskApi(id);
 
       // 步骤2: 生成完成
       if (shouldManageLoading) ls.nextStep();
 
-      if (!error && updatedTask) {
+      if (!error && responseData) {
+        const updatedTask = extractData(responseData);
         const index = tasks.value.findIndex(t => t.id === id);
         if (index !== -1) {
           tasks.value[index] = { ...tasks.value[index], ...updatedTask };
@@ -313,8 +323,15 @@ export const useTaskStore = defineStore('task-store', () => {
   async function expandTaskAsync(id: number) {
     try {
       const { data, error } = await expandTaskAsyncApi(id);
+      // 后端返回格式: { code: 0, message: "success", data: { message: "..." } }
+      // 当 code === 0 时，error 为 null，data 为响应体
       if (!error && data) {
-        return data.messageId;
+        // data 已经是后端返回的完整响应体 { code, message, data }
+        const innerData = extractData(data);
+        // 异步展开成功，返回 true 表示已开始
+        if (innerData?.message || (data as any).code === 0) {
+          return true;
+        }
       }
       return null;
     } catch (error) {
@@ -327,8 +344,9 @@ export const useTaskStore = defineStore('task-store', () => {
   async function clearTaskSubtasks(taskId: number) {
     loading.value = true;
     try {
-      const { data: updatedTask, error } = await clearTaskSubtasksApi(taskId);
-      if (!error && updatedTask) {
+      const { data: responseData, error } = await clearTaskSubtasksApi(taskId);
+      if (!error && responseData) {
+        const updatedTask = extractData(responseData);
         const index = tasks.value.findIndex(t => t.id === taskId);
         if (index !== -1) {
           tasks.value[index] = { ...tasks.value[index], ...updatedTask };
@@ -381,8 +399,17 @@ export const useTaskStore = defineStore('task-store', () => {
     try {
       const { data, error } = await batchDeleteTasksApi(taskIds);
 
-      const successIds = !error && data ? data.successIds || [] : [];
-      const failedIds = !error && data ? data.failedIds || [] : taskIds;
+      if (error) {
+        return { successIds: [], failedIds: taskIds };
+      }
+
+      // 后端返回 { deleted: number } 格式
+      const responseData = extractData(data);
+      const deletedCount = responseData?.deleted || 0;
+
+      // 如果删除数量大于0，认为全部成功
+      const successIds = deletedCount > 0 ? taskIds : [];
+      const failedIds = deletedCount > 0 ? [] : taskIds;
 
       if (successIds.length) {
         tasks.value = tasks.value.filter(task => !successIds.includes(task.id));
@@ -401,8 +428,9 @@ export const useTaskStore = defineStore('task-store', () => {
   async function deleteSubtask(taskId: number, subtaskId: number) {
     loading.value = true;
     try {
-      const { data: updatedTask, error } = await deleteSubtaskApi(taskId, subtaskId);
-      if (!error && updatedTask) {
+      const { data: responseData, error } = await deleteSubtaskApi(taskId, subtaskId);
+      if (!error && responseData) {
+        const updatedTask = extractData(responseData);
         const index = tasks.value.findIndex(t => t.id === taskId);
         if (index !== -1) {
           tasks.value[index] = { ...tasks.value[index], ...updatedTask };
@@ -436,12 +464,13 @@ export const useTaskStore = defineStore('task-store', () => {
       // 步骤1: 分析原子任务
       if (shouldManageLoading) ls.nextStep();
 
-      const { data: updatedTask, error } = await regenerateSubtaskApi(taskId, subtaskId, { prompt });
+      const { data: responseData, error } = await regenerateSubtaskApi(taskId, subtaskId, { prompt });
 
       // 步骤2: 重新生成完成
       if (shouldManageLoading) ls.nextStep();
 
-      if (!error && updatedTask) {
+      if (!error && responseData) {
+        const updatedTask = extractData(responseData);
         const index = tasks.value.findIndex(t => t.id === taskId);
         if (index !== -1) {
           tasks.value[index] = { ...tasks.value[index], ...updatedTask };
@@ -474,8 +503,9 @@ export const useTaskStore = defineStore('task-store', () => {
   // 子任务排序
   async function reorderSubtasks(taskId: number, subtaskIds: number[]) {
     try {
-      const { data: updatedTask, error } = await reorderSubtasksApi(taskId, subtaskIds);
-      if (!error && updatedTask) {
+      const { data: responseData, error } = await reorderSubtasksApi(taskId, subtaskIds);
+      if (!error && responseData) {
+        const updatedTask = extractData(responseData);
         // 更新列表中的任务
         const index = tasks.value.findIndex(t => t.id === taskId);
         if (index !== -1) {
@@ -522,7 +552,7 @@ export const useTaskStore = defineStore('task-store', () => {
         } else {
           window.$message?.success('任务复制成功');
         }
-        return data;
+        return extractData(data);
       }
 
       if (shouldManageLoading) ls.error('任务复制失败');

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NGrid, NGi } from 'naive-ui';
+import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NTabs, NTabPane } from 'naive-ui';
 import type { SelectOption } from 'naive-ui';
 import { VueDraggable } from 'vue-draggable-plus';
 import { MdEditor, MdPreview } from 'md-editor-v3';
@@ -216,6 +216,10 @@ const showRegenerateModal = ref(false);
 const regeneratePrompt = ref('');
 const regeneratingSubtaskId = ref<number | null>(null);
 
+// 轮询相关状态
+const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null);
+const pollingMessageId = ref<number | null>(null);
+
 // 拆分子任务 - 异步版本
 async function handleExpandTask() {
   if (!taskId.value) return;
@@ -390,7 +394,8 @@ onUnmounted(() => {
 
 <template>
   <div class="task-detail-page">
-    <NSpace vertical :size="16">
+    <!-- 顶部操作栏 -->
+    <div class="task-toolbar">
       <NSpace>
         <NButton secondary @click="router.back()">返回</NButton>
         <!-- 拆分子任务按钮 - 根据状态显示不同文案 -->
@@ -415,9 +420,15 @@ onUnmounted(() => {
           删除任务
         </NButton>
       </NSpace>
+    </div>
 
+    <!-- 主体内容区域：左右分栏布局 -->
+    <div class="task-content-wrapper">
       <NSpin :show="taskStore.loading">
-        <NCard v-if="task">
+        <div v-if="task" class="task-layout">
+          <!-- 左侧：任务详情（70%） -->
+          <div class="task-main">
+            <NCard>
           <template #header>
             <div v-if="editingType === 'task' && editingField === 'title'" class="edit-field">
               <NInput

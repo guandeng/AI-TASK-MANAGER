@@ -19,8 +19,8 @@ export function deleteTask(id: number) {
   return request({ url: `${API_BASE}/tasks/${id}`, method: 'DELETE' });
 }
 
-export function batchDeleteTasks(taskIds: number[]) {
-  return request({ url: `${API_BASE}/tasks/batch-delete`, method: 'POST', data: { taskIds } });
+export function batchDeleteTasks(ids: number[]) {
+  return request({ url: `${API_BASE}/tasks/batch-delete`, method: 'POST', data: { ids } });
 }
 
 export function updateSubtask(taskId: number, subtaskId: number, data: Record<string, any>) {

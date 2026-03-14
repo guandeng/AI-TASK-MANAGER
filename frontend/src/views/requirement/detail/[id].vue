@@ -212,14 +212,14 @@ function formatFileSize(bytes: number): string {
 // 加载需求详情
 async function loadDetail() {
   if (!isNew.value && requirementId.value) {
-    const { data, error } = await requirementStore.loadRequirementDetail(requirementId.value);
-    if (!error && data) {
+    const { error } = await requirementStore.loadRequirementDetail(requirementId.value);
+    if (!error && requirementStore.currentRequirement) {
       formData.value = {
-        title: data.title,
-        content: data.content,
-        status: data.status,
-        priority: data.priority,
-        assignee: data.assignee || ''
+        title: requirementStore.currentRequirement.title,
+        content: requirementStore.currentRequirement.content,
+        status: requirementStore.currentRequirement.status,
+        priority: requirementStore.currentRequirement.priority,
+        assignee: requirementStore.currentRequirement.assignee || ''
       };
     }
   }

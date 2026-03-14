@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ai-task-manager/backend/internal/config"
@@ -39,6 +42,17 @@ func (s *Service) ExpandTask(task *models.Task) ([]models.Subtask, error) {
 		return nil, err
 	}
 	return s.parseSubtasks(response, task.ID)
+}
+
+// SplitRequirement 将需求拆分为任务
+// taskType: frontend, backend, fullstack
+func (s *Service) SplitRequirement(requirement *models.Requirement, taskType string) ([]models.Task, error) {
+	prompt := s.buildSplitRequirementPrompt(requirement, taskType)
+	response, err := s.Chat(prompt)
+	if err != nil {
+		return nil, err
+	}
+	return s.parseTasks(response, requirement.ID)
 }
 
 // Chat 发送聊天请求
@@ -251,4 +265,161 @@ func (s *Service) GenerateSubtask(task *models.Task) (*models.Subtask, error) {
 		return nil, fmt.Errorf("no subtask generated")
 	}
 	return &subtasks[0], nil
+}
+
+// buildSplitRequirementPrompt 构建需求拆分提示词
+func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, taskType string) string {
+	// 根据任务类型生成不同的提示
+	var typeGuidance string
+	switch taskType {
+	case "frontend":
+		typeGuidance = `IMPORTANT: 只需要生成前端相关的任务，包括：
+- 前端页面和组件开发
+- 前端路由和状态管理
+- 前端 API 调用和数据展示
+- 前端样式和交互效果
+- 前端表单验证和处理
+
+不要包含后端 API 开发、数据库设计、后端逻辑等后端任务。`
+	case "backend":
+		typeGuidance = `IMPORTANT: 只需要生成后端相关的任务，包括：
+- 后端 API 接口开发
+- 数据库设计和操作
+- 后端业务逻辑实现
+- 后端中间件和服务层
+- 后端数据验证和处理
+
+不要包含前端页面、组件、样式等前端任务。`
+	case "fullstack":
+		typeGuidance = `需要生成前端和后端的完整任务，包括：
+- 前端页面和组件开发
+- 后端 API 接口开发
+- 数据库设计和操作
+- 前后端联调
+- 完整的功能实现`
+	default:
+		typeGuidance = `需要生成后端相关的任务。`
+	}
+
+	return fmt.Sprintf(`你是一个AI助手，帮助将产品需求文档（PRD）拆分为开发任务。
+
+请分析以下需求并拆分为合适的开发任务。每个任务应该是一个具体的、可执行的开发单元。
+
+%s
+
+需求标题：%s
+需求内容：
+%s
+
+请以 JSON 数组格式返回任务列表，每个任务包含以下字段：
+- title: 任务标题（简洁明了）
+- description: 任务描述（详细说明要做什么）
+- details: 实现细节（技术方案、注意事项等）
+- priority: 优先级（high/medium/low）
+- dependencies: 依赖的任务索引数组（如 [0, 1] 表示依赖第1和第2个任务）
+
+拆分原则：
+1. 按照功能模块拆分，每个任务专注于一个功能点
+2. 优先级设置：基础架构和高优先级功能设为 high，核心功能设为 medium，辅助功能设为 low
+3. 合理设置依赖关系，确保任务可以按顺序执行
+4. 每个任务应该足够独立，可以单独开发和测试
+
+示例格式：
+[
+  {
+    "title": "任务1标题",
+    "description": "任务1描述",
+    "details": "实现细节",
+    "priority": "high",
+    "dependencies": []
+  },
+  {
+    "title": "任务2标题",
+    "description": "任务2描述",
+    "details": "实现细节",
+    "priority": "medium",
+    "dependencies": [0]
+  }
+]
+
+请只返回 JSON 数组，不要包含其他内容。`,
+		typeGuidance,
+		requirement.Title,
+		requirement.Content,
+	)
+}
+
+// parseTasks 解析任务列表
+func (s *Service) parseTasks(response string, requirementID uint64) ([]models.Task, error) {
+	// 尝试从响应中提取 JSON 数组
+	jsonStart := strings.Index(response, "[")
+	jsonEnd := strings.LastIndex(response, "]")
+
+	if jsonStart == -1 || jsonEnd == -1 || jsonEnd < jsonStart {
+		return nil, fmt.Errorf("could not find valid JSON array in response")
+	}
+
+	jsonStr := response[jsonStart : jsonEnd+1]
+
+	var tasksData []struct {
+		Title        string `json:"title"`
+		Description  string `json:"description"`
+		Details      string `json:"details"`
+		TestStrategy string `json:"testStrategy"`
+		Priority     string `json:"priority"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &tasksData); err != nil {
+		return nil, fmt.Errorf("failed to parse tasks: %w", err)
+	}
+
+	reqID := requirementID
+	result := make([]models.Task, len(tasksData))
+	for i, td := range tasksData {
+		priority := td.Priority
+		if priority == "" {
+			priority = "medium"
+		}
+
+		result[i] = models.Task{
+			RequirementID: &reqID,
+			Title:         td.Title,
+			Description:   td.Description,
+			Details:       td.Details,
+			TestStrategy:  td.TestStrategy,
+			Status:        "pending",
+			Priority:      priority,
+		}
+	}
+
+	return result, nil
+}
+
+// extractJSONFromString 从字符串中提取 JSON
+func extractJSONFromString(text string) string {
+	// 尝试匹配 JSON 数组
+	reArray := regexp.MustCompile(`\[[\s\S]*\]`)
+	if match := reArray.FindString(text); match != "" {
+		return match
+	}
+
+	// 尝试匹配 JSON 对象
+	reObject := regexp.MustCompile(`\{[\s\S]*\}`)
+	if match := reObject.FindString(text); match != "" {
+		return match
+	}
+
+	return text
+}
+
+// parseIntOrDefault 解析整数或返回默认值
+func parseIntOrDefault(s string, defaultVal int) int {
+	if s == "" {
+		return defaultVal
+	}
+	val, err := strconv.Atoi(s)
+	if err != nil {
+		return defaultVal
+	}
+	return val
 }

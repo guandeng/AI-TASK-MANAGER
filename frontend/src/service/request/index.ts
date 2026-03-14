@@ -27,12 +27,18 @@ export const request = createFlatRequest<
       // 不需要认证
       return config;
     },
-    isBackendSuccess() {
-      // 任务管理器 API 不使用标准错误码，直接返回成功
+    isBackendSuccess(response) {
+      // 检查后端返回的 code 字段，0 表示成功
+      const data = response as any;
+      // 如果有 code 字段，检查是否为 0
+      if (data && typeof data.code !== 'undefined') {
+        return data.code === 0;
+      }
+      // 如果没有 code 字段，默认成功
       return true;
     },
-    async onBackendFail() {
-      // 不处理
+    async onBackendFail(_response) {
+      // 不在这里处理错误，让调用方处理
     },
     onError(error) {
       // 显示错误信息

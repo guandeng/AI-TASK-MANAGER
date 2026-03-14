@@ -1,10 +1,18 @@
 package handlers
 
 import (
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
+	"github.com/ai-task-manager/backend/internal/config"
 	"github.com/ai-task-manager/backend/internal/database"
 	"github.com/ai-task-manager/backend/internal/models"
+	"github.com/ai-task-manager/backend/pkg/ai"
 	"github.com/ai-task-manager/backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -12,12 +20,20 @@ import (
 
 // RequirementHandler 需求处理器
 type RequirementHandler struct {
-	logger *zap.Logger
+	logger    *zap.Logger
+	aiService *ai.Service
 }
 
 // NewRequirementHandler 创建需求处理器
-func NewRequirementHandler(logger *zap.Logger) *RequirementHandler {
-	return &RequirementHandler{logger: logger}
+func NewRequirementHandler(logger *zap.Logger, cfg *config.Config) *RequirementHandler {
+	var aiSvc *ai.Service
+	if cfg != nil {
+		aiSvc = ai.NewService(&cfg.AI)
+	}
+	return &RequirementHandler{
+		logger:    logger,
+		aiService: aiSvc,
+	}
 }
 
 // List 获取需求列表
@@ -197,8 +213,97 @@ func (h *RequirementHandler) Delete(c *gin.Context) {
 
 // UploadDocument 上传文档
 func (h *RequirementHandler) UploadDocument(c *gin.Context) {
-	// TODO: 实现文件上传
-	response.Success(c, nil)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求 ID")
+		return
+	}
+
+	db := database.GetDB()
+
+	// 验证需求是否存在
+	var requirement models.Requirement
+	if err := db.First(&requirement, id).Error; err != nil {
+		response.NotFound(c, "需求不存在")
+		return
+	}
+
+	// 获取上传的文件
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		response.BadRequest(c, "请选择要上传的文件")
+		return
+	}
+	defer file.Close()
+
+	// 验证文件大小（最大 50MB）
+	const maxSize = 50 * 1024 * 1024
+	if header.Size > maxSize {
+		response.BadRequest(c, "文件大小不能超过 50MB")
+		return
+	}
+
+	// 获取文件扩展名并验证
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	allowedExts := map[string]bool{
+		".pdf": true, ".doc": true, ".docx": true, ".xls": true, ".xlsx": true,
+		".ppt": true, ".pptx": true, ".txt": true, ".md": true,
+		".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".bmp": true,
+	}
+	if !allowedExts[ext] {
+		response.BadRequest(c, "不支持的文件类型")
+		return
+	}
+
+	// 创建上传目录
+	uploadDir := filepath.Join("uploads", "documents", strconv.FormatUint(id, 10))
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		h.logger.Error("创建上传目录失败", zap.Error(err))
+		response.Error(c, 500, "上传失败")
+		return
+	}
+
+	// 生成唯一文件名
+	filename := fmt.Sprintf("%d_%d%s", time.Now().UnixNano(), id, ext)
+	filePath := filepath.Join(uploadDir, filename)
+
+	// 创建目标文件
+	dst, err := os.Create(filePath)
+	if err != nil {
+		h.logger.Error("创建文件失败", zap.Error(err))
+		response.Error(c, 500, "上传失败")
+		return
+	}
+	defer dst.Close()
+
+	// 复制文件内容
+	if _, err := io.Copy(dst, file); err != nil {
+		h.logger.Error("保存文件失败", zap.Error(err))
+		response.Error(c, 500, "上传失败")
+		return
+	}
+
+	// 获取 MIME 类型
+	mimeType := getMimeType(ext)
+
+	// 保存文档记录到数据库
+	doc := models.RequirementDocument{
+		RequirementID: id,
+		Name:          header.Filename,
+		Path:          filePath,
+		Size:          uint64(header.Size),
+		MimeType:      &mimeType,
+	}
+
+	if err := db.Create(&doc).Error; err != nil {
+		// 删除已上传的文件
+		os.Remove(filePath)
+		h.logger.Error("保存文档记录失败", zap.Error(err))
+		response.Error(c, 500, "上传失败")
+		return
+	}
+
+	response.Success(c, doc)
 }
 
 // DeleteDocument 删除文档
@@ -227,12 +332,130 @@ func (h *RequirementHandler) DeleteDocument(c *gin.Context) {
 
 // DownloadDocument 下载文档
 func (h *RequirementHandler) DownloadDocument(c *gin.Context) {
-	// TODO: 实现文件下载
-	response.Success(c, nil)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求 ID")
+		return
+	}
+	docId, err := strconv.ParseUint(c.Param("docId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的文档 ID")
+		return
+	}
+
+	db := database.GetDB()
+
+	// 查询文档记录
+	var doc models.RequirementDocument
+	if err := db.Where("id = ? AND requirement_id = ?", docId, id).First(&doc).Error; err != nil {
+		response.NotFound(c, "文档不存在")
+		return
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(doc.Path); os.IsNotExist(err) {
+		response.NotFound(c, "文件不存在")
+		return
+	}
+
+	// 设置响应头
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Transfer-Encoding", "binary")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", doc.Name))
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Length", strconv.FormatUint(doc.Size, 10))
+
+	// 发送文件
+	c.File(doc.Path)
+}
+
+// getMimeType 根据文件扩展名获取 MIME 类型
+func getMimeType(ext string) string {
+	mimeTypes := map[string]string{
+		".pdf":  "application/pdf",
+		".doc":  "application/msword",
+		".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		".xls":  "application/vnd.ms-excel",
+		".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		".ppt":  "application/vnd.ms-powerpoint",
+		".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		".txt":  "text/plain",
+		".md":   "text/markdown",
+		".png":  "image/png",
+		".jpg":  "image/jpeg",
+		".jpeg": "image/jpeg",
+		".gif":  "image/gif",
+		".bmp":  "image/bmp",
+	}
+	if mt, ok := mimeTypes[ext]; ok {
+		return mt
+	}
+	return "application/octet-stream"
+}
+
+// SplitTasksRequest 拆分任务请求
+type SplitTasksRequest struct {
+	TaskType string `json:"taskType"` // frontend, backend, fullstack
 }
 
 // SplitTasks 需求拆分为任务（AI）
 func (h *RequirementHandler) SplitTasks(c *gin.Context) {
-	// TODO: 实现 AI 拆分
-	response.Success(c, nil)
+	db := database.GetDB()
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求 ID")
+		return
+	}
+
+	// 解析请求体
+	var req SplitTasksRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// 如果没有请求体，使用默认值
+		req.TaskType = "backend"
+	}
+
+	// 验证任务类型
+	if req.TaskType != "frontend" && req.TaskType != "backend" && req.TaskType != "fullstack" {
+		req.TaskType = "backend"
+	}
+
+	// 获取需求详情
+	var requirement models.Requirement
+	if err := db.First(&requirement, id).Error; err != nil {
+		response.NotFound(c, "需求不存在")
+		return
+	}
+
+	// 检查 AI 服务是否可用
+	if h.aiService == nil {
+		response.Error(c, 500, "AI 服务未配置")
+		return
+	}
+
+	// 调用 AI 服务拆分需求
+	tasks, err := h.aiService.SplitRequirement(&requirement, req.TaskType)
+	if err != nil {
+		h.logger.Error("AI 拆分需求失败", zap.Error(err))
+		response.Error(c, 500, "AI 拆分需求失败: "+err.Error())
+		return
+	}
+
+	// 保存任务到数据库
+	if len(tasks) > 0 {
+		if err := db.Create(&tasks).Error; err != nil {
+			h.logger.Error("保存任务失败", zap.Error(err))
+			response.Error(c, 500, "保存任务失败")
+			return
+		}
+	}
+
+	// 更新需求状态为已拆分
+	db.Model(&requirement).Update("status", "active")
+
+	response.Success(c, gin.H{
+		"success": true,
+		"message": "成功拆分为任务",
+		"tasks":   tasks,
+	})
 }

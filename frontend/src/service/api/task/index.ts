@@ -47,3 +47,19 @@ export function regenerateSubtask(taskId: number, subtaskId: number, data: { pro
     timeout: 5 * 60 * 1000 // 5 分钟超时
   });
 }
+
+export function reorderSubtasks(taskId: number, subtaskIds: number[]) {
+  return request({
+    url: `${API_BASE}/tasks/${taskId}/subtasks/reorder`,
+    method: 'POST',
+    data: { subtaskIds }
+  });
+}
+
+export function copyTask(taskId: number) {
+  return request({
+    url: `${API_BASE}/tasks/${taskId}/copy`,
+    method: 'POST',
+    timeout: 60 * 1000 // 1 分钟超时
+  });
+}

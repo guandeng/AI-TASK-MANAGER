@@ -25,6 +25,8 @@ import {
   NEmpty
 } from 'naive-ui';
 import type { UploadFileInfo } from 'naive-ui';
+import { MdEditor, MdPreview } from 'md-editor-v3';
+import 'md-editor-v3/lib/style.css';
 import { useRequirementStore } from '@/store/modules/requirement';
 import type { RequirementStatus, RequirementPriority, RequirementDocument } from '@/typings/api/requirement';
 import { getDocumentDownloadUrl } from '@/service/api/requirement';
@@ -52,6 +54,61 @@ const formData = ref({
 
 // 预览模式
 const previewMode = ref(false);
+
+// Markdown 编辑器工具栏配置
+const editorToolbars = [
+  'bold',
+  'underline',
+  'italic',
+  '-',
+  'strikeThrough',
+  'title',
+  'sub',
+  'sup',
+  'quote',
+  'unorderedList',
+  'orderedList',
+  'task',
+  '-',
+  'codeRow',
+  'code',
+  'link',
+  'image',
+  'table',
+  'mermaid',
+  '-',
+  'revoke',
+  'next',
+  '=',
+  'pageFullscreen',
+  'fullscreen',
+  'preview',
+  'catalog'
+];
+
+// 处理编辑器图片上传
+async function handleUploadImg(files: File[], callback: (urls: string[]) => void) {
+  if (isNew.value) {
+    window.$message?.warning('请先保存需求后再上传图片');
+    callback([]);
+    return;
+  }
+
+  try {
+    const urls: string[] = [];
+    for (const file of files) {
+      const { data, error } = await requirementStore.uploadRequirementDocument(requirementId.value, file);
+      if (!error && data) {
+        // 返回图片访问 URL
+        urls.push(getDocumentDownloadUrl(requirementId.value, data.id));
+      }
+    }
+    callback(urls);
+  } catch {
+    window.$message?.error('图片上传失败');
+    callback([]);
+  }
+}
 
 // 状态选项
 const statusOptions = [
@@ -238,39 +295,6 @@ async function handleDeleteDocument(docId: number) {
   }
 }
 
-// 简单的 Markdown 渲染（基础版）
-function renderMarkdown(content: string): string {
-  if (!content) return '';
-
-  let html = content
-    // 转义 HTML
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    // 标题
-    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-    .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-    // 粗体和斜体
-    .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    // 代码块
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-    // 行内代码
-    .replace(/`(.*?)`/g, '<code>$1</code>')
-    // 链接
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-    // 列表
-    .replace(/^\- (.*$)/gm, '<li>$1</li>')
-    .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
-    // 段落
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br>');
-
-  return `<div class="markdown-content"><p>${html}</p></div>`;
-}
-
 // 监听路由变化
 watch(
   () => route.params.id,
@@ -303,70 +327,81 @@ onMounted(() => {
 <template>
   <div class="h-full overflow-auto p-4">
     <NSpin :show="requirementStore.detailLoading">
-      <!-- 顶部操作栏 -->
-      <NCard class="mb-4">
-        <NSpace justify="center" align="center">
-          <NButton text @click="handleBack">
-            <template #icon>
-              <span class="i-mdi:arrow-left text-lg"></span>
-            </template>
-          </NButton>
-          <span class="text-lg font-medium">
-            {{ isNew ? '新建需求' : '编辑需求' }}
-          </span>
-          <NTag v-if="!isNew && requirementStore.currentRequirement" :type="statusColors[requirementStore.currentRequirement.status] as any">
-            {{ statusText[requirementStore.currentRequirement.status] }}
-          </NTag>
-          <NButton v-if="!isNew" @click="togglePreview">
-            <template #icon>
-              <span :class="previewMode ? 'i-mdi:pencil' : 'i-mdi:eye'"></span>
-            </template>
-            {{ previewMode ? '编辑' : '预览' }}
-          </NButton>
-          <NButton type="primary" @click="handleSave" class="min-w-20">
-            <template #icon>
-              <span class="i-mdi:content-save"></span>
-            </template>
-            保存
-          </NButton>
-        </NSpace>
-      </NCard>
-
       <!-- 主内容区 -->
       <NGrid :cols="24" :x-gap="16">
         <!-- 左侧：编辑/预览 -->
         <NGi :span="18">
-          <NCard title="需求内容">
+          <NCard>
+            <!-- 标题栏 -->
+            <template #header>
+              <div class="flex items-center gap-3">
+                <NButton text @click="handleBack">
+                  <template #icon>
+                    <span class="i-mdi:arrow-left text-lg"></span>
+                  </template>
+                </NButton>
+                <span class="text-lg font-medium">
+                  {{ isNew ? '新建需求' : '编辑需求' }}
+                </span>
+                <NTag v-if="!isNew && requirementStore.currentRequirement" :type="statusColors[requirementStore.currentRequirement.status] as any">
+                  {{ statusText[requirementStore.currentRequirement.status] }}
+                </NTag>
+              </div>
+            </template>
+
             <!-- 预览模式 -->
             <div v-if="previewMode" class="min-h-96">
-              <div v-if="formData.content" class="prose max-w-none" v-html="renderMarkdown(formData.content)"></div>
+              <MdPreview v-if="formData.content" :model-value="formData.content" class="markdown-preview-wrapper" />
               <NEmpty v-else description="暂无内容" />
             </div>
 
             <!-- 编辑模式 -->
-            <div v-else>
+            <div v-else class="flex flex-col gap-4">
               <NFormItem label="标题" required>
                 <NInput v-model:value="formData.title" placeholder="请输入需求标题" />
               </NFormItem>
 
-              <NFormItem label="内容（支持 Markdown 格式）">
-                <NInput
-                  v-model:value="formData.content"
-                  type="textarea"
+              <NFormItem label="内容">
+                <MdEditor
+                  v-model="formData.content"
+                  language="zh-CN"
+                  :toolbars="editorToolbars"
                   placeholder="请输入需求内容，支持 Markdown 格式"
-                  :autosize="{
-                    minRows: 20,
-                    maxRows: 40
-                  }"
+                  :style="{ height: '500px' }"
+                  @onUploadImg="handleUploadImg"
                 />
               </NFormItem>
             </div>
           </NCard>
         </NGi>
 
-        <!-- 右侧：属性和文档 -->
+        <!-- 右侧：操作按钮和属性 -->
         <NGi :span="6">
           <NSpace vertical :size="16">
+            <!-- 操作按钮 -->
+            <NCard title="操作" size="small">
+              <NSpace vertical>
+                <NButton type="primary" @click="handleSave" block>
+                  <template #icon>
+                    <span class="i-mdi:content-save"></span>
+                  </template>
+                  保存
+                </NButton>
+                <NButton v-if="!isNew" @click="togglePreview" block>
+                  <template #icon>
+                    <span :class="previewMode ? 'i-mdi:pencil' : 'i-mdi:eye'"></span>
+                  </template>
+                  {{ previewMode ? '编辑' : '预览' }}
+                </NButton>
+                <NButton @click="handleBack" block>
+                  <template #icon>
+                    <span class="i-mdi:arrow-left"></span>
+                  </template>
+                  返回列表
+                </NButton>
+              </NSpace>
+            </NCard>
+
             <!-- 基本信息 -->
             <NCard title="基本信息" size="small">
               <NSpace vertical>
@@ -447,68 +482,28 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.markdown-content {
-  line-height: 1.8;
+/* Markdown 预览容器样式 */
+.markdown-preview-wrapper {
+  border: none !important;
+  background: transparent !important;
 }
 
-.markdown-content :deep(h1) {
-  font-size: 1.75rem;
-  font-weight: 600;
-  margin: 1rem 0;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #e5e7eb;
+/* Markdown 编辑器样式覆盖 */
+:deep(.md-editor) {
+  --md-bk-color: transparent;
 }
 
-.markdown-content :deep(h2) {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0.875rem 0;
+:deep(.md-editor-toolbar-wrapper) {
+  border-radius: 8px 8px 0 0;
 }
 
-.markdown-content :deep(h3) {
-  font-size: 1.25rem;
-  font-weight: 500;
-  margin: 0.75rem 0;
+:deep(.md-editor-content) {
+  border-radius: 0 0 8px 8px;
 }
 
-.markdown-content :deep(code) {
-  background-color: #f3f4f6;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.875rem;
-}
-
-.markdown-content :deep(pre) {
-  background-color: #1f2937;
-  color: #e5e7eb;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  overflow-x: auto;
-  margin: 1rem 0;
-}
-
-.markdown-content :deep(pre code) {
-  background-color: transparent;
-  padding: 0;
-  color: inherit;
-}
-
-.markdown-content :deep(a) {
-  color: #3b82f6;
-  text-decoration: none;
-}
-
-.markdown-content :deep(a:hover) {
-  text-decoration: underline;
-}
-
-.markdown-content :deep(li) {
-  margin-left: 1.5rem;
-  list-style-type: disc;
-}
-
-.prose {
-  max-width: none;
+/* 确保编辑器在卡片内显示正常 */
+:deep(.md-editor) {
+  border: 1px solid #e0e0e6;
+  border-radius: 8px;
 }
 </style>

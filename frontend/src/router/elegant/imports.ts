@@ -21,8 +21,13 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   "iframe-page": () => import("@/views/_builtin/iframe-page/[url].vue"),
   login: () => import("@/views/_builtin/login/index.vue"),
   manage_config: () => import("@/views/manage/config/index.vue"),
+  manage_menu: () => import("@/views/manage/menu/index.vue"),
   requirement_detail: () => import("@/views/requirement/detail/[id].vue"),
   requirement_list: () => import("@/views/requirement/list/index.vue"),
   "requirement_task-detail": () => import("@/views/requirement/task-detail/[id].vue"),
   "requirement_task-list": () => import("@/views/requirement/task-list/index.vue"),
+  team_members: () => import("@/views/team/members/index.vue"),
+  team_workload: () => import("@/views/team/workload/index.vue"),
+  templates_projects: () => import("@/views/templates/projects/index.vue"),
+  templates_tasks: () => import("@/views/templates/tasks/index.vue"),
 };

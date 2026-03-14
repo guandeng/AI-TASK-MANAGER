@@ -9,7 +9,10 @@ import { SetupStoreId } from '@/enum';
 import { createStaticRoutes, getAuthVueRoutes } from '@/router/routes';
 import { ROOT_ROUTE } from '@/router/routes/builtin';
 import { getRouteName, getRoutePath } from '@/router/elegant/transform';
+import { useSvgIcon } from '@/hooks/common/icon';
+import type { MenuTreeNode } from '@/typings/api/menu';
 import { useAuthStore } from '../auth';
+import { useMenuStore } from '../menu';
 import { useTabStore } from '../tab';
 import {
   filterAuthRoutesByRoles,
@@ -78,18 +81,68 @@ export const useRouteStore = defineStore(SetupStoreId.Route, () => {
 
   const removeRouteFns: (() => void)[] = [];
 
-  /** Global menus */
-  const menus = ref<App.Global.Menu[]>([]);
-  const searchMenus = computed(() => transformMenuToSearchMenus(menus.value));
+  /** Global menus - computed from menuStore backend data */
+  const menus = computed<App.Global.Menu[]>(() => {
+    const menuStore = useMenuStore();
+    // Use backend menu data if available
+    if (menuStore.menus.length > 0) {
+      return convertBackendMenusToGlobalMenus(menuStore.enabledMenuTree);
+    }
+    // Fallback to route-based menus when backend menus are not loaded
+    return fallbackMenus.value;
+  });
 
-  /** Get global menus */
-  function getGlobalMenus(routes: ElegantConstRoute[]) {
-    menus.value = getGlobalMenusByAuthRoutes(routes);
+  /** Convert backend MenuTreeNode to App.Global.Menu format */
+  function convertBackendMenusToGlobalMenus(menuNodes: MenuTreeNode[]): App.Global.Menu[] {
+    const { SvgIconVNode } = useSvgIcon();
+
+    function convertNodes(nodes: MenuTreeNode[]): App.Global.Menu[] {
+      const result: App.Global.Menu[] = [];
+
+      for (const node of nodes) {
+        // Skip disabled menus (already filtered by enabledMenuTree, but double-check)
+        if (!node.enabled || node.hideInMenu) continue;
+
+        const menu: App.Global.Menu = {
+          key: node.key,
+          // Use backend label directly, no i18n translation
+          label: node.label,
+          i18nKey: null,
+          routeKey: (node.routeName || node.key) as App.Global.RouteKey,
+          routePath: (node.path || '') as App.Global.RoutePath,
+          icon: SvgIconVNode({ icon: node.icon, fontSize: 20 })
+        };
+
+        // Recursively process children
+        if (node.children && node.children.length > 0) {
+          const childMenus = convertNodes(node.children);
+          if (childMenus.length > 0) {
+            menu.children = childMenus;
+          }
+        }
+
+        result.push(menu);
+      }
+
+      return result;
+    }
+
+    return convertNodes(menuNodes);
   }
 
-  /** Update global menus by locale */
+  /** Fallback menus from route config */
+  const fallbackMenus = ref<App.Global.Menu[]>([]);
+
+  const searchMenus = computed(() => transformMenuToSearchMenus(menus.value));
+
+  /** Get global menus from routes (fallback only) */
+  function getGlobalMenus(routes: ElegantConstRoute[]) {
+    fallbackMenus.value = getGlobalMenusByAuthRoutes(routes);
+  }
+
+  /** Update global menus by locale (for fallback menus only) */
   function updateGlobalMenusByLocale() {
-    menus.value = updateLocaleOfGlobalMenus(menus.value);
+    fallbackMenus.value = updateLocaleOfGlobalMenus(fallbackMenus.value);
   }
 
   /** Cache routes */
@@ -186,6 +239,10 @@ export const useRouteStore = defineStore(SetupStoreId.Route, () => {
     } else {
       await initDynamicAuthRoute();
     }
+
+    // Load backend menus for sidebar navigation
+    const menuStore = useMenuStore();
+    await menuStore.loadMenus();
 
     tabStore.initHomeTab();
   }

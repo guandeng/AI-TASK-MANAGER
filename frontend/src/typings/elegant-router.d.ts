@@ -24,11 +24,18 @@ declare module "@elegant-router/types" {
     "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?";
     "manage": "/manage";
     "manage_config": "/manage/config";
+    "manage_menu": "/manage/menu";
     "requirement": "/requirement";
     "requirement_detail": "/requirement/detail/:id";
     "requirement_list": "/requirement/list";
     "requirement_task-detail": "/requirement/task-detail/:id";
     "requirement_task-list": "/requirement/task-list";
+    "team": "/team";
+    "team_members": "/team/members";
+    "team_workload": "/team/workload";
+    "templates": "/templates";
+    "templates_projects": "/templates/projects";
+    "templates_tasks": "/templates/tasks";
   };
 
   /**
@@ -67,6 +74,8 @@ declare module "@elegant-router/types" {
     | "login"
     | "manage"
     | "requirement"
+    | "team"
+    | "templates"
   >;
 
   /**
@@ -89,10 +98,15 @@ declare module "@elegant-router/types" {
     | "iframe-page"
     | "login"
     | "manage_config"
+    | "manage_menu"
     | "requirement_detail"
     | "requirement_list"
     | "requirement_task-detail"
     | "requirement_task-list"
+    | "team_members"
+    | "team_workload"
+    | "templates_projects"
+    | "templates_tasks"
   >;
 
   /**

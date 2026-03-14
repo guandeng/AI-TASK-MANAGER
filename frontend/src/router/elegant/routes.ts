@@ -84,6 +84,15 @@ export const generatedRoutes: GeneratedRoute[] = [
           i18nKey: 'route.manage_config',
           icon: 'mdi:cog-outline'
         }
+      },
+      {
+        name: 'manage_menu',
+        path: '/manage/menu',
+        component: 'view.manage_menu',
+        meta: {
+          title: 'manage_menu',
+          i18nKey: 'route.manage_menu'
+        }
       }
     ]
   },
@@ -140,6 +149,64 @@ export const generatedRoutes: GeneratedRoute[] = [
           i18nKey: 'route.requirement_task-list',
           icon: 'mdi:clipboard-list',
           order: 2
+        }
+      }
+    ]
+  },
+  {
+    name: 'team',
+    path: '/team',
+    component: 'layout.base',
+    meta: {
+      title: 'team',
+      i18nKey: 'route.team'
+    },
+    children: [
+      {
+        name: 'team_members',
+        path: '/team/members',
+        component: 'view.team_members',
+        meta: {
+          title: 'team_members',
+          i18nKey: 'route.team_members'
+        }
+      },
+      {
+        name: 'team_workload',
+        path: '/team/workload',
+        component: 'view.team_workload',
+        meta: {
+          title: 'team_workload',
+          i18nKey: 'route.team_workload'
+        }
+      }
+    ]
+  },
+  {
+    name: 'templates',
+    path: '/templates',
+    component: 'layout.base',
+    meta: {
+      title: 'templates',
+      i18nKey: 'route.templates'
+    },
+    children: [
+      {
+        name: 'templates_projects',
+        path: '/templates/projects',
+        component: 'view.templates_projects',
+        meta: {
+          title: 'templates_projects',
+          i18nKey: 'route.templates_projects'
+        }
+      },
+      {
+        name: 'templates_tasks',
+        path: '/templates/tasks',
+        component: 'view.templates_tasks',
+        meta: {
+          title: 'templates_tasks',
+          i18nKey: 'route.templates_tasks'
         }
       }
     ]

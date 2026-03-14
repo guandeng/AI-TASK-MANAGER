@@ -9,10 +9,13 @@ import {
   fetchTaskDetail,
   fetchTaskList,
   regenerateSubtask as regenerateSubtaskApi,
+  reorderSubtasks as reorderSubtasksApi,
   updateTask,
-  updateSubtask as updateSubtaskApi
+  updateSubtask as updateSubtaskApi,
+  copyTask as copyTaskApi
 } from '@/service/api/task';
 import type { Task, Subtask, TaskStatus, TaskStatistics, TaskListParams } from '@/typings/api/task';
+import { createLoadingService, LoadingService, LOADING_PRESETS } from '@/utils/loading-service';
 
 export const useTaskStore = defineStore('task-store', () => {
   // 状态
@@ -238,10 +241,25 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
-  async function expandTask(id: number) {
+  async function expandTask(id: number, loadingService?: LoadingService) {
+    // 使用传入的 loadingService 或创建新的
+    const ls = loadingService || createLoadingService();
+    const shouldManageLoading = !loadingService;
+
+    if (shouldManageLoading) {
+      ls.start(LOADING_PRESETS.expandTask);
+    }
+
     loading.value = true;
     try {
+      // 步骤1: 分析任务内容
+      if (shouldManageLoading) ls.nextStep();
+
       const { data: updatedTask, error } = await expandTaskApi(id);
+
+      // 步骤2: 生成完成
+      if (shouldManageLoading) ls.nextStep();
+
       if (!error && updatedTask) {
         const index = tasks.value.findIndex(t => t.id === id);
         if (index !== -1) {
@@ -249,12 +267,23 @@ export const useTaskStore = defineStore('task-store', () => {
         }
         currentTask.value = updatedTask;
         await loadTasks();
-        window.$message?.success('子任务拆分成功');
+
+        if (shouldManageLoading) {
+          ls.success('子任务拆分成功');
+        } else {
+          window.$message?.success('子任务拆分成功');
+        }
         return true;
       }
+
+      if (shouldManageLoading) ls.error('子任务拆分失败');
       return false;
     } catch (error) {
-      window.$message?.error('子任务拆分失败');
+      if (shouldManageLoading) {
+        ls.error('子任务拆分失败');
+      } else {
+        window.$message?.error('子任务拆分失败');
+      }
       console.error('Failed to expand task:', error);
       return false;
     } finally {
@@ -360,24 +389,119 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
-  async function regenerateSubtask(taskId: number, subtaskId: number, prompt?: string) {
+  async function regenerateSubtask(taskId: number, subtaskId: number, prompt?: string, loadingService?: LoadingService) {
+    // 使用传入的 loadingService 或创建新的
+    const ls = loadingService || createLoadingService();
+    const shouldManageLoading = !loadingService;
+
+    if (shouldManageLoading) {
+      ls.start(LOADING_PRESETS.regenerateSubtask);
+    }
+
     loading.value = true;
     try {
+      // 步骤1: 分析原子任务
+      if (shouldManageLoading) ls.nextStep();
+
       const { data: updatedTask, error } = await regenerateSubtaskApi(taskId, subtaskId, { prompt });
+
+      // 步骤2: 重新生成完成
+      if (shouldManageLoading) ls.nextStep();
+
       if (!error && updatedTask) {
         const index = tasks.value.findIndex(t => t.id === taskId);
         if (index !== -1) {
           tasks.value[index] = { ...tasks.value[index], ...updatedTask };
         }
         currentTask.value = updatedTask;
-        window.$message?.success('子任务已重新生成');
+
+        if (shouldManageLoading) {
+          ls.success('子任务重写成功');
+        } else {
+          window.$message?.success('子任务已重新生成');
+        }
+        return true;
+      }
+
+      if (shouldManageLoading) ls.error('子任务重写失败');
+      return false;
+    } catch (error) {
+      if (shouldManageLoading) {
+        ls.error('子任务重写失败');
+      } else {
+        window.$message?.error('重新生成子任务失败');
+      }
+      console.error('Failed to regenerate subtask:', error);
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // 子任务排序
+  async function reorderSubtasks(taskId: number, subtaskIds: number[]) {
+    try {
+      const { data: updatedTask, error } = await reorderSubtasksApi(taskId, subtaskIds);
+      if (!error && updatedTask) {
+        // 更新列表中的任务
+        const index = tasks.value.findIndex(t => t.id === taskId);
+        if (index !== -1) {
+          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+        }
+        // 更新当前任务
+        if (currentTask.value?.id === taskId) {
+          currentTask.value = updatedTask;
+        }
         return true;
       }
       return false;
     } catch (error) {
-      window.$message?.error('重新生成子任务失败');
-      console.error('Failed to regenerate subtask:', error);
+      window.$message?.error('子任务排序失败');
+      console.error('Failed to reorder subtasks:', error);
       return false;
+    }
+  }
+
+  async function copyTask(taskId: number, loadingService?: LoadingService) {
+    // 使用传入的 loadingService 或创建新的
+    const ls = loadingService || createLoadingService();
+    const shouldManageLoading = !loadingService;
+
+    if (shouldManageLoading) {
+      ls.start(LOADING_PRESETS.copyTask);
+    }
+
+    loading.value = true;
+    try {
+      // 步骤1: 复制任务
+      if (shouldManageLoading) ls.nextStep();
+
+      const { data, error } = await copyTaskApi(taskId);
+
+      // 步骤2: 复制子任务
+      if (shouldManageLoading) ls.nextStep();
+
+      if (!error && data) {
+        await loadTasks();
+
+        if (shouldManageLoading) {
+          ls.success('任务复制成功');
+        } else {
+          window.$message?.success('任务复制成功');
+        }
+        return data;
+      }
+
+      if (shouldManageLoading) ls.error('任务复制失败');
+      return null;
+    } catch (error) {
+      if (shouldManageLoading) {
+        ls.error('任务复制失败');
+      } else {
+        window.$message?.error('复制任务失败');
+      }
+      console.error('Failed to copy task:', error);
+      return null;
     } finally {
       loading.value = false;
     }
@@ -411,6 +535,8 @@ export const useTaskStore = defineStore('task-store', () => {
     batchDeleteTasks,
     deleteSubtask,
     regenerateSubtask,
-    clearCurrentTask
+    reorderSubtasks,
+    clearCurrentTask,
+    copyTask
   };
 });

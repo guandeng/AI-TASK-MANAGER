@@ -1,0 +1,42 @@
+# Git 属性配置 - 强制 UTF-8 处理
+# https://git-scm.com/docs/gitattributes
+
+# 自动检测文本文件并规范化为 LF
+* text=auto eol=lf
+
+# 明确指定文本文件使用 UTF-8
+*.md text charset=utf-8
+*.json text charset=utf-8
+*.js text charset=utf-8
+*.ts text charset=utf-8
+*.jsx text charset=utf-8
+*.tsx text charset=utf-8
+*.vue text charset=utf-8
+*.html text charset=utf-8
+*.css text charset=utf-8
+*.scss text charset=utf-8
+*.less text charset=utf-8
+*.py text charset=utf-8
+*.sh text charset=utf-8
+*.yml text charset=utf-8
+*.yaml text charset=utf-8
+*.xml text charset=utf-8
+*.sql text charset=utf-8
+
+# 配置件
+*.config text charset=utf-8
+.editorconfig text charset=utf-8
+.gitattributes text charset=utf-8
+.gitignore text charset=utf-8
+.eslintrc text charset=utf-8
+.prettierrc text charset=utf-8
+
+# 二进制文件不处理
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary

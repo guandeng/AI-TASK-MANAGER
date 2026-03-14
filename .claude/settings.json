@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:3002/api/tasks -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:9528 -o /dev/null -w \"%{http_code}\")",
+      "Bash(node -e \":*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(xxd)",
+      "Bash(/Users/guandeng/www/ai/AI-TASK-MANAGER/.gitignore:*)",
+      "Bash(git config:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"import\\(''./scripts/modules/member-manager.js''\\).then\\(\\(\\) => console.log\\(''OK''\\)\\).catch\\(e => console.error\\(e\\)\\)\")",
+      "Bash(curl -X PUT http://localhost:3002/api/tasks/19/subtasks/reorder -H \"Content-Type: application/json\" -d '{\"\"\"\"subtaskIds\"\"\"\":[]}' -v)",
+      "Bash(curl -s http://localhost:3002/api/members)",
+      "Bash(curl -X PUT http://localhost:3002/api/tasks/19/subtasks/reorder -H \"Content-Type: application/json\" -d '{\"\"subtaskIds\"\":[]}')",
+      "Bash(ls -la /Users/guandeng/www/ai/AI-TASK-MANAGER/*.md)",
+      "Bash(node scripts/server/express-server.js)",
+      "Bash(curl -s http://localhost:3002/api/templates/projects)",
+      "Bash(curl -s http://localhost:3002/api/templates/tasks)",
+      "Bash(curl -s http://localhost:3002/api/templates/categories)",
+      "Bash(npm test:*)",
+      "Bash(grep -l \"beforeEach\" tests/api/*.test.js)",
+      "Read(//usr/local/var/hk8591/admin-antd/src/views/page/login/**)",
+      "Bash(npm run:*)",
+      "Bash(curl -s http://localhost:9529/login)",
+      "Read(//private/tmp/**)"
+    ],
+    "additionalDirectories": [
+      "/Users/guandeng/www/ai/AI-TASK-MANAGER"
+    ]
+  }
+}

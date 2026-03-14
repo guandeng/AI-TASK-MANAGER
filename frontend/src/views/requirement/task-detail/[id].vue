@@ -1,14 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NTimeline, NTimelineItem, NModal, NSelect } from 'naive-ui';
+import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NGrid, NGi } from 'naive-ui';
 import type { SelectOption } from 'naive-ui';
+import { VueDraggable } from 'vue-draggable-plus';
+import { MdEditor, MdPreview } from 'md-editor-v3';
+import 'md-editor-v3/lib/style.css';
 import { useTaskStore } from '@/store/modules/task';
-import type { TaskStatus } from '@/typings/api/task';
+import { useMemberStore } from '@/store/modules/member';
+import type { TaskStatus, Subtask } from '@/typings/api/task';
+import CommentSection from '@/components/task/CommentSection.vue';
+import AssignmentPanel from '@/components/task/AssignmentPanel.vue';
+import ActivityTimeline from '@/components/task/ActivityTimeline.vue';
 
 const route = useRoute();
 const router = useRouter();
 const taskStore = useTaskStore();
+const memberStore = useMemberStore();
+
+// 当前用户成员ID（用于评论功能）
+const currentMemberId = computed(() => memberStore.currentMember?.id);
 
 const statusTextMap: Record<string, string> = {
   pending: '待处理',
@@ -66,6 +77,26 @@ const editingField = ref<EditableTaskField | EditableSubtaskField | null>(null);
 const editingSubtaskId = ref<number | null>(null);
 const editingValue = ref('');
 
+// 预览模式（用于 Markdown 字段）
+const previewFields = ref<Record<string, boolean>>({});
+
+// 获取预览状态 key
+function getPreviewKey(type: 'task' | 'subtask', field: string, subtaskId?: number): string {
+  return subtaskId !== undefined ? `${type}-${field}-${subtaskId}` : `${type}-${field}`;
+}
+
+// 切换预览模式
+function togglePreview(type: 'task' | 'subtask', field: string, subtaskId?: number) {
+  const key = getPreviewKey(type, field, subtaskId);
+  previewFields.value[key] = !previewFields.value[key];
+}
+
+// 检查是否处于预览模式
+function isPreviewMode(type: 'task' | 'subtask', field: string, subtaskId?: number): boolean {
+  const key = getPreviewKey(type, field, subtaskId);
+  return previewFields.value[key] ?? true; // 默认是预览模式
+}
+
 // 开始编辑任务字段
 function startEditTask(field: EditableTaskField) {
   if (!task.value) return;
@@ -78,6 +109,10 @@ function startEditTask(field: EditableTaskField) {
     editingValue.value = task.value.detailsTrans || task.value.details || '';
   } else {
     editingValue.value = task.value.testStrategyTrans || task.value.testStrategy || '';
+  }
+  // 切换到编辑模式
+  if (field !== 'title') {
+    togglePreview('task', field);
   }
 }
 
@@ -95,10 +130,23 @@ function startEditSubtask(subtaskId: number, field: EditableSubtaskField) {
   } else {
     editingValue.value = subtask.descriptionTrans || subtask.description || '';
   }
+  // 切换到编辑模式
+  if (field === 'description') {
+    togglePreview('subtask', field, subtaskId);
+  }
 }
 
 // 取消编辑
 function cancelEdit() {
+  // 如果是 Markdown 字段，切回预览模式
+  if (editingType.value && editingField.value) {
+    const field = editingField.value;
+    if (field === 'details' || field === 'testStrategy') {
+      togglePreview('task', field);
+    } else if (field === 'description' && editingSubtaskId.value !== null) {
+      togglePreview('subtask', field, editingSubtaskId.value);
+    }
+  }
   editingType.value = null;
   editingField.value = null;
   editingSubtaskId.value = null;
@@ -124,6 +172,10 @@ async function saveEdit() {
       }
       const success = await taskStore.updateTask(taskId.value, updateData);
       if (success) {
+        // 切回预览模式
+        if (field === 'details' || field === 'testStrategy') {
+          togglePreview('task', field);
+        }
         cancelEdit();
         window.$message?.success('保存成功');
       } else {
@@ -140,6 +192,10 @@ async function saveEdit() {
       }
       const success = await taskStore.updateSubtask(taskId.value, editingSubtaskId.value, updateData);
       if (success) {
+        // 切回预览模式
+        if (field === 'description') {
+          togglePreview('subtask', field, editingSubtaskId.value);
+        }
         cancelEdit();
         window.$message?.success('保存成功');
       } else {
@@ -244,9 +300,28 @@ async function handleConfirmRegenerate() {
   handleCloseRegenerateModal();
 }
 
+// 子任务拖拽排序
+const subtaskList = computed({
+  get: () => task.value?.subtasks || [],
+  set: () => {
+    // 拖拽后由 onDragEnd 处理
+  }
+});
+
+async function handleDragEnd() {
+  if (!taskId.value || !task.value?.subtasks) return;
+
+  const subtaskIds = task.value.subtasks.map(st => st.id);
+  await taskStore.reorderSubtasks(taskId.value, subtaskIds);
+}
+
 onMounted(async () => {
   if (taskId.value) {
     await taskStore.loadTaskDetail(taskId.value);
+  }
+  // 加载成员列表以便获取当前用户信息
+  if (memberStore.members.length === 0) {
+    await memberStore.loadMembers();
   }
 });
 
@@ -319,54 +394,85 @@ onUnmounted(() => {
                 {{ task.dependencies?.length ? task.dependencies.join(', ') : '-' }}
               </NDescriptionsItem>
               <NDescriptionsItem label="实现细节">
-                <div v-if="editingType === 'task' && editingField === 'details'" class="edit-field">
-                  <NInput
-                    v-model:value="editingValue"
-                    type="textarea"
-                    :autosize="{ minRows: 3, maxRows: 10 }"
-                    placeholder="请输入实现细节"
-                  />
-                  <NSpace class="mt-8px">
-                    <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
-                    <NButton size="small" @click="cancelEdit">取消</NButton>
-                  </NSpace>
-                </div>
-                <div v-else class="editable-field" @click="startEditTask('details')">
-                  <div class="pre-wrap">{{ task.detailsTrans || task.details || '-' }}</div>
-                  <NButton text type="primary" size="small" class="edit-btn">
-                    <template #icon><span class="i-mdi:pencil text-14px"></span></template>
-                  </NButton>
+                <div class="markdown-field">
+                  <!-- 编辑模式 -->
+                  <div v-if="!isPreviewMode('task', 'details')" class="markdown-editor-wrapper">
+                    <MdEditor
+                      v-model="editingValue"
+                      language="zh-CN"
+                      placeholder="请输入实现细节，支持 Markdown 格式"
+                      :style="{ height: '300px' }"
+                    />
+                    <NSpace class="mt-8px">
+                      <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                      <NButton size="small" @click="cancelEdit">取消</NButton>
+                    </NSpace>
+                  </div>
+                  <!-- 预览模式 -->
+                  <div v-else class="markdown-preview-container editable-field" @click="startEditTask('details')">
+                    <MdPreview
+                      v-if="task.detailsTrans || task.details"
+                      :model-value="task.detailsTrans || task.details || ''"
+                      class="markdown-preview-wrapper"
+                    />
+                    <span v-else class="text-gray-400">点击编辑实现细节</span>
+                    <NButton text type="primary" size="small" class="edit-btn">
+                      <template #icon><span class="i-mdi:pencil text-14px"></span></template>
+                    </NButton>
+                  </div>
                 </div>
               </NDescriptionsItem>
               <NDescriptionsItem label="测试策略">
-                <div v-if="editingType === 'task' && editingField === 'testStrategy'" class="edit-field">
-                  <NInput
-                    v-model:value="editingValue"
-                    type="textarea"
-                    :autosize="{ minRows: 3, maxRows: 10 }"
-                    placeholder="请输入测试策略"
-                  />
-                  <NSpace class="mt-8px">
-                    <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
-                    <NButton size="small" @click="cancelEdit">取消</NButton>
-                  </NSpace>
-                </div>
-                <div v-else class="editable-field" @click="startEditTask('testStrategy')">
-                  <div class="pre-wrap">{{ task.testStrategyTrans || task.testStrategy || '-' }}</div>
-                  <NButton text type="primary" size="small" class="edit-btn">
-                    <template #icon><span class="i-mdi:pencil text-14px"></span></template>
-                  </NButton>
+                <div class="markdown-field">
+                  <!-- 编辑模式 -->
+                  <div v-if="!isPreviewMode('task', 'testStrategy')" class="markdown-editor-wrapper">
+                    <MdEditor
+                      v-model="editingValue"
+                      language="zh-CN"
+                      placeholder="请输入测试策略，支持 Markdown 格式"
+                      :style="{ height: '300px' }"
+                    />
+                    <NSpace class="mt-8px">
+                      <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                      <NButton size="small" @click="cancelEdit">取消</NButton>
+                    </NSpace>
+                  </div>
+                  <!-- 预览模式 -->
+                  <div v-else class="markdown-preview-container editable-field" @click="startEditTask('testStrategy')">
+                    <MdPreview
+                      v-if="task.testStrategyTrans || task.testStrategy"
+                      :model-value="task.testStrategyTrans || task.testStrategy || ''"
+                      class="markdown-preview-wrapper"
+                    />
+                    <span v-else class="text-gray-400">点击编辑测试策略</span>
+                    <NButton text type="primary" size="small" class="edit-btn">
+                      <template #icon><span class="i-mdi:pencil text-14px"></span></template>
+                    </NButton>
+                  </div>
                 </div>
               </NDescriptionsItem>
             </NDescriptions>
 
             <NCard title="子任务" size="small">
-              <NTimeline v-if="task.subtasks?.length">
-                <NTimelineItem
+              <VueDraggable
+                v-if="task.subtasks?.length"
+                v-model="subtaskList"
+                :animation="150"
+                handle=".drag-handle"
+                class="subtask-list"
+                @end="handleDragEnd"
+              >
+                <div
                   v-for="subtask in task.subtasks"
                   :key="subtask.id"
+                  class="subtask-item"
                 >
-                  <template #header>
+                  <div class="subtask-header">
+                    <span class="drag-handle">
+                      <NIcon :size="16" color="#9ca3af">
+                        <span class="i-mdi:drag-vertical"></span>
+                      </NIcon>
+                    </span>
                     <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'title'" class="edit-field-inline">
                       <NInput
                         v-model:value="editingValue"
@@ -382,91 +488,117 @@ onUnmounted(() => {
                         <span class="i-mdi:pencil text-12px"></span>
                       </NButton>
                     </div>
-                  </template>
-                  <template #default>
-                    <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'description'" class="edit-field">
-                      <NInput
-                        v-model:value="editingValue"
-                        type="textarea"
-                        :autosize="{ minRows: 2, maxRows: 6 }"
-                        placeholder="请输入子任务描述"
-                      />
-                      <NSpace class="mt-8px">
-                        <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
-                        <NButton size="small" @click="cancelEdit">取消</NButton>
-                      </NSpace>
+                  </div>
+                  <div class="subtask-content">
+                    <div class="markdown-field">
+                      <!-- 编辑模式 -->
+                      <div v-if="!isPreviewMode('subtask', 'description', subtask.id)" class="markdown-editor-wrapper">
+                        <MdEditor
+                          v-model="editingValue"
+                          language="zh-CN"
+                          placeholder="请输入子任务描述，支持 Markdown 格式"
+                          :style="{ height: '200px' }"
+                        />
+                        <NSpace class="mt-8px">
+                          <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                          <NButton size="small" @click="cancelEdit">取消</NButton>
+                        </NSpace>
+                      </div>
+                      <!-- 预览模式 -->
+                      <div v-else class="markdown-preview-container editable-field" @click="startEditSubtask(subtask.id, 'description')">
+                        <MdPreview
+                          v-if="subtask.descriptionTrans || subtask.description"
+                          :model-value="subtask.descriptionTrans || subtask.description || ''"
+                          class="markdown-preview-wrapper"
+                        />
+                        <span v-else class="text-gray-400">点击编辑子任务描述</span>
+                        <NButton text type="primary" size="small" class="edit-btn">
+                          <template #icon><span class="i-mdi:pencil text-14px"></span></template>
+                        </NButton>
+                      </div>
                     </div>
-                    <div v-else class="editable-field" @click="startEditSubtask(subtask.id, 'description')">
-                      <div class="pre-wrap">{{ subtask.descriptionTrans || subtask.description || '-' }}</div>
-                      <NButton text type="primary" size="small" class="edit-btn">
-                        <template #icon><span class="i-mdi:pencil text-14px"></span></template>
-                      </NButton>
-                    </div>
-                  </template>
-                  <template #footer>
-                    <NSpace align="center" justify="space-between" style="width: 100%;">
-                      <NSelect
-                        :value="subtask.status"
-                        :options="subtaskStatusOptions"
+                  </div>
+                  <div class="subtask-footer">
+                    <NSelect
+                      :value="subtask.status"
+                      :options="subtaskStatusOptions"
+                      size="small"
+                      :class="getSubtaskStatusClass(subtask.status)"
+                      style="width: 120px"
+                      @update:value="(value: TaskStatus) => handleSubtaskStatusChange(subtask.id, value)"
+                    />
+                    <NSpace>
+                      <NButton
+                        type="warning"
                         size="small"
-                        :class="getSubtaskStatusClass(subtask.status)"
-                        style="width: 120px"
-                        @update:value="(value: TaskStatus) => handleSubtaskStatusChange(subtask.id, value)"
-                      />
-                      <NSpace>
-                        <NButton
-                          type="warning"
-                          size="small"
-                          ghost
-                          :loading="taskStore.loading"
-                          @click="handleOpenRegenerateModal(subtask.id)"
-                        >
-                          重写
-                        </NButton>
-                        <NButton
-                          type="error"
-                          size="small"
-                          ghost
-                          :loading="taskStore.loading"
-                          @click="handleDeleteSubtask(subtask.id)"
-                        >
-                          删除
-                        </NButton>
-                      </NSpace>
+                        ghost
+                        :loading="taskStore.loading"
+                        @click="handleOpenRegenerateModal(subtask.id)"
+                      >
+                        重写
+                      </NButton>
+                      <NButton
+                        type="error"
+                        size="small"
+                        ghost
+                        :loading="taskStore.loading"
+                        @click="handleDeleteSubtask(subtask.id)"
+                      >
+                        删除
+                      </NButton>
                     </NSpace>
-                  </template>
-                </NTimelineItem>
-              </NTimeline>
+                  </div>
+                </div>
+              </VueDraggable>
               <NEmpty v-else description="暂无子任务" />
             </NCard>
           </NSpace>
         </NCard>
 
-        <NEmpty v-else-if="!taskStore.loading" description="任务不存在" />
-      </NSpin>
-    </NSpace>
+        <!-- 任务分配和活动记录区域 -->
+        <NGrid v-if="task" :cols="2" :x-gap="16" :y-gap="16" responsive="screen">
+          <NGi>
+            <AssignmentPanel :task-id="taskId!" @assigned="() => {}" @unassigned="() => {}" />
+          </NGi>
+          <NGi>
+            <ActivityTimeline :task-id="taskId!" />
+          </NGi>
+        </NGrid>
 
-    <!-- 重写子任务弹窗 -->
-    <NModal
-      v-model:show="showRegenerateModal"
-      preset="dialog"
-      title="重写子任务"
-      positive-text="确认重写"
-      negative-text="取消"
-      :loading="taskStore.loading"
-      @positive-click="handleConfirmRegenerate"
-      @negative-click="handleCloseRegenerateModal"
-    >
-      <NSpace vertical :size="16">
-        <p>可选：输入提示词来指导子任务的重新生成（留空则自动重新生成）</p>
-        <NInput
-          v-model:value="regeneratePrompt"
-          type="textarea"
-          placeholder="例如：请更关注性能优化方面..."
-          :rows="4"
+        <!-- 评论区 -->
+        <CommentSection
+          v-if="task && taskId"
+          :task-id="taskId"
+          :member-id="currentMemberId"
+          @commented="() => {}"
+          @deleted="() => {}"
         />
-      </NSpace>
-    </NModal>
+
+        <NEmpty v-if="!task && !taskStore.loading" description="任务不存在" />
+      </NSpin>
+
+      <!-- 重写子任务弹窗 -->
+      <NModal
+        v-model:show="showRegenerateModal"
+        preset="dialog"
+        title="重写子任务"
+        positive-text="确认重写"
+        negative-text="取消"
+        :loading="taskStore.loading"
+        @positive-click="handleConfirmRegenerate"
+        @negative-click="handleCloseRegenerateModal"
+      >
+        <NSpace vertical :size="16">
+          <p>可选：输入提示词来指导子任务的重新生成（留空则自动重新生成）</p>
+          <NInput
+            v-model:value="regeneratePrompt"
+            type="textarea"
+            placeholder="例如：请更关注性能优化方面..."
+            :rows="4"
+          />
+        </NSpace>
+      </NModal>
+    </NSpace>
   </div>
 </template>
 
@@ -490,6 +622,24 @@ onUnmounted(() => {
 
 .text-14px {
   font-size: 14px;
+}
+
+.text-gray-400 {
+  color: #9ca3af;
+}
+
+// Markdown 字段容器
+.markdown-field {
+  width: 100%;
+}
+
+.markdown-editor-wrapper {
+  width: 100%;
+}
+
+.markdown-preview-container {
+  min-height: 40px;
+  position: relative;
 }
 
 // 可编辑标题样式
@@ -628,5 +778,91 @@ onUnmounted(() => {
   :deep(.n-base-selection-label) {
     color: #f0a020;
   }
+}
+
+// 子任务拖拽列表样式
+.subtask-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subtask-item {
+  padding: 12px;
+  border: 1px solid #e0e0e6;
+  border-radius: 8px;
+  background-color: #fff;
+  transition: box-shadow 0.2s, transform 0.2s;
+
+  &:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+}
+
+.subtask-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s, background-color 0.2s;
+
+  &:hover {
+    color: #1890ff;
+    background-color: rgba(24, 144, 255, 0.1);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  .n-icon {
+    color: inherit;
+  }
+}
+
+.subtask-content {
+  margin-bottom: 12px;
+  padding-left: 24px;
+}
+
+.subtask-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 24px;
+}
+
+/* Markdown 预览容器样式 */
+.markdown-preview-wrapper {
+  border: none !important;
+  background: transparent !important;
+}
+
+/* Markdown 编辑器样式覆盖 */
+:deep(.md-editor) {
+  --md-bk-color: transparent;
+}
+
+:deep(.md-editor-toolbar-wrapper) {
+  border-radius: 8px 8px 0 0;
+}
+
+:deep(.md-editor-content) {
+  border-radius: 0 0 8px 8px;
+}
+
+/* 确保编辑器在卡片内显示正常 */
+:deep(.md-editor) {
+  border: 1px solid #e0e0e6;
+  border-radius: 8px;
 }
 </style>

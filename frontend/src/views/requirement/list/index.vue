@@ -6,6 +6,7 @@ import type { DataTableColumns, SelectOption } from 'naive-ui';
 import { useRequirementStore } from '@/store/modules/requirement';
 import type { Requirement, RequirementStatus, RequirementPriority } from '@/typings/api/requirement';
 import { splitRequirementToTasks } from '@/service/api/requirement';
+import { createLoadingService, LOADING_PRESETS } from '@/utils/loading-service';
 
 defineOptions({
   name: 'RequirementList'
@@ -271,16 +272,31 @@ async function handleSplitTasks(row: Requirement) {
 
   splittingTaskIds.value.add(row.id);
 
+  // 创建加载服务实例
+  const loadingService = createLoadingService();
+  loadingService.start(LOADING_PRESETS.splitRequirement);
+
   try {
+    // 步骤1: 解析需求文档
+    loadingService.nextStep();
+
+    // 步骤2: AI 分析
+    loadingService.nextStep();
+
     const { data, error } = await splitRequirementToTasks(row.id);
 
+    // 步骤3: 生成任务列表
+    loadingService.nextStep();
+
     if (!error && data?.success) {
-      window.$message?.success(data.message || `成功拆分为 ${data.tasks?.length || 0} 个任务`);
+      // 步骤4: 保存完成
+      loadingService.nextStep();
+      loadingService.success(data.message || `成功拆分为 ${data.tasks?.length || 0} 个任务`);
     } else {
-      window.$message?.error(error?.message || '拆分任务失败');
+      loadingService.error(error?.message || '拆分任务失败');
     }
   } catch (err: any) {
-    window.$message?.error(err.message || '拆分任务失败');
+    loadingService.error(err.message || '拆分任务失败');
   } finally {
     splittingTaskIds.value.delete(row.id);
   }
@@ -380,9 +396,6 @@ onActivated(() => {
           class="w-32"
         />
         <NButton type="primary" @click="handleCreate">
-          <template #icon>
-            <span class="i-mdi:plus"></span>
-          </template>
           新建需求
         </NButton>
       </NSpace>

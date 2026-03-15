@@ -48,9 +48,9 @@ func TestLanguageHandler_List(t *testing.T) {
 
 	mock.ExpectQuery("SELECT").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "name", "display_name", "framework", "description", "code_hints", "remark", "is_active", "sort_order", "created_at", "updated_at",
-		}).AddRow(1, "Go", "Go (Gin + GORM)", "Gin + GORM", "Go语言", "", "", true, 1, nil, nil).
-			AddRow(2, "Java", "Java (Spring)", "Spring Boot", "Java语言", "", "", true, 2, nil, nil))
+			"id", "name", "display_name", "category", "framework", "description", "code_hints", "remark", "is_active", "sort_order", "created_at", "updated_at",
+		}).AddRow(1, "Go", "Go (Gin + GORM)", "backend", "Gin + GORM", "Go语言", "", "", true, 1, nil, nil).
+			AddRow(2, "Java", "Java (Spring)", "backend", "Spring Boot", "Java语言", "", "", true, 2, nil, nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/languages", nil)
 	w := httptest.NewRecorder()
@@ -67,9 +67,9 @@ func TestLanguageHandler_List_All(t *testing.T) {
 
 	mock.ExpectQuery("SELECT").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "name", "display_name", "framework", "description", "code_hints", "remark", "is_active", "sort_order", "created_at", "updated_at",
-		}).AddRow(1, "Go", "Go (Gin + GORM)", "Gin + GORM", "Go语言", "", "", true, 1, nil, nil).
-			AddRow(2, "Java", "Java (Spring)", "Spring Boot", "Java语言", "", "", false, 2, nil, nil))
+			"id", "name", "display_name", "category", "framework", "description", "code_hints", "remark", "is_active", "sort_order", "created_at", "updated_at",
+		}).AddRow(1, "Go", "Go (Gin + GORM)", "backend", "Gin + GORM", "Go语言", "", "", true, 1, nil, nil).
+			AddRow(2, "Java", "Java (Spring)", "backend", "Spring Boot", "Java语言", "", "", false, 2, nil, nil))
 
 	req := httptest.NewRequest(http.MethodGet, "/languages?all=true", nil)
 	w := httptest.NewRecorder()
@@ -93,9 +93,9 @@ func TestLanguageHandler_Get(t *testing.T) {
 			expectCode: http.StatusOK,
 			setupMock: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows([]string{
-					"id", "name", "display_name", "framework", "description", "code_hints", "remark", "is_active", "sort_order", "created_at", "updated_at",
-				}).AddRow(1, "Go", "Go (Gin + GORM)", "Gin + GORM", "Go语言", "", "", true, 1, nil, nil)
-				mock.ExpectQuery("SELECT \\* FROM `languages`").
+					"id", "name", "display_name", "category", "framework", "description", "code_hints", "remark", "is_active", "sort_order", "created_at", "updated_at",
+				}).AddRow(1, "Go", "Go (Gin + GORM)", "backend", "Gin + GORM", "Go语言", "", "", true, 1, nil, nil)
+				mock.ExpectQuery("SELECT \\* FROM `task_languages`").
 					WillReturnRows(rows)
 			},
 		},
@@ -104,7 +104,7 @@ func TestLanguageHandler_Get(t *testing.T) {
 			id:         "999",
 			expectCode: http.StatusNotFound,
 			setupMock: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery("SELECT \\* FROM `languages`").
+				mock.ExpectQuery("SELECT \\* FROM `task_languages`").
 					WillReturnRows(sqlmock.NewRows([]string{"id"}))
 			},
 		},
@@ -143,11 +143,11 @@ func TestLanguageHandler_Create(t *testing.T) {
 	}{
 		{
 			name:       "创建语言成功",
-			body:       `{"name":"Rust","displayName":"Rust","isActive":true,"sortOrder":3}`,
+			body:       `{"name":"Rust","displayName":"Rust","category":"backend","isActive":true,"sortOrder":3}`,
 			expectCode: http.StatusOK,
 			setupMock: func(mock sqlmock.Sqlmock) {
 				mock.ExpectBegin()
-				mock.ExpectExec("INSERT INTO `languages`").
+				mock.ExpectExec("INSERT INTO `task_languages`").
 					WillReturnResult(sqlmock.NewResult(1, 1))
 				mock.ExpectCommit()
 			},
@@ -200,18 +200,18 @@ func TestLanguageHandler_Update(t *testing.T) {
 			expectCode: http.StatusOK,
 			setupMock: func(mock sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows([]string{
-					"id", "name", "display_name", "framework", "description", "code_hints", "remark", "is_active", "sort_order", "created_at", "updated_at",
-				}).AddRow(1, "Go", "Go (Gin + GORM)", "Gin + GORM", "Go语言", "", "", true, 1, nil, nil)
-				mock.ExpectQuery("SELECT \\* FROM `languages`").
+					"id", "name", "display_name", "category", "framework", "description", "code_hints", "remark", "is_active", "sort_order", "created_at", "updated_at",
+				}).AddRow(1, "Go", "Go (Gin + GORM)", "backend", "Gin + GORM", "Go语言", "", "", true, 1, nil, nil)
+				mock.ExpectQuery("SELECT \\* FROM `task_languages`").
 					WillReturnRows(rows)
 				mock.ExpectBegin()
-				mock.ExpectExec("UPDATE `languages`").
+				mock.ExpectExec("UPDATE `task_languages`").
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectCommit()
 				reloadRows := sqlmock.NewRows([]string{
-					"id", "name", "display_name", "framework", "description", "code_hints", "remark", "is_active", "sort_order", "created_at", "updated_at",
-				}).AddRow(1, "Go更新", "Go (Gin + GORM)", "Gin + GORM", "Go语言", "", "", true, 1, nil, nil)
-				mock.ExpectQuery("SELECT \\* FROM `languages`").
+					"id", "name", "display_name", "category", "framework", "description", "code_hints", "remark", "is_active", "sort_order", "created_at", "updated_at",
+				}).AddRow(1, "Go更新", "Go (Gin + GORM)", "backend", "Gin + GORM", "Go语言", "", "", true, 1, nil, nil)
+				mock.ExpectQuery("SELECT \\* FROM `task_languages`").
 					WillReturnRows(reloadRows)
 			},
 		},
@@ -221,7 +221,7 @@ func TestLanguageHandler_Update(t *testing.T) {
 			body:       `{"name":"测试"}`,
 			expectCode: http.StatusNotFound,
 			setupMock: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery("SELECT \\* FROM `languages`").
+				mock.ExpectQuery("SELECT \\* FROM `task_languages`").
 					WillReturnRows(sqlmock.NewRows([]string{"id"}))
 			},
 		},
@@ -266,7 +266,7 @@ func TestLanguageHandler_Delete(t *testing.T) {
 			expectCode: http.StatusOK,
 			setupMock: func(mock sqlmock.Sqlmock) {
 				mock.ExpectBegin()
-				mock.ExpectExec("DELETE FROM `languages`").
+				mock.ExpectExec("DELETE FROM `task_languages`").
 					WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectCommit()
 			},

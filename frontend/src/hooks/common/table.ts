@@ -5,7 +5,7 @@ import { useBoolean, useTable } from '@sa/hooks';
 import type { PaginationData, TableColumnCheck, UseTableOptions } from '@sa/hooks';
 import type { FlatResponseData } from '@sa/axios';
 import { jsonClone } from '@sa/utils';
-import { useAppStore } from '@/store/modules/app';
+import { getLocale } from '@/locales';
 import { $t } from '@/locales';
 
 export type UseNaiveTableOptions<ResponseData, ApiData, Pagination extends boolean> = Omit<
@@ -30,7 +30,6 @@ const EXPAND_KEY = '__expand__';
 
 export function useNaiveTable<ResponseData, ApiData>(options: UseNaiveTableOptions<ResponseData, ApiData, false>) {
   const scope = effectScope();
-  const appStore = useAppStore();
 
   const result = useTable<ResponseData, ApiData, NaiveUI.TableColumn<ApiData>, false>({
     ...options,
@@ -47,7 +46,7 @@ export function useNaiveTable<ResponseData, ApiData>(options: UseNaiveTableOptio
 
   scope.run(() => {
     watch(
-      () => appStore.locale,
+      () => getLocale(),
       () => {
         result.reloadColumns();
       }
@@ -81,9 +80,6 @@ export function useNaivePaginatedTable<ResponseData, ApiData>(
   options: UseNaivePaginatedTableOptions<ResponseData, ApiData>
 ) {
   const scope = effectScope();
-  const appStore = useAppStore();
-
-  const isMobile = computed(() => appStore.isMobile);
 
   const showTotal = computed(() => options.showTotal ?? true);
 
@@ -108,8 +104,8 @@ export function useNaivePaginatedTable<ResponseData, ApiData>(
   const mobilePagination = computed(() => {
     const p: PaginationProps = {
       ...pagination,
-      pageSlot: isMobile.value ? 3 : 9,
-      prefix: !isMobile.value && showTotal.value ? pagination.prefix : undefined
+      pageSlot: 9,
+      prefix: showTotal.value ? pagination.prefix : undefined
     };
 
     return p;
@@ -147,7 +143,7 @@ export function useNaivePaginatedTable<ResponseData, ApiData>(
 
   scope.run(() => {
     watch(
-      () => appStore.locale,
+      () => getLocale(),
       () => {
         result.reloadColumns();
       }

@@ -154,8 +154,8 @@ const hoveredNodeId = ref<number | null>(null);
 async function loadDependencies() {
   loading.value = true;
   try {
-    const { data, error } = await taskStore.validateDependencies();
-    if (!error) {
+    const result = await taskStore.validateDependencies();
+    if (result && !result.error) {
       // 这里简化处理，实际应该调用专门的依赖 API
       dependencies.value = taskStore.taskDependencies;
     }

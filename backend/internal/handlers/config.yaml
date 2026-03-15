@@ -1,16 +1,16 @@
 server:
-    port: 8080
-    mode: debug
+    port: 0
+    mode: ""
 database:
-    host: localhost
-    port: 3306
-    database: ai_task
-    username: root
-    password: "123456"
-    tableprefix: task_
-    charset: utf8mb4
-    collation: utf8mb4_unicode_ci
-    poolsize: 10
+    host: ""
+    port: 0
+    database: ""
+    username: ""
+    password: ""
+    tableprefix: ""
+    charset: ""
+    collation: ""
+    poolsize: 0
 ai:
     provider: qwen
     providers:
@@ -22,13 +22,13 @@ ai:
         perplexity:
             enabled: false
             apikey: ""
-            model: llama-3.1-sonar-large-128k-online
+            model: llama-3
             baseurl: ""
         qwen:
             enabled: true
-            apikey: ""
+            apikey: new-api-key
             model: qwen-max
-            baseurl: ""
+            baseurl: https://new.api.url
     parameters:
         maxtokens: 8192
         temperature: 0.7

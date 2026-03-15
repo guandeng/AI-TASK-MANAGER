@@ -37,10 +37,8 @@ export function setupElegantRouter() {
 
       // 设置路由顺序，order 越小越靠前
       const routeOrder: Partial<Record<RouteKey, number>> = {
-        home: 1,
-        task: 2,
-        task_list: 1,
-        task_detail: 2
+        'requirement_task-list': 1,
+        'requirement_task-detail': 2
       };
 
       if (routeOrder[key] !== undefined) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   NCard,
@@ -12,7 +12,9 @@ import {
   NTag,
   NCascader,
   NSpin,
-  NAlert
+  NAlert,
+  NDatePicker,
+  NInputNumber
 } from 'naive-ui';
 import type { FormInst, FormRules, SelectOption } from 'naive-ui';
 import { useTaskStore } from '@/store/modules/task';
@@ -41,8 +43,8 @@ const formData = ref({
   requirementId: undefined as number | undefined,
   dependencies: [] as number[],
   tags: [] as string[],
-  startDate: undefined as string | undefined,
-  dueDate: undefined as string | undefined,
+  startDate: null as number | null,
+  dueDate: null as number | null,
   estimatedHours: undefined as number | undefined
 });
 
@@ -78,7 +80,7 @@ const dependencyOptions = computed<SelectOption[]>(() => {
     options.push({
       label: task.title,
       value: task.id,
-      disabled: formData.value.requirementId && task.requirementId === formData.value.requirementId
+      disabled: !!(formData.value.requirementId && task.requirementId === formData.value.requirementId)
     });
   });
   return options;
@@ -109,8 +111,8 @@ async function handleSubmit() {
       assignee: formData.value.assignee,
       requirementId: formData.value.requirementId,
       dependencies: formData.value.dependencies,
-      startDate: formData.value.startDate,
-      dueDate: formData.value.dueDate,
+      startDate: formData.value.startDate ? new Date(formData.value.startDate).toISOString().split('T')[0] : undefined,
+      dueDate: formData.value.dueDate ? new Date(formData.value.dueDate).toISOString().split('T')[0] : undefined,
       estimatedHours: formData.value.estimatedHours
     };
 
@@ -204,7 +206,7 @@ onMounted(async () => {
           </NFormItem>
 
           <NFormItem label="开始日期" path="startDate">
-            <NInput
+            <NDatePicker
               v-model:value="formData.startDate"
               type="date"
               placeholder="选择开始日期"
@@ -214,7 +216,7 @@ onMounted(async () => {
           </NFormItem>
 
           <NFormItem label="截止日期" path="dueDate">
-            <NInput
+            <NDatePicker
               v-model:value="formData.dueDate"
               type="date"
               placeholder="选择截止日期"
@@ -224,9 +226,8 @@ onMounted(async () => {
           </NFormItem>
 
           <NFormItem label="预估工时（小时）" path="estimatedHours">
-            <NInput
+            <NInputNumber
               v-model:value="formData.estimatedHours"
-              type="number"
               placeholder="输入预估工时"
               style="width: 200px"
               :min="0"

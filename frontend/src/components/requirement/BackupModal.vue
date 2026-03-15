@@ -49,8 +49,16 @@ const submitLoading = ref(false);
 const currentPage = ref(1);
 const pageSize = ref(20);
 
+interface BackupRow {
+  id: number;
+  createdAt: string;
+  type: string;
+  taskCount: number;
+  status: string;
+}
+
 // 备份列表列定义
-const columns: DataTableColumns = [
+const columns: DataTableColumns<BackupRow> = [
   {
     title: '备份时间',
     key: 'createdAt',

@@ -437,19 +437,42 @@ func (h *RequirementHandler) SplitTasks(c *gin.Context) {
 	}
 
 	// 调用 AI 服务拆分需求
-	tasks, err := h.aiService.SplitRequirement(&requirement, req.TaskType)
+	tasksWithDeps, err := h.aiService.SplitRequirement(&requirement, req.TaskType)
 	if err != nil {
 		h.logger.Error("AI 拆分需求失败", zap.Error(err))
 		response.Error(c, 500, "AI 拆分需求失败: "+err.Error())
 		return
 	}
 
-	// 保存任务到数据库
-	if len(tasks) > 0 {
+	// 提取任务并保存到数据库
+	var tasks []models.Task
+	if len(tasksWithDeps) > 0 {
+		tasks = make([]models.Task, len(tasksWithDeps))
+		for i, twd := range tasksWithDeps {
+			tasks[i] = twd.Task
+		}
+
 		if err := db.Create(&tasks).Error; err != nil {
 			h.logger.Error("保存任务失败", zap.Error(err))
 			response.Error(c, 500, "保存任务失败")
 			return
+		}
+
+		// 保存任务依赖关系
+		for i, twd := range tasksWithDeps {
+			if len(twd.Dependencies) > 0 {
+				for _, depIndex := range twd.Dependencies {
+					if depIndex >= 0 && depIndex < len(tasks) && depIndex != i {
+						dependency := models.TaskDependency{
+							TaskID:         tasks[i].ID,
+							DependsOnTaskID: tasks[depIndex].ID,
+						}
+						if err := db.Create(&dependency).Error; err != nil {
+							h.logger.Warn("保存任务依赖失败", zap.Error(err))
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -527,7 +550,7 @@ func (h *RequirementHandler) SplitTasksAsync(c *gin.Context) {
 	// 异步执行拆分
 	go func() {
 		// 调用 AI 服务拆分需求（传入语言信息）
-		tasks, err := h.aiService.SplitRequirementWithLanguage(&requirement, req.TaskType, language)
+		tasksWithDeps, err := h.aiService.SplitRequirementWithLanguage(&requirement, req.TaskType, language)
 		if err != nil {
 			h.logger.Error("AI 拆分需求失败", zap.Error(err))
 			// 更新消息状态为失败
@@ -539,8 +562,13 @@ func (h *RequirementHandler) SplitTasksAsync(c *gin.Context) {
 			return
 		}
 
-		// 保存任务到数据库
-		if len(tasks) > 0 {
+		// 提取任务并保存到数据库
+		if len(tasksWithDeps) > 0 {
+			tasks := make([]models.Task, len(tasksWithDeps))
+			for i, twd := range tasksWithDeps {
+				tasks[i] = twd.Task
+			}
+
 			if err := db.Create(&tasks).Error; err != nil {
 				h.logger.Error("保存任务失败", zap.Error(err))
 				// 更新消息状态为失败
@@ -551,13 +579,30 @@ func (h *RequirementHandler) SplitTasksAsync(c *gin.Context) {
 				})
 				return
 			}
+
+			// 保存任务依赖关系
+			for i, twd := range tasksWithDeps {
+				if len(twd.Dependencies) > 0 {
+					for _, depIndex := range twd.Dependencies {
+						if depIndex >= 0 && depIndex < len(tasks) && depIndex != i {
+							dependency := models.TaskDependency{
+								TaskID:         tasks[i].ID,
+								DependsOnTaskID: tasks[depIndex].ID,
+							}
+							if err := db.Create(&dependency).Error; err != nil {
+								h.logger.Warn("保存任务依赖失败", zap.Error(err), zap.Uint64("taskId", tasks[i].ID), zap.Int("depIndex", depIndex))
+							}
+						}
+					}
+				}
+			}
 		}
 
 		// 更新需求状态为已拆分
 		db.Model(&requirement).Update("status", "active")
 
 		// 更新消息状态为成功
-		resultSummary := fmt.Sprintf("成功拆分为 %d 个任务", len(tasks))
+		resultSummary := fmt.Sprintf("成功拆分为 %d 个任务", len(tasksWithDeps))
 		db.Model(&message).Updates(map[string]interface{}{
 			"status":         "success",
 			"result_summary": &resultSummary,

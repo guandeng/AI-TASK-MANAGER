@@ -206,3 +206,164 @@ func TestConfigHandler_Reset(t *testing.T) {
 		t.Errorf("期望状态码 %d, 实际 %d", http.StatusOK, w.Code)
 	}
 }
+
+func TestConfigHandler_UpdateAIProvider_InvalidProvider(t *testing.T) {
+	handler, router := setupConfigTest(t)
+	router.PUT("/config/ai/provider", handler.UpdateAIProvider)
+
+	tests := []struct {
+		name       string
+		body       string
+		expectCode int
+	}{
+		{
+			name:       "空提供商",
+			body:       `{"provider": ""}`,
+			expectCode: http.StatusBadRequest,
+		},
+		{
+			name:       "不支持的提供商",
+			body:       `{"provider": "unsupported"}`,
+			expectCode: http.StatusBadRequest,
+		},
+		{
+			name:       "无效JSON",
+			body:       `invalid json`,
+			expectCode: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPut, "/config/ai/provider", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			if w.Code != tt.expectCode {
+				t.Errorf("期望状态码 %d, 实际 %d", tt.expectCode, w.Code)
+			}
+		})
+	}
+}
+
+func TestConfigHandler_UpdateSpecificProvider_InvalidJSON(t *testing.T) {
+	handler, router := setupConfigTest(t)
+	router.PUT("/config/ai/providers/:provider", handler.UpdateSpecificProvider)
+
+	// 无效 JSON
+	req := httptest.NewRequest(http.MethodPut, "/config/ai/providers/qwen", strings.NewReader(`invalid json`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("期望状态码 %d, 实际 %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestConfigHandler_SetConfigPath(t *testing.T) {
+	handler, _ := setupConfigTest(t)
+
+	// 测试设置配置路径
+	handler.SetConfigPath("/custom/config.yaml")
+
+	if handler.configPath != "/custom/config.yaml" {
+		t.Errorf("期望 configPath 为 /custom/config.yaml, 实际 %s", handler.configPath)
+	}
+}
+
+func TestConfigHandler_Update_WithAIParameters(t *testing.T) {
+	handler, router := setupConfigTest(t)
+	router.PUT("/config", handler.Update)
+
+	body := `{
+		"ai": {
+			"provider": "gemini",
+			"parameters": {
+				"maxTokens": 4096,
+				"temperature": 0.5
+			},
+			"providers": {
+				"gemini": {
+					"enabled": true,
+					"model": "gemini-pro-vision"
+				}
+			}
+		},
+		"general": {
+			"debug": true,
+			"logLevel": "debug",
+			"defaultSubtasks": 5,
+			"defaultPriority": "high",
+			"projectName": "Test Project"
+		}
+	}`
+
+	req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("期望状态码 %d, 实际 %d", http.StatusOK, w.Code)
+	}
+
+	// 验证配置已更新
+	if handler.config.AI.Provider != "gemini" {
+		t.Errorf("期望 provider 为 gemini, 实际 %s", handler.config.AI.Provider)
+	}
+
+	if handler.config.AI.Parameters.MaxTokens != 4096 {
+		t.Errorf("期望 MaxTokens 为 4096, 实际 %d", handler.config.AI.Parameters.MaxTokens)
+	}
+
+	if handler.config.General.Debug != true {
+		t.Error("期望 Debug 为 true")
+	}
+}
+
+func TestConfigHandler_Update_InvalidJSON(t *testing.T) {
+	handler, router := setupConfigTest(t)
+	router.PUT("/config", handler.Update)
+
+	req := httptest.NewRequest(http.MethodPut, "/config", strings.NewReader(`invalid json`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("期望状态码 %d, 实际 %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestConfigHandler_UpdateSpecificProvider_WithAPIKey(t *testing.T) {
+	handler, router := setupConfigTest(t)
+	router.PUT("/config/ai/providers/:provider", handler.UpdateSpecificProvider)
+
+	body := `{
+		"enabled": true,
+		"apiKey": "new-api-key",
+		"model": "qwen-max",
+		"baseUrl": "https://new.api.url"
+	}`
+
+	req := httptest.NewRequest(http.MethodPut, "/config/ai/providers/qwen", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("期望状态码 %d, 实际 %d", http.StatusOK, w.Code)
+	}
+
+	// 验证提供商配置已更新
+	if handler.config.AI.Providers["qwen"].APIKey != "new-api-key" {
+		t.Error("期望 API Key 已更新")
+	}
+}

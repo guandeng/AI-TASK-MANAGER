@@ -15,6 +15,12 @@ import (
 	"github.com/ai-task-manager/backend/internal/models"
 )
 
+// TaskWithDependencies 带依赖索引的任务
+type TaskWithDependencies struct {
+	Task         models.Task
+	Dependencies []int // 依赖的任务索引
+}
+
 // Provider AI 提供商接口
 type Provider interface {
 	ExpandTask(task *models.Task) ([]models.Subtask, error)
@@ -47,13 +53,13 @@ func (s *Service) ExpandTask(task *models.Task) ([]models.Subtask, error) {
 
 // SplitRequirement 将需求拆分为任务
 // taskType: frontend, backend, fullstack
-func (s *Service) SplitRequirement(requirement *models.Requirement, taskType string) ([]models.Task, error) {
+func (s *Service) SplitRequirement(requirement *models.Requirement, taskType string) ([]TaskWithDependencies, error) {
 	return s.SplitRequirementWithLanguage(requirement, taskType, nil)
 }
 
 // SplitRequirementWithLanguage 将需求拆分为任务（带语言信息）
 // taskType: frontend, backend, fullstack
-func (s *Service) SplitRequirementWithLanguage(requirement *models.Requirement, taskType string, language *models.Language) ([]models.Task, error) {
+func (s *Service) SplitRequirementWithLanguage(requirement *models.Requirement, taskType string, language *models.Language) ([]TaskWithDependencies, error) {
 	prompt := s.buildSplitRequirementPromptWithLanguage(requirement, taskType, language)
 	response, err := s.Chat(prompt)
 	if err != nil {
@@ -641,7 +647,7 @@ func (s *Service) buildSplitRequirementPromptWithLanguage(requirement *models.Re
 }
 
 // parseTasks 解析任务列表
-func (s *Service) parseTasks(response string, requirementID uint64) ([]models.Task, error) {
+func (s *Service) parseTasks(response string, requirementID uint64) ([]TaskWithDependencies, error) {
 	// 尝试从响应中提取 JSON 数组
 	jsonStart := strings.Index(response, "[")
 	jsonEnd := strings.LastIndex(response, "]")
@@ -658,6 +664,7 @@ func (s *Service) parseTasks(response string, requirementID uint64) ([]models.Ta
 		Details      string `json:"details"`
 		TestStrategy string `json:"testStrategy"`
 		Priority     string `json:"priority"`
+		Dependencies []int  `json:"dependencies"`
 	}
 
 	if err := json.Unmarshal([]byte(jsonStr), &tasksData); err != nil {
@@ -665,21 +672,24 @@ func (s *Service) parseTasks(response string, requirementID uint64) ([]models.Ta
 	}
 
 	reqID := requirementID
-	result := make([]models.Task, len(tasksData))
+	result := make([]TaskWithDependencies, len(tasksData))
 	for i, td := range tasksData {
 		priority := td.Priority
 		if priority == "" {
 			priority = "medium"
 		}
 
-		result[i] = models.Task{
-			RequirementID: &reqID,
-			Title:         td.Title,
-			Description:   td.Description,
-			Details:       td.Details,
-			TestStrategy:  td.TestStrategy,
-			Status:        "pending",
-			Priority:      priority,
+		result[i] = TaskWithDependencies{
+			Task: models.Task{
+				RequirementID: &reqID,
+				Title:         td.Title,
+				Description:   td.Description,
+				Details:       td.Details,
+				TestStrategy:  td.TestStrategy,
+				Status:        "pending",
+				Priority:      priority,
+			},
+			Dependencies: td.Dependencies,
 		}
 	}
 

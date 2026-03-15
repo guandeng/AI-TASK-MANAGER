@@ -51,7 +51,7 @@ const workloadTableData = computed(() => {
         ...member,
         ...workload,
         utilization: workload
-          ? Math.round((workload.actualHours / Math.max(workload.estimatedHours || 1, 1)) * 100)
+          ? Math.round((workload.totalActualHours / Math.max(workload.totalEstimatedHours || 1, 1)) * 100)
           : 0
       };
     });
@@ -215,10 +215,10 @@ const statistics = computed(() => {
   let overworkCount = 0;
 
   workloadMap.value.forEach(w => {
-    totalTasks += w.taskCount || 0;
-    totalEstimated += w.estimatedHours || 0;
-    totalActual += w.actualHours || 0;
-    if (w.actualHours && w.estimatedHours && w.actualHours > w.estimatedHours) {
+    totalTasks += w.totalTasks || 0;
+    totalEstimated += w.totalEstimatedHours || 0;
+    totalActual += w.totalActualHours || 0;
+    if (w.totalActualHours && w.totalEstimatedHours && w.totalActualHours > w.totalEstimatedHours) {
       overworkCount++;
     }
   });

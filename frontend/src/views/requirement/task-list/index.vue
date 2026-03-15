@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { NCard, NDataTable, NTag, NSpace, NButton, NInput, NSelect, NStatistic, NGrid, NGi, NProgress, NEmpty, NSpin } from 'naive-ui';
 import type { DataTableColumns, DataTableRowKey, SelectOption } from 'naive-ui';
 import { useTaskStore } from '@/store/modules/task';
+import { fetchLanguageList } from '@/service/api/language';
 import type { Task, TaskStatus, TaskListParams, TaskCategory } from '@/typings/api/task';
 
 const route = useRoute();
@@ -18,6 +19,8 @@ function confirmAction(message: string) {
 const filterStatus = ref<TaskStatus | 'all'>('all');
 const filterCategory = ref<TaskCategory | 'all'>('all');
 const filterRequirementId = ref<number | 'all'>('all');
+const filterLanguageId = ref<number | 'all'>('all');
+const filterExpandStatus = ref<'all' | 'expanding' | 'expanded' | 'none'>('all');
 const searchText = ref('');
 const checkedRowKeys = ref<DataTableRowKey[]>([]);
 
@@ -25,6 +28,26 @@ const checkedRowKeys = ref<DataTableRowKey[]>([]);
 const currentPage = ref(1);
 const pageSize = ref(20);
 const total = ref(0);
+
+// 语言选项
+const languageOptions = ref<SelectOption[]>([{ label: '全部语言', value: 'all' }]);
+
+// 加载语言列表
+async function loadLanguageOptions() {
+  const { data } = await fetchLanguageList();
+  if (data) {
+    const list = (data as any).data || data;
+    if (Array.isArray(list)) {
+      languageOptions.value = [
+        { label: '全部语言', value: 'all' },
+        ...list.map((lang: any) => ({
+          label: lang.displayName || lang.name,
+          value: lang.id
+        }))
+      ];
+    }
+  }
+}
 
 // 状态选项
 const statusOptions = [
@@ -40,6 +63,14 @@ const categoryOptions = [
   { label: '全部分类', value: 'all' },
   { label: '前端', value: 'frontend' },
   { label: '后端', value: 'backend' }
+];
+
+// 拆分状态选项
+const expandStatusOptions = [
+  { label: '全部状态', value: 'all' },
+  { label: '拆分中', value: 'expanding' },
+  { label: '已拆分', value: 'expanded' },
+  { label: '未拆分', value: 'none' }
 ];
 
 // 负责人选项
@@ -265,6 +296,14 @@ async function loadTaskListData() {
     params.category = filterCategory.value;
   }
 
+  if (filterLanguageId.value !== 'all') {
+    params.languageId = filterLanguageId.value;
+  }
+
+  if (filterExpandStatus.value !== 'all') {
+    params.expandStatus = filterExpandStatus.value;
+  }
+
   if (searchText.value) {
     params.keyword = searchText.value;
   }
@@ -343,14 +382,17 @@ const paginationConfig = computed(() => ({
   pageSizes: [10, 20, 50, 100],
   onChange: (page: number) => {
     currentPage.value = page;
-    loadTaskListData();
   },
   onUpdatePageSize: (size: number) => {
     pageSize.value = size;
     currentPage.value = 1;
-    loadTaskListData();
   }
 }));
+
+// 监听分页变化
+watch([currentPage, pageSize], () => {
+  loadTaskListData();
+});
 // 完成率
 const completionRate = computed(() => {
   if (taskStore.statistics.total === 0) return 0;
@@ -448,6 +490,12 @@ watch(
             :options="requirementOptions"
             style="width: 150px"
             placeholder="需求筛选"
+          />
+          <NSelect
+            v-model:value="filterCategory"
+            :options="categoryOptions"
+            style="width: 100px"
+            placeholder="分类"
           />
           <NSelect
             v-model:value="filterStatus"

@@ -353,7 +353,7 @@ onActivated(() => {
         />
         <NSelect
           v-model:value="filterCategory"
-          :options="[{ label: '全部分类', value: null }, ...TEMPLATE_CATEGORY_OPTIONS]"
+          :options="[{ label: '全部分类', value: '' }, ...TEMPLATE_CATEGORY_OPTIONS]"
           placeholder="选择分类"
           clearable
           style="width: 140px"
@@ -383,7 +383,7 @@ onActivated(() => {
         <NDescriptions label-placement="left" :column="2">
           <NDescriptionsItem label="模板名称">{{ editingTemplate.name }}</NDescriptionsItem>
           <NDescriptionsItem label="分类">
-            {{ TEMPLATE_CATEGORY_OPTIONS.find(o => o.value === editingTemplate.category)?.label }}
+            {{ TEMPLATE_CATEGORY_OPTIONS.find(o => o.value === editingTemplate!.category)?.label }}
           </NDescriptionsItem>
           <NDescriptionsItem label="公开">
             <NTag :type="editingTemplate.isPublic ? 'success' : 'default'" size="small">

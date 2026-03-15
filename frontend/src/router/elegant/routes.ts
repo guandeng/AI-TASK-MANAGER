@@ -190,7 +190,8 @@ export const generatedRoutes: GeneratedRoute[] = [
         meta: {
           title: 'requirement_task-detail',
           i18nKey: 'route.requirement_task-detail',
-          hideInMenu: true
+          hideInMenu: true,
+          order: 2
         }
       },
       {

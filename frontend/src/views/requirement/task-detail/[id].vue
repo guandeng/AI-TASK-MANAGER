@@ -73,9 +73,29 @@ const clearLoading = ref(false);
 const deleteLoading = ref(false);
 const saveLoading = ref(false);
 
+// 拆分超时检测
+const EXPAND_TIMEOUT_MS = 5 * 60 * 1000; // 5分钟
+const expandStartTime = ref<number | null>(null);
+
+// 判断是否超时（超过5分钟）
+const isExpandTimeout = computed(() => {
+  if (!task.value?.isExpanding || !expandStartTime.value) return false;
+  return Date.now() - expandStartTime.value > EXPAND_TIMEOUT_MS;
+});
+
+// 实际的loading状态（考虑超时）
+const actualExpandLoading = computed(() => {
+  return (task.value?.isExpanding || expandLoading.value) && !isExpandTimeout.value;
+});
+
+// 实际的disabled状态（考虑超时）
+const actualExpandDisabled = computed(() => {
+  return task.value?.isExpanding && !isExpandTimeout.value;
+});
+
 // 编辑模式状态
 type EditableTaskField = 'title' | 'details' | 'testStrategy';
-type EditableSubtaskField = 'title' | 'description';
+type EditableSubtaskField = 'title' | 'description' | 'details' | 'codeInterface' | 'acceptanceCriteria' | 'relatedFiles' | 'codeHints';
 const editingType = ref<'task' | 'subtask' | null>(null);
 const editingField = ref<EditableTaskField | EditableSubtaskField | null>(null);
 const editingSubtaskId = ref<number | null>(null);
@@ -158,11 +178,21 @@ function startEditSubtask(subtaskId: number, field: EditableSubtaskField) {
   editingSubtaskId.value = subtaskId;
   if (field === 'title') {
     editingValue.value = subtask.titleTrans || subtask.title || '';
-  } else {
+  } else if (field === 'description') {
     editingValue.value = subtask.descriptionTrans || subtask.description || '';
+  } else if (field === 'details') {
+    editingValue.value = subtask.detailsTrans || subtask.details || '';
+  } else if (field === 'codeInterface') {
+    editingValue.value = subtask.codeInterface || '';
+  } else if (field === 'acceptanceCriteria') {
+    editingValue.value = subtask.acceptanceCriteria || '';
+  } else if (field === 'relatedFiles') {
+    editingValue.value = subtask.relatedFiles || '';
+  } else if (field === 'codeHints') {
+    editingValue.value = subtask.codeHints || '';
   }
   // 切换到编辑模式
-  if (field === 'description') {
+  if (field === 'description' || field === 'details') {
     togglePreview('subtask', field, subtaskId);
   }
 }
@@ -174,8 +204,8 @@ function cancelEdit() {
     const field = editingField.value;
     if (field === 'details' || field === 'testStrategy') {
       togglePreview('task', field);
-    } else if (field === 'description' && editingSubtaskId.value !== null) {
-      togglePreview('subtask', field, editingSubtaskId.value);
+    } else if ((field === 'description' || field === 'details') && editingSubtaskId.value !== null) {
+      togglePreview('subtask', field as 'description' | 'details', editingSubtaskId.value);
     }
   }
   editingType.value = null;
@@ -219,18 +249,45 @@ async function saveEdit() {
     } else if (editingType.value === 'subtask' && editingSubtaskId.value !== null) {
       // 更新子任务
       const field = editingField.value as EditableSubtaskField;
-      let updateData: Record<string, string>;
+      let updateData: Record<string, unknown>;
       if (field === 'title') {
         updateData = { title: editingValue.value };
-      } else {
+      } else if (field === 'description') {
         updateData = { description: editingValue.value };
+      } else if (field === 'details') {
+        updateData = { details: editingValue.value };
+      } else if (field === 'codeInterface') {
+        try {
+          updateData = { codeInterface: editingValue.value ? JSON.parse(editingValue.value) : null };
+        } catch {
+          window.$message?.error('代码接口 JSON 格式不正确');
+          return;
+        }
+      } else if (field === 'acceptanceCriteria') {
+        try {
+          updateData = { acceptanceCriteria: editingValue.value ? JSON.parse(editingValue.value) : null };
+        } catch {
+          window.$message?.error('验收标准 JSON 格式不正确');
+          return;
+        }
+      } else if (field === 'relatedFiles') {
+        try {
+          updateData = { relatedFiles: editingValue.value ? JSON.parse(editingValue.value) : null };
+        } catch {
+          window.$message?.error('关联文件 JSON 格式不正确');
+          return;
+        }
+      } else if (field === 'codeHints') {
+        updateData = { codeHints: editingValue.value };
+      } else {
+        return;
       }
       const success = await taskStore.updateSubtask(taskId.value, editingSubtaskId.value, updateData);
       if (success) {
         // 先取消编辑状态，再切换预览模式
         cancelEdit();
         // 切回预览模式
-        if (field === 'description') {
+        if (field === 'description' || field === 'details') {
           togglePreview('subtask', field, editingSubtaskId.value);
         }
         window.$message?.success('保存成功');
@@ -260,13 +317,14 @@ const pollingMessageId = ref<number | null>(null);
 async function handleExpandTask() {
   if (!taskId.value) return;
 
-  // 检查任务是否已经在拆分中
-  if (task.value?.isExpanding) {
+  // 检查任务是否已经在拆分中（除非已超时）
+  if (task.value?.isExpanding && !isExpandTimeout.value) {
     window.$message?.info('任务正在拆分中，完成后会通知您');
     return;
   }
 
   expandLoading.value = true;
+  expandStartTime.value = Date.now(); // 记录开始时间
   try {
     const messageId = await taskStore.expandTaskAsync(taskId.value);
     if (messageId) {
@@ -274,10 +332,12 @@ async function handleExpandTask() {
       // 不再跳转到消息列表，保持当前页面
     } else {
       window.$message?.error('提交拆分任务失败');
+      expandStartTime.value = null; // 失败时重置
     }
   } catch (error) {
     console.error('Failed to expand task async:', error);
     window.$message?.error('拆分任务失败');
+    expandStartTime.value = null; // 失败时重置
   } finally {
     expandLoading.value = false;
   }
@@ -424,9 +484,19 @@ watch(
       return;
     }
 
-    // 检查是否是真正的数据变化（通过比较 JSON）
-    const newJson = JSON.stringify(newSubtasks.map((s: Subtask) => ({ id: s.id, status: s.status, title: s.title, description: s.description })));
-    const currentJson = JSON.stringify(localSubtasks.value.map((s: Subtask) => ({ id: s.id, status: s.status, title: s.title, description: s.description })));
+    // 检查是否是真正的数据变化（通过比较完整 JSON）
+    const newJson = JSON.stringify(newSubtasks.map((s: Subtask) => ({
+      id: s.id, status: s.status, title: s.title, description: s.description,
+      details: s.details, codeInterface: s.codeInterface,
+      acceptanceCriteria: s.acceptanceCriteria, relatedFiles: s.relatedFiles,
+      codeHints: s.codeHints
+    })));
+    const currentJson = JSON.stringify(localSubtasks.value.map((s: Subtask) => ({
+      id: s.id, status: s.status, title: s.title, description: s.description,
+      details: s.details, codeInterface: s.codeInterface,
+      acceptanceCriteria: s.acceptanceCriteria, relatedFiles: s.relatedFiles,
+      codeHints: s.codeHints
+    })));
 
     if (newJson !== currentJson) {
       // 数据确实变了，更新本地列表
@@ -677,22 +747,65 @@ onUnmounted(() => {
                         </div>
                       </div>
 
-                      <!-- 展开的详细信息 -->
+                      <!-- 展开��详细信息 -->
                       <div v-if="isSubtaskExpanded(subtask.id)" class="subtask-details">
                         <NDivider style="margin: 8px 0 12px;">详细信息</NDivider>
 
                         <!-- 实现细节 -->
-                        <div v-if="subtask.details || subtask.detailsTrans" class="detail-section">
-                          <div class="detail-label">实现细节</div>
-                          <div class="detail-content">
+                        <div class="detail-section">
+                          <div class="detail-header">
+                            <div class="detail-label">实现细节</div>
+                            <NButton
+                              v-if="!(editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'details')"
+                              text
+                              type="primary"
+                              size="tiny"
+                              @click="startEditSubtask(subtask.id, 'details')"
+                            >编辑</NButton>
+                          </div>
+                          <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'details'" class="detail-content">
+                            <MdEditor
+                              v-model="editingValue"
+                              language="zh-CN"
+                              placeholder="请输入实现细节，支持 Markdown 格式"
+                              :style="{ height: '200px' }"
+                            />
+                            <NSpace class="mt-8px">
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton size="small" @click="cancelEdit">取消</NButton>
+                            </NSpace>
+                          </div>
+                          <div v-else-if="subtask.details || subtask.detailsTrans" class="detail-content">
                             <MdPreview :model-value="subtask.detailsTrans || subtask.details || ''" class="markdown-preview-wrapper" />
                           </div>
+                          <div v-else class="detail-content text-gray-400">点击编辑实现细节</div>
                         </div>
 
                         <!-- 代码接口 -->
-                        <div v-if="subtask.codeInterface" class="detail-section">
-                          <div class="detail-label">代码接口</div>
-                          <div class="detail-content code-interface">
+                        <div class="detail-section">
+                          <div class="detail-header">
+                            <div class="detail-label">代码接口</div>
+                            <NButton
+                              v-if="!(editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'codeInterface')"
+                              text
+                              type="primary"
+                              size="tiny"
+                              @click="startEditSubtask(subtask.id, 'codeInterface')"
+                            >编辑</NButton>
+                          </div>
+                          <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'codeInterface'" class="detail-content">
+                            <NInput
+                              v-model:value="editingValue"
+                              type="textarea"
+                              placeholder='JSON 格式，例如: {"name": "funcName", "inputs": "string", "outputs": "boolean"}'
+                              :rows="6"
+                            />
+                            <NSpace class="mt-8px">
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton size="small" @click="cancelEdit">取消</NButton>
+                            </NSpace>
+                          </div>
+                          <div v-else-if="subtask.codeInterface" class="detail-content code-interface">
                             <template v-if="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)">
                               <div class="interface-name">
                                 <NTag type="info" size="small">函数名</NTag>
@@ -712,12 +825,34 @@ onUnmounted(() => {
                               </div>
                             </template>
                           </div>
+                          <div v-else class="detail-content text-gray-400">点击编辑代码接口</div>
                         </div>
 
                         <!-- 验收标准 -->
-                        <div v-if="subtask.acceptanceCriteria" class="detail-section">
-                          <div class="detail-label">验收标准</div>
-                          <div class="detail-content acceptance-criteria">
+                        <div class="detail-section">
+                          <div class="detail-header">
+                            <div class="detail-label">验收标准</div>
+                            <NButton
+                              v-if="!(editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'acceptanceCriteria')"
+                              text
+                              type="primary"
+                              size="tiny"
+                              @click="startEditSubtask(subtask.id, 'acceptanceCriteria')"
+                            >编辑</NButton>
+                          </div>
+                          <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'acceptanceCriteria'" class="detail-content">
+                            <NInput
+                              v-model:value="editingValue"
+                              type="textarea"
+                              placeholder='JSON 数组格式，例如: [{"id": 1, "description": "功能正常", "completed": false}]'
+                              :rows="6"
+                            />
+                            <NSpace class="mt-8px">
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton size="small" @click="cancelEdit">取消</NButton>
+                            </NSpace>
+                          </div>
+                          <div v-else-if="subtask.acceptanceCriteria" class="detail-content acceptance-criteria">
                             <template v-if="parseJsonField<Array<{id: number; description: string; completed: boolean}>>(subtask.acceptanceCriteria)">
                               <div
                                 v-for="criteria in parseJsonField<Array<{id: number; description: string; completed: boolean}>>(subtask.acceptanceCriteria)"
@@ -730,12 +865,34 @@ onUnmounted(() => {
                               </div>
                             </template>
                           </div>
+                          <div v-else class="detail-content text-gray-400">点击编辑验收标准</div>
                         </div>
 
                         <!-- 关联文件 -->
-                        <div v-if="subtask.relatedFiles" class="detail-section">
-                          <div class="detail-label">关联文件</div>
-                          <div class="detail-content">
+                        <div class="detail-section">
+                          <div class="detail-header">
+                            <div class="detail-label">关联文件</div>
+                            <NButton
+                              v-if="!(editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'relatedFiles')"
+                              text
+                              type="primary"
+                              size="tiny"
+                              @click="startEditSubtask(subtask.id, 'relatedFiles')"
+                            >编辑</NButton>
+                          </div>
+                          <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'relatedFiles'" class="detail-content">
+                            <NInput
+                              v-model:value="editingValue"
+                              type="textarea"
+                              placeholder='JSON 数组格式，例如: ["src/main.ts", "src/utils.ts"]'
+                              :rows="4"
+                            />
+                            <NSpace class="mt-8px">
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton size="small" @click="cancelEdit">取消</NButton>
+                            </NSpace>
+                          </div>
+                          <div v-else-if="subtask.relatedFiles" class="detail-content">
                             <NSpace>
                               <NTag
                                 v-for="(file, idx) in parseJsonField<string[]>(subtask.relatedFiles)"
@@ -748,14 +905,37 @@ onUnmounted(() => {
                               </NTag>
                             </NSpace>
                           </div>
+                          <div v-else class="detail-content text-gray-400">点击编辑关联文件</div>
                         </div>
 
                         <!-- 代码提示 -->
-                        <div v-if="subtask.codeHints" class="detail-section">
-                          <div class="detail-label">代码提示</div>
-                          <div class="detail-content code-hints">
+                        <div class="detail-section">
+                          <div class="detail-header">
+                            <div class="detail-label">代码提示</div>
+                            <NButton
+                              v-if="!(editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'codeHints')"
+                              text
+                              type="primary"
+                              size="tiny"
+                              @click="startEditSubtask(subtask.id, 'codeHints')"
+                            >编辑</NButton>
+                          </div>
+                          <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'codeHints'" class="detail-content">
+                            <NInput
+                              v-model:value="editingValue"
+                              type="textarea"
+                              placeholder="请输入代码提示"
+                              :rows="4"
+                            />
+                            <NSpace class="mt-8px">
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton size="small" @click="cancelEdit">取消</NButton>
+                            </NSpace>
+                          </div>
+                          <div v-else-if="subtask.codeHints" class="detail-content code-hints">
                             {{ subtask.codeHints }}
                           </div>
+                          <div v-else class="detail-content text-gray-400">点击编辑代码提示</div>
                         </div>
                       </div>
 
@@ -1135,11 +1315,17 @@ onUnmounted(() => {
   }
 }
 
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .detail-label {
   font-weight: 600;
   font-size: 13px;
   color: #666;
-  margin-bottom: 8px;
   padding-left: 8px;
   border-left: 3px solid #1890ff;
 }

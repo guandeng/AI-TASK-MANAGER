@@ -365,3 +365,180 @@ func TestTemplateHandler_DeleteTaskTemplate(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplateHandler_CreateProjectTemplate_WithTasks(t *testing.T) {
+	handler, router, mock := setupTemplateTestWithDB(t)
+	router.POST("/project-templates", handler.CreateProjectTemplate)
+
+	// 创建带任务和子任务的模板
+	body := `{
+		"name": "完整模板",
+		"description": "带任务的模板",
+		"category": "task",
+		"isPublic": true,
+		"tags": ["tag1", "tag2"],
+		"tasks": [
+			{
+				"title": "任务1",
+				"description": "描述1",
+				"priority": "high",
+				"order": 1,
+				"estimatedHours": 4,
+				"subtasks": [
+					{"title": "子任务1", "order": 1}
+				]
+			}
+		]
+	}`
+
+	mock.ExpectBegin()
+	mock.ExpectExec("INSERT INTO `task_project_template`").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	// Preload tasks query
+	mock.ExpectQuery("SELECT").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "template_id"}))
+
+	req := httptest.NewRequest(http.MethodPost, "/project-templates", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("期望状态码 %d, 实际 %d", http.StatusOK, w.Code)
+	}
+}
+
+func TestTemplateHandler_UpdateProjectTemplate(t *testing.T) {
+	t.Run("无效的ID", func(t *testing.T) {
+		handler, router, _ := setupTemplateTestWithDB(t)
+		router.PUT("/project-templates/:id", handler.UpdateProjectTemplate)
+
+		body := `{"name":"更新模板"}`
+		req := httptest.NewRequest(http.MethodPut, "/project-templates/abc", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("期望状态码 %d, 实际 %d", http.StatusBadRequest, w.Code)
+		}
+	})
+
+	t.Run("模板不存在", func(t *testing.T) {
+		handler, router, mock := setupTemplateTestWithDB(t)
+		router.PUT("/project-templates/:id", handler.UpdateProjectTemplate)
+
+		mock.ExpectQuery("SELECT \\* FROM `task_project_template`").
+			WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
+		body := `{"name":"更新模板"}`
+		req := httptest.NewRequest(http.MethodPut, "/project-templates/999", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("期望状态码 %d, 实际 %d", http.StatusNotFound, w.Code)
+		}
+	})
+}
+
+func TestTemplateHandler_UpdateTaskTemplate(t *testing.T) {
+	t.Run("无效的ID", func(t *testing.T) {
+		handler, router, _ := setupTemplateTestWithDB(t)
+		router.PUT("/task-templates/:id", handler.UpdateTaskTemplate)
+
+		body := `{"name":"更新模板"}`
+		req := httptest.NewRequest(http.MethodPut, "/task-templates/abc", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("期望状态码 %d, 实际 %d", http.StatusBadRequest, w.Code)
+		}
+	})
+
+	t.Run("模板不存在", func(t *testing.T) {
+		handler, router, mock := setupTemplateTestWithDB(t)
+		router.PUT("/task-templates/:id", handler.UpdateTaskTemplate)
+
+		mock.ExpectQuery("SELECT \\* FROM `task_template`").
+			WillReturnRows(sqlmock.NewRows([]string{"id"}))
+
+		body := `{"name":"更新模板"}`
+		req := httptest.NewRequest(http.MethodPut, "/task-templates/999", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		// 模板不存在时返回 400 或 404
+		if w.Code != http.StatusBadRequest && w.Code != http.StatusNotFound {
+			t.Errorf("期望状态码 400 或 404, 实际 %d", w.Code)
+		}
+	})
+}
+
+func TestTemplateHandler_InstantiateProjectTemplate(t *testing.T) {
+	t.Run("无效的ID", func(t *testing.T) {
+		handler, router, _ := setupTemplateTestWithDB(t)
+		router.POST("/project-templates/:id/instantiate", handler.InstantiateProjectTemplate)
+
+		body := `{"requirementId":1}`
+		req := httptest.NewRequest(http.MethodPost, "/project-templates/abc/instantiate", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("期望状态码 %d, 实际 %d", http.StatusBadRequest, w.Code)
+		}
+	})
+}
+
+func TestTemplateHandler_InstantiateTaskTemplate(t *testing.T) {
+	t.Run("无效的ID", func(t *testing.T) {
+		handler, router, _ := setupTemplateTestWithDB(t)
+		router.POST("/task-templates/:id/instantiate", handler.InstantiateTaskTemplate)
+
+		body := `{"taskId":1}`
+		req := httptest.NewRequest(http.MethodPost, "/task-templates/abc/instantiate", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("期望状态码 %d, 实际 %d", http.StatusBadRequest, w.Code)
+		}
+	})
+}
+
+func TestTemplateHandler_CreateTaskTemplate_InvalidJSON(t *testing.T) {
+	handler, router, _ := setupTemplateTestWithDB(t)
+	router.POST("/task-templates", handler.CreateTaskTemplate)
+
+	req := httptest.NewRequest(http.MethodPost, "/task-templates", bytes.NewBufferString(`invalid json`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("期望状态码 %d, 实际 %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestTemplateHandler_CreateProjectTemplate_InvalidJSON(t *testing.T) {
+	handler, router, _ := setupTemplateTestWithDB(t)
+	router.POST("/project-templates", handler.CreateProjectTemplate)
+
+	req := httptest.NewRequest(http.MethodPost, "/project-templates", bytes.NewBufferString(`invalid json`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("期望状态码 %d, 实际 %d", http.StatusBadRequest, w.Code)
+	}
+}

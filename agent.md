@@ -380,6 +380,57 @@ docker exec -i mysql mysql -h localhost -u root -p123456 --default-character-set
 3. SQL 文件路径必须是容器内可访问的路径，使用 `-i` 参数通过 stdin 传入
 4. **必须使用 `--default-character-set=utf8mb4` 参数**，否则中文会显示乱码
 
+### GORM 模型与数据库映射规范
+
+**重要：GORM 默认使用蛇形命名策略，模型字段会自动映射到数据库列**
+
+#### 命名映射规则
+
+| Go 模型字段       | 数据库列名        | 说明           |
+| ----------------- | ----------------- | -------------- |
+| `ID`              | `id`              | 主键           |
+| `DisplayName`     | `display_name`    | 驼峰 → 蛇形    |
+| `Category`        | `category`        | 单词直接映射   |
+| `CreatedAt`       | `created_at`      | 时间字段       |
+| `IsActive`        | `is_active`       | 布尔字段       |
+
+#### 自定义类型（如 LanguageCategory）
+
+```go
+// ✅ 正确：自定义类型需要明确指定 column
+type Language struct {
+    Category LanguageCategory `gorm:"column:category;size:20;not null" json:"category"`
+}
+
+// ❌ 错误：自定义类型有时需要显式指定 column 标签
+type Language struct {
+    Category LanguageCategory `gorm:"size:20;not null" json:"category"` // 可能映射失败
+}
+```
+
+#### 数据库修改后必须重启后端
+
+当修改模型结构或添加新字段后：
+1. GORM 的 AutoMigrate 会在启动时自动添加新列
+2. 但如果后端进程已经在运行，需要杀掉并重启
+3. 使用 `pkill -f "go run cmd/server/main.go"` 或 `lsof -ti:8080 | xargs kill -9`
+
+#### 表名前缀规范
+
+所有表名必须使用 `task_` 前缀：
+
+```go
+// ✅ 正确
+func (Language) TableName() string {
+    return "task_languages"
+}
+
+// ❌ 错误：缺少前缀
+func (Language) TableName() string {
+    return "languages"
+}
+```
+
 ---
 
 ## 前端 UI 规范

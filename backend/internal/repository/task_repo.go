@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/ai-task-manager/backend/internal/database"
@@ -249,7 +250,46 @@ func (r *taskRepository) UpdateSubtaskWithMap(taskID, subtaskID uint64, updates 
 	if len(updates) == 0 {
 		return nil
 	}
-	return r.db.Model(&models.Subtask{}).Where("id = ? AND task_id = ?", subtaskID, taskID).Updates(updates).Error
+
+	// 将前端驼峰命名转换为数据库蛇形命名，并处理 JSON 字段
+	jsonFields := map[string]bool{
+		"codeInterface":      true,
+		"acceptanceCriteria": true,
+		"relatedFiles":       true,
+	}
+
+	dbUpdates := make(map[string]interface{})
+	for key, value := range updates {
+		dbKey := camelToSnake(key)
+
+		// 对于 JSON 字段，需要序列化为字符串
+		if jsonFields[key] && value != nil {
+			jsonBytes, err := json.Marshal(value)
+			if err != nil {
+				return err
+			}
+			dbUpdates[dbKey] = string(jsonBytes)
+		} else {
+			dbUpdates[dbKey] = value
+		}
+	}
+
+	return r.db.Model(&models.Subtask{}).Where("id = ? AND task_id = ?", subtaskID, taskID).Updates(dbUpdates).Error
+}
+
+// camelToSnake 将驼峰命名转换为蛇形命名
+func camelToSnake(s string) string {
+	var result []rune
+	for i, r := range s {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			result = append(result, '_', r+32) // 转小写
+		} else if r >= 'A' && r <= 'Z' {
+			result = append(result, r+32) // 转小写
+		} else {
+			result = append(result, r)
+		}
+	}
+	return string(result)
 }
 
 // DeleteSubtask 删除子任务

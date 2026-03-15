@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { h, ref, onMounted } from 'vue';
 import {
   NCard,
   NDataTable,
@@ -31,6 +31,7 @@ const showModal = ref(false);
 const editingId = ref<number | null>(null);
 const formData = ref<LanguageCreateRequest>({
   name: '',
+  category: 'backend',
   displayName: '',
   framework: '',
   description: '',
@@ -139,6 +140,7 @@ function handleAdd() {
   editingId.value = null;
   formData.value = {
     name: '',
+    category: 'backend',
     displayName: '',
     framework: '',
     description: '',

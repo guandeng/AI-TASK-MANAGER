@@ -167,3 +167,11 @@ export interface TaskStatistics {
   mediumPriority: number;
   lowPriority: number;
 }
+
+/** 任务依赖关系 */
+export interface TaskDependency {
+  id: number;
+  taskId: number;
+  dependsOnTaskId: number;
+  createdAt?: string;
+}

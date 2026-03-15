@@ -40,7 +40,6 @@ declare module "@elegant-router/types" {
     "team_workload": "/team/workload";
     "templates": "/templates";
     "templates_projects": "/templates/projects";
-    "templates_projects_detail": "/templates/projects/:id";
     "templates_tasks": "/templates/tasks";
   };
 
@@ -83,7 +82,6 @@ declare module "@elegant-router/types" {
     | "requirement"
     | "team"
     | "templates"
-    | "templates_projects_detail"
   >;
 
   /**
@@ -118,7 +116,6 @@ declare module "@elegant-router/types" {
     | "team_members"
     | "team_workload"
     | "templates_projects"
-    | "templates_projects_detail"
     | "templates_tasks"
   >;
 

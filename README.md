@@ -1,726 +1,423 @@
-# AI Task Master
+# AI Task Manager
 
-### by [@eyaltoledano](https://x.com/eyaltoledano), enhanced by [skindhu]
+一个现代化的 AI 驱动任务管理系统，采用前后端分离架构，支持需求管理、任务拆分、子任务管理、MCP 集成等功能。
 
-一个用于AI驱动开发的通用任务管理系统，使用Google Gemini模型，专为与Cursor AI无缝协作而设计。
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
+![Vue](https://img.shields.io/badge/Vue-3.5+-4FC08D?logo=vue.js&logoColor=white)
+![MCP](https://img.shields.io/badge/MCP-Supported-FF6B6B?logo=github&logoColor=white)
 
-## 相关文章介绍
-[Vibe coding 最后一公里： 打造一套通用的AI任务拆分和管理系统](https://mp.weixin.qq.com/s/uyBh28lNed4XMaFbS2g25Q)
-<br />
-[Vibe coding之调试篇：如何高效Debugging](https://mp.weixin.qq.com/s/4BN4YjBRDTVYd7gU_pY4gQ)
+## ✨ 特性
 
-## 项目背景
+### 核心功能
+- **需求管理** - 支持需求创建、编辑、文档上传、状态追踪
+- **任务拆分** - AI 辅助将需求拆分为可执行的任务和子任务
+- **任务管理** - 完整的任务生命周期管理，支持依赖关系、优先级、分类
+- **子任务管理** - 细粒度的子任务拆分，支持代码接口定义、验收标准
+- **成员管理** - 团队成员管理、任务分配、工作负载查看
+- **活动追踪** - 完整的操作日志和活动时间线
+- **消息通知** - 系统消息和通知管理
+- **模板系统** - 项目模板和任务模板，支持快速实例化
+- **备份恢复** - 需求数据自动备份和恢复功能
+- **复杂度分析** - AI 驱动的任务复杂度评估
+- **知识库集成** - 支持业务知识库辅助任务拆分
+- **多语言支持** - 中英双语任务内容
+- **MCP 服务器** - 支持 Cursor 等 AI 编辑器集成
 
-AI Task Master 是对原始 [claude-task-manager](https://github.com/eyaltoledano/claude-task-manager) 项目的增强和改进版本。分析了原始项目的设计理念和能力后，发现其具有以下不足：
+### 技术特性
+- 前后端分离架构
+- RESTful API 设计
+- 优雅的错误处理和恢复机制
+- 支持 MySQL 数据库
+- 响应式 Web 界面
+- 支持暗色模式
+- 完整的单元测试覆盖
 
-1. **模型限制**：项目使用的Claude模型API费用高昂（输入$3/百万token，输出$15/百万token），且Claude风控极其严格，API在国内容易被封禁。
-2. **知识融合不足**：任务拆分完全依赖PRD文档，缺乏对业务知识的深入理解。
-3. **语言单一**：输出仅限英文，需要二次翻译才能便于中文用户理解。
-4. **操作繁琐**：任务管理主要依赖CLI命令，缺乏直观的可视化呈现。
-5. **拆分不灵活**：任务和子任务拆分必须指定固定数量，不够智能和灵活。
+## 🏗️ 技术架构
 
-基于以上问题，我们对系统进行了全方位的改进：
+### 后端
+| 技术 | 说明 |
+|------|------|
+| Go 1.22+ | 编程语言 |
+| Gin | Web 框架 |
+| GORM | ORM 框架 |
+| Zap | 日志库 |
+| Viper | 配置管理 |
+| MCP-Go | MCP 服务器 SDK |
+| MySQL | 数据库 |
 
-1. **模型升级**：将所有Claude调用替换为Gemini 2.5 Pro，不仅免费且更稳定。
-2. **知识库集成**：支持在拆分任务时传递业务知识库路径，让AI参考业务背景进行更准确的任务拆解。
-3. **中英双语支持**：通过USE_CHINESE环境变量，支持同时生成英文指令和中文描述，既保证指令执行质量，又提升阅读体验。
-4. **可视化管理**：新增web服务器功能，提供直观的中文界面管理任务，同时支持一键复制英文指令。
-5. **智能拆分**：优化任务拆分逻辑，可以根据任务复杂度自动决定适合的拆解粒度。
+### 前端
+| 技术 | 说明 |
+|------|------|
+| Vue 3.5+ | 渐进式框架 |
+| TypeScript | 类型系统 |
+| Vite 7 | 构建工具 |
+| Naive UI | UI 组件库 |
+| Pinia | 状态管理 |
+| Vue Router | 路由管理 |
+| UnoCSS | 原子化 CSS |
+| ECharts | 数据可视化 |
 
-这些改进使Task Master成为一个更强大、更友好的AI任务管理工具，特别适合中文开发者使用。
-## 系统截图
+## 📦 项目结构
 
-![Task Master Web UI](https://wechat-account-1251781786.cos.ap-guangzhou.myqcloud.com/co-drawing/manager.png)
-
-*Task Master Web界面展示了任务列表和详细信息，支持中英双语显示和状态管理*
-
-
-## 核心优势
-
-- **免费稳定的AI模型**: 使用Gemini 2.5 Pro，无需支付高昂的API费用
-- **业务知识融合**: 任务拆分时可引入业务知识背景，提高任务理解质量
-- **中英双语支持**: 同时生成英文指令和中文描述，兼顾使用体验和执行质量
-- **可视化界面**: 提供Web界面进行任务管理，摆脱繁琐的命令行操作
-- **智能任务拆分**: 能够根据PRD和任务复杂度自动决定最适合的拆分粒度，无需手动指定数量
-
-## 系统要求
-
-- Node.js 14.0.0 或更高版本
-- 阿里云千问 API key (推荐) 或 Google API key (用于Gemini API访问)
-- OpenAI SDK (可选，用于Perplexity API集成)
-
-## 配置
-
-通过项目根目录下的`.env`文件中的环境变量进行配置：
-
-### AI 服务提供商选择
-
-系统支持两种AI服务提供商：
-- **千问 (Qwen)** - 阿里云提供，国内访问稳定（推荐）
-- **Gemini** - Google提供
-
-通过 `AI_PROVIDER` 环境变量选择，可选值：`qwen` 或 `gemini`。
-如果不设置，系统会自动检测：如果配置了 `QWEN_API_KEY` 则使用千问，否则使用 Gemini。
-
-### 千问配置 (推荐)
-
-- `QWEN_API_KEY`: 阿里云千问API密钥（从 [阿里云DashScope控制台](https://dashscope.console.aliyun.com/) 获取）
-- `DASHSCOPE_API_KEY`: 千问API密钥的备用环境变量名
-- `QWEN_MODEL`: 千问模型选择 (默认: `qwen-plus`)
-  - 可选值: `qwen-turbo` (快速), `qwen-plus` (均衡), `qwen-max` (强大)
-- `QWEN_BASE_URL`: 千问API端点 (默认: `https://dashscope.aliyuncs.com/compatible-mode/v1`)
-
-### Gemini配置 (备选)
-
-- `GOOGLE_API_KEY`: 用于Gemini访问的Google API密钥
-- `GEMINI_MODEL`: Gemini模型 (默认: `gemini-2.5-flash`)
-- `GEMINI_BASE_URL`: Gemini API代理 (可选)
-
-### 可选配置
-
-- `MAX_TOKENS`: 模型响应的最大令牌数 (默认: 8192)
-- `TEMPERATURE`: 模型响应的温度 (默认: 0.7)
-- `PERPLEXITY_API_KEY`: 用于研究支持的子任务生成的Perplexity API密钥
-- `PERPLEXITY_MODEL`: 指定要使用的Perplexity模型 (默认: "sonar-pro")
-- `DEBUG`: 启用调试日志 (默认: false)
-- `LOG_LEVEL`: 日志级别 - debug, info, warn, error (默认: info)
-- `DEFAULT_SUBTASKS`: 当手动指定子任务数量时的默认值 (默认: 3)
-- `DEFAULT_PRIORITY`: 生成任务的默认优先级 (默认: medium)
-- `PROJECT_NAME`: 覆盖tasks.json中的默认项目名称
-- `PROJECT_VERSION`: 覆盖tasks.json中的默认版本
-- `USE_CHINESE`: 设置后将生成任务的中文翻译字段 (如titleTrans, descriptionTrans等)
-
-## 安装
-
-```bash
-# 全局安装
-npm install -g ai-task-manager
-
-# 或在项目中本地安装
-npm install ai-task-manager
+```
+AI-TASK-MANAGER/
+├── backend/                     # 后端服务
+│   ├── cmd/
+│   │   ├── server/             # 主服务入口
+│   │   └── mcp-server/         # MCP 服务器入口
+│   ├── internal/
+│   │   ├── config/             # 配置管理
+│   │   ├── database/           # 数据库初始化
+│   │   ├── handlers/           # HTTP 处理器
+│   │   ├── middleware/         # 中间件
+│   │   ├── models/             # 数据模型
+│   │   ├── repository/         # 数据访问层
+│   │   ├── services/           # 业务逻辑层
+│   │   └── mcp/                # MCP 服务
+│   ├── pkg/
+│   │   ├── ai/                 # AI 服务封装
+│   │   └── response/           # 统一响应格式
+│   └── test/                   # 测试文件
+├── frontend/                    # 前端应用
+│   ├── src/
+│   │   ├── api/                # API 请求封装
+│   │   ├── components/         # 组件
+│   │   ├── composables/        # 组合式函数
+│   │   ├── layouts/            # 布局
+│   │   ├── router/             # 路由配置
+│   │   ├── store/              # 状态管理
+│   │   ├── views/              # 页面视图
+│   │   └── utils/              # 工具函数
+│   └── public/                 # 静态资源
+└── package.json                 # 项目配置
 ```
 
-### 初始化新项目
+## 🚀 快速开始
+
+### 环境要求
+- Go 1.22+
+- Node.js 18.0+
+- pnpm 10.5+
+- MySQL 8.0+
+
+### 安装
 
 ```bash
-# 如果全局安装
-task-manager init
+# 克隆项目
+git clone https://github.com/skindhu/AI-TASK-MANAGER.git
+cd AI-TASK-MANAGER
 
-# 如果本地安装
-npx task-manager-init
+# 安装前端依赖
+cd frontend
+pnpm install
+
+# 安装后端依赖
+cd ../backend
+go mod download
 ```
 
-这将提示您输入项目详细信息，并设置一个具有必要文件和结构的新项目。
+### 配置
 
-### 重要说明
+#### 后端配置
 
-1. 本包使用ES模块。您的package.json应包含`"type": "module"`。
-2. 您需要一个具有适当权限的有效Google API密钥才能使用Gemini Pro 2.5。
+在 `backend` 目录下创建 `.env` 文件或复制 `.env.example`：
 
-## 全局命令快速入门
+```env
+# 服务器配置
+SERVER_PORT=8080
+SERVER_MODE=debug
 
-全局安装软件包后，您可以从任何目录使用这些CLI命令：
+# 数据库配置
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=ai_task_manager
+
+# AI 服务配置 (可选)
+AI_PROVIDER=qwen  # 或 gemini
+QWEN_API_KEY=your_qwen_api_key
+QWEN_MODEL=qwen-plus
+QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+
+# 或 Gemini 配置
+# GOOGLE_API_KEY=your_google_api_key
+# GEMINI_MODEL=gemini-2.5-pro
+```
+
+#### 数据库初始化
+
+```sql
+CREATE DATABASE ai_task_manager CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### 启动服务
+
+#### 开发模式
 
 ```bash
-# 初始化新项目
-task-manager init
+# 方式一：使用根目录脚本
+# 启动前端（开发模式）
+npm run dev
 
-# 从PRD解析并生成任务 (AI将自动决定任务数量)
-task-manager parse-prd your-prd.txt
+# 启动后端（新开终端）
+npm run dev:backend
 
-# 从PRD解析并生成指定数量的任务
-task-manager parse-prd your-prd.txt --num-tasks=10
+# 方式二：分别启动
+# 前端
+cd frontend
+pnpm dev
 
-# 从PRD解析并生成任务，同时参考业务知识库
-task-manager parse-prd your-prd.txt -k docs/
-
-# 列出所有任务
-task-manager list
-
-# 显示下一个要处理的任务
-task-manager next
-
-# 生成任务文件
-task-manager generate
-
-# 启动Web界面进行任务管理
-task-manager server
+# 后端
+cd backend
+go run ./cmd/server
 ```
 
-## 任务结构
-
-tasks.json中的任务具有以下结构：
-
-- `id`: 任务的唯一标识符 (例如: `1`)
-- `title`: 任务的简短描述性标题 (例如: `"Initialize Repo"`)
-- `titleTrans`: 任务标题的中文翻译 (例如: `"初始化仓库"`) (当设置USE_CHINESE时生成)
-- `description`: 任务内容的简明描述 (例如: `"Create a new repository, set up initial structure."`)
-- `descriptionTrans`: 任务描述的中文翻译 (例如: `"创建新仓库，设置初始结构。"`) (当设置USE_CHINESE时生成)
-- `status`: 任务的当前状态 (例如: `"pending"`, `"done"`, `"deferred"`)
-- `dependencies`: 必须在此任务之前完成的任务的ID (例如: `[1, 2]`)
-  - 依赖项显示带有状态指示器 (✅ 表示已完成, ⏱️ 表示待处理)
-  - 这有助于快速识别哪些先决任务正在阻止工作
-- `priority`: 任务的重要性级别 (例如: `"high"`, `"medium"`, `"low"`)
-- `details`: 深入的实现说明 (例如: `"Use GitHub client ID/secret, handle callback, set session token."`)
-- `detailsTrans`: 实现细节的中文翻译 (当设置USE_CHINESE时生成)
-- `testStrategy`: 验证方法 (例如: `"Deploy and call endpoint to confirm 'Hello World' response."`)
-- `testStrategyTrans`: 测试策略的中文翻译 (当设置USE_CHINESE时生成)
-- `subtasks`: 构成主任务的更小、更具体的任务列表 (例如: `[{"id": 1, "title": "Configure OAuth", ...}]`)
-
-## 智能任务拆分
-
-Task Master 现在支持基于复杂度的智能任务拆分：
+#### 生产构建
 
 ```bash
-# 从PRD生成任务（AI自动决定最合适的任务数量）
-task-manager parse-prd your-prd.txt
+# 构建前端
+cd frontend
+pnpm build
 
-# 将任务拆分为子任务（AI自动决定最合适的子任务数量）
-task-manager expand --id=3
+# 构建后端
+cd backend
+go build -o bin/server ./cmd/server
 
-# 也可以手动指定数量
-task-manager parse-prd your-prd.txt --num-tasks=15
-task-manager expand --id=3 --num=5
+# 启动后端服务
+./bin/server
 ```
 
-智能拆分的优势：
-- AI根据PRD和任务复杂度自行决定最合理的拆分粒度
-- 不同复杂度的任务可以有不同数量的子任务
-- 减少了人工决策负担，让拆分更符合实际需求
-- 当系统不指定数量时，AI会根据内容深度分析并提供最佳拆分方案
+### 访问应用
 
-## 业务知识集成
+- 前端：http://localhost:5173
+- 后端 API：http://localhost:8080/api
+- 健康检查：http://localhost:8080/health
 
-Task Master现在支持在任务生成过程中引入业务知识库：
+## 🔌 API 接口
 
-```bash
-# 使用知识库目录解析PRD
-task-manager parse-prd your-prd.txt -k docs/
+### 需求管理
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/requirements | 获取需求列表 |
+| GET | /api/requirements/:id | 获取需求详情 |
+| POST | /api/requirements | 创建需求 |
+| POST | /api/requirements/:id/update | 更新需求 |
+| POST | /api/requirements/:id/delete | 删除需求 |
+| POST | /api/requirements/:id/split-tasks | AI 拆分任务 |
+| GET | /api/requirements/:id/structure | 获取需求结构 |
 
-# 使用特定知识文件解析PRD
-task-manager parse-prd your-prd.txt -k docs/domain_knowledge.md
+### 任务管理
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/tasks | 获取任务列表 |
+| GET | /api/tasks/:id | 获取任务详情 |
+| POST | /api/tasks | 创建任务 |
+| POST | /api/tasks/:id/update | 更新任务 |
+| POST | /api/tasks/:id/delete | 删除任务 |
+| POST | /api/tasks/:id/expand | AI 展开子任务 |
+| GET | /api/tasks/ready | 获取可执行任务 |
+| POST | /api/tasks/:id/score | 任务质量评分 |
 
-# 生成子任务时使用知识库(如果parse-prd时已使用知识库，则无需再次指定)
-task-manager expand --id=3 -k docs/
-```
+### 子任务管理
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /api/tasks/:id/subtasks/:subtaskId/update | 更新子任务 |
+| POST | /api/tasks/:id/subtasks/:subtaskId/delete | 删除子任务 |
+| POST | /api/tasks/:id/subtasks/reorder | 重排子任务 |
 
-业务知识集成的优势：
-- 任务拆分更贴合业务实际需求
-- 提高任务描述的准确性和相关性
-- 减少AI对业务理解不足导致的错误
-- 知识库一旦在PRD解析时引入，会自动用于后续的子任务拆分
+### 成员管理
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/members | 获取成员列表 |
+| POST | /api/members | 创建成员 |
+| POST | /api/members/:id/update | 更新成员 |
+| GET | /api/members/:id/workload | 工作负载 |
 
-## 中英双语支持
+### MCP 工具
 
-设置`USE_CHINESE=true`环境变量后，系统会同时生成英文指令和中文描述：
+系统提供以下 MCP 工具供 AI 编辑器调用：
 
-- 英文字段用于AI执行，确保指令执行质量
-- 中文字段用于人工查看，提高理解效率
-- Web界面默认显示中文字段（如果存在）
+| 工具 | 说明 |
+|------|------|
+| list_tasks | 列出任务 |
+| show_task | 显示任务详情 |
+| set_task_status | 设置任务状态 |
+| expand_task | 展开任务为子任务 |
+| next_task | 获取下一个待办任务 |
+| add_task | 添加新任务 |
+| update_task | 更新任务信息 |
+| get_task_with_comments | 获取任务及评论 |
+| validate_dependencies | 验证依赖关系 |
+| get_ready_tasks | 获取可执行任务 |
+| search_requirements | 搜索需求 |
+| get_requirement_tasks | 获取需求下的任务 |
 
-中文字段包括：
-- `titleTrans`: 任务标题的中文翻译
-- `descriptionTrans`: 任务描述的中文翻译
-- `detailsTrans`: 实现细节的中文翻译
-- `testStrategyTrans`: 测试策略的中文翻译
+### Cursor MCP 配置
 
-## Web界面
+在 Cursor 设置中添加以下配置：
 
-Task Master包含内置的Web界面，用于任务可视化和管理。
-
-### 启动Web服务器
-
-```bash
-# 在默认端口(3002)上启动Web服务器
-task-manager server
-
-# 使用自定义端口
-task-manager server --port=4000
-
-# 指定替代tasks.json文件
-task-manager server --file=custom-tasks.json
-
-# 启动并显示调试路径信息
-task-manager server --debug-paths
-```
-
-### Web界面功能
-
-- **任务列表视图**: 浏览所有任务，可按状态筛选
-- **任务详情视图**: 查看每个任务的综合信息
-- **子任务管理**: 查看和交互子任务
-- **状态更新**: 直接从Web界面更改任务状态
-- **本地化支持**: 通过locale参数在英文和中文内容之间切换
-- **API访问**: 通过RESTful端点以编程方式访问任务数据
-
-### API端点
-
-Web服务器提供以下RESTful API端点：
-
-- **GET /api/tasks**: 获取所有任务及其子任务
-  ```bash
-  # 使用默认语言(中文)获取任务
-  curl http://localhost:3002/api/tasks
-
-  # 以英文获取任务
-  curl http://localhost:3002/api/tasks?locale=en
-  ```
-
-- **GET /api/tasks/:taskId**: 通过ID获取特定任务
-  ```bash
-  # 以英文获取ID为1的任务
-  curl http://localhost:3002/api/tasks/1?locale=en
-  ```
-
-- **PUT /api/tasks/:taskId**: 更新任务属性
-  ```bash
-  # 更新任务状态
-  curl -X PUT http://localhost:3002/api/tasks/1 -H "Content-Type: application/json" -d '{"status":"done"}'
-  ```
-
-- **PUT /api/tasks/:taskId/subtasks/:subtaskId**: 更新子任务属性
-  ```bash
-  # 更新子任务状态
-  curl -X PUT http://localhost:3002/api/tasks/1/subtasks/2 -H "Content-Type: application/json" -d '{"status":"done"}'
-  ```
-
-## 与Cursor AI集成
-
-Task Master专为与[Cursor AI](https://www.cursor.so/)无缝协作而设计，为AI驱动的开发提供结构化工作流。
-
-### 使用Cursor设置
-
-1. 初始化项目后，在Cursor中打开它
-2. `.cursor/rules/dev_workflow.mdc`文件被Cursor自动加载，向AI提供有关任务管理系统的知识
-3. 将PRD文档放在`scripts/`目录中(例如，`scripts/prd.txt`)
-4. 打开Cursor的AI聊天并切换到Agent模式
-
-### 在Cursor中设置MCP
-
-要使用模型控制协议(MCP)直接在Cursor中启用增强的任务管理功能：
-
-1. 转到Cursor设置
-2. 导航到MCP部分
-3. 点击"添加新MCP服务器"
-4. 使用以下详细信息进行配置：
-
-**使用千问 (推荐):**
 ```json
 {
-	"mcpServers": {
-		"ai-task-manager": {
-			"command": "npx",
-			"args": ["-y", "--package=ai-task-manager", "task-manager-mcp-server"],
-			"env": {
-				"QWEN_API_KEY": "YOUR_QWEN_API_KEY_HERE",
-				"QWEN_MODEL": "qwen-plus"
-			}
-		}
-	}
+  "mcpServers": {
+    "ai-task-manager": {
+      "command": "node",
+      "args": ["/path/to/backend/cmd/mcp-server/main.go"],
+      "env": {
+        "QWEN_API_KEY": "your_api_key"
+      }
+    }
+  }
 }
 ```
 
-**使用 Gemini:**
-```json
-{
-	"mcpServers": {
-		"ai-task-manager": {
-			"command": "npx",
-			"args": ["-y", "--package=ai-task-manager", "task-manager-mcp-server"],
-			"env": {
-				"GOOGLE_API_KEY": "YOUR_GEMINI_API_KEY_HERE",
-				"GEMINI_BASE_URL": "可选，GEMINI的代理"
-			}
-		}
-	}
-}
+## 📊 数据模型
+
+### 核心实体关系
+
 ```
-5. 保存设置
+Requirement (需求)
+    └── Task (任务)
+            ├── Subtask (子任务)
+            ├── Assignment (分配)
+            ├── Comment (评论)
+            └── Dependency (依赖)
+```
 
-配置完成后，您可以直接通过Cursor的界面与Task Master的任务管理命令交互，提供更集成的体验。
+### 主要模型
 
-### 调试 MCP 服务器
+#### Task (任务)
+- `id` - 主键
+- `requirement_id` - 所属需求
+- `title` - 标题
+- `description` - 描述
+- `status` - 状态 (pending/in_progress/done/cancelled)
+- `priority` - 优先级 (high/medium/low)
+- `category` - 分类 (frontend/backend)
+- `details` - 详情
+- `acceptance_criteria` - 验收标准
+- `module` - 模块归属
 
-如果需要调试 MCP 服务器，可以使用官方提供的 MCP Inspector 工具：
+#### Subtask (子任务)
+- `id` - 主键
+- `task_id` - 所属任务
+- `title` - 标题
+- `description` - 描述
+- `status` - 状态
+- `code_interface` - 代码接口定义 (JSON)
+- `acceptance_criteria` - 验收标准
+- `related_files` - 关联文件
+- `code_hints` - 代码提示
 
+## 📸 界面预览
+
+### 需求列表
+需求管理界面支持创建、编辑、删除需求，查看需求状态和任务统计。
+
+### 任务看板
+看板视图展示任务的不同状态，支持拖拽操作。
+
+### 任务详情
+任务详情页展示任务信息、子任务列表、评论、分配情况等。
+
+### 依赖关系图
+可视化展示任务之间的依赖关系。
+
+## 🧪 测试
+
+### 后端测试
 ```bash
-# 在项目目录下运行
-cd /path/to/AI-TASK-MANAGER
-npx @modelcontextprotocol/inspector node mcp-server/server.js
+cd backend
+go test ./... -v
 ```
 
-这会启动一个 Web 界面（默认端口 5173），你可以在那里：
-- 查看所有可用的 tools、resources、prompts
-- 测试调用每个 tool
-- 查看请求/响应的 JSON-RPC 消息
-
-如果 5173 端口被占用，可以指定其他端口：
-
+### 前端测试
 ```bash
-npx @modelcontextprotocol/inspector --port 3000 node mcp-server/server.js
+cd frontend
+pnpm test
 ```
 
-### 初始任务生成
+## 📝 开发规范
 
-在Cursor的AI聊天中，指示代理从您的PRD生成任务：
+### Go 代码规范
+- 使用 `gofmt` 格式化代码
+- 遵循 Effective Go 指南
+- 使用 `any` 代替 `interface{}`
+- 使用 `:=` 短变量声明
 
-```
-请使用task-manager parse-prd命令从我的PRD生成任务。PRD位于scripts/prd.txt。
-```
+### 前端代码规范
+- 使用 ESLint + Prettier 代码格式
+- TypeScript 严格模式
+- 组件使用 Composition API
+- 使用 ESLint 进行代码检查
 
-代理将执行：
-
+### 提交规范
 ```bash
-task-manager parse-prd scripts/prd.txt
+feat: 新功能
+fix: 修复 bug
+docs: 文档更新
+style: 代码格式调整
+refactor: 重构代码
+test: 测试相关
+chore: 构建/工具链相关
 ```
 
-或者，如果您想要利用业务知识库：
+## 🔧 配置说明
 
-```bash
-task-manager parse-prd scripts/prd.txt -k docs/
-```
+### 环境变量
 
-这将：
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| SERVER_PORT | 服务端口 | 8080 |
+| SERVER_MODE | 运行模式 (debug/release) | debug |
+| DB_HOST | 数据库主机 | localhost |
+| DB_PORT | 数据库端口 | 3306 |
+| DB_USER | 数据库用户 | root |
+| DB_PASSWORD | 数据库密码 | - |
+| DB_NAME | 数据库名 | ai_task_manager |
+| AI_PROVIDER | AI 提供商 (qwen/gemini) | qwen |
+| QWEN_API_KEY | 千问 API Key | - |
+| QWEN_MODEL | 千问模型 | qwen-plus |
+| MAX_TOKENS | 最大 Token 数 | 8192 |
+| TEMPERATURE | 模型温度 | 0.7 |
 
-- 解析您的PRD文档
-- 生成具有任务、依赖项、优先级和测试策略的结构化`tasks.json`文件
-- 由于Cursor规则，代理将理解此过程
+## 🤝 参与贡献
 
-## AI驱动的开发工作流
+欢迎提交 Issue 和 Pull Request！
 
-通过Cursor代理预配置（通过规则文件），可以遵循以下工作流程：
+1. Fork 本项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建 Pull Request
 
-### 1. 任务发现和选择
+## 📄 开源协议
 
-询问代理可用的任务：
+本项目采用 MIT 协议开源 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
-```
-有哪些任务可以进行处理？
-```
+## 👥 作者
 
-代理将：
+- **skindhu** - [GitHub](https://github.com/skindhu)
 
-- 运行`task-manager list`查看所有任务
-- 运行`task-manager next`确定下一个要处理的任务
-- 分析依赖关系，确定哪些任务已准备好进行处理
-- 基于优先级和ID顺序对任务进行优先排序
-- 建议下一个要实现的任务
+## 🙏 致谢
 
-### 2. 任务实现
+本项目基于以下开源项目构建：
 
-在实现任务时，代理将：
+- [Gin](https://github.com/gin-gonic/gin)
+- [GORM](https://github.com/go-gorm/gorm)
+- [Vue.js](https://github.com/vuejs/core)
+- [Naive UI](https://github.com/tusen-ai/naive-ui)
+- [Soybean Admin](https://github.com/soybeanjs/soybean-admin)
+- [MCP Go](https://github.com/mark3labs/mcp-go)
 
-- 参考任务的详细信息部分了解实现细节
-- 考虑对先前任务的依赖关系
-- 遵循项目的编码标准
-- 基于任务的testStrategy创建适当的测试
+## 📮 联系方式
 
-您可以询问：
+如有问题或建议，请通过以下方式联系：
 
-```
-让我们实现任务3。它涉及什么？
-```
+- GitHub Issues: [提交问题](https://github.com/skindhu/AI-TASK-MANAGER/issues)
+- Email: [发送邮件](mailto:your-email@example.com)
 
-### 3. 任务验证
+---
 
-在将任务标记为完成之前，根据以下内容进行验证：
-
-- 任务指定的testStrategy
-- 代码库中的任何自动测试
-- 必要时进行手动验证
-
-### 4. 任务完成
-
-当任务完成时，告诉代理：
-
-```
-任务3现在已完成。请更新其状态。
-```
-
-代理将执行：
-
-```bash
-task-manager set-status --id=3 --status=done
-```
-
-### 5. 处理实现偏差
-
-如果在实现过程中，您发现：
-
-- 当前方法与计划的有显著不同
-- 由于当前实现选择，未来任务需要修改
-- 出现了新的依赖项或需求
-
-告诉代理：
-
-```
-我们改变了方法。我们现在使用Express而不是Fastify。请更新所有未来任务以反映这一变化。
-```
-
-代理将执行：
-
-```bash
-task-manager update --from=4 --prompt="现在我们使用Express而不是Fastify。"
-```
-
-这将重写或重新调整tasks.json中的后续任务，同时保留已完成的工作。
-
-### 6. 分解复杂任务
-
-对于需要更细粒度的复杂任务：
-
-```
-任务5看起来很复杂。能将它分解为子任务吗？
-```
-
-代理将执行：
-
-```bash
-task-manager expand --id=5 --num=3
-```
-
-您可以提供额外的上下文：
-
-```
-请分解任务5，重点关注安全考虑因素。
-```
-
-代理将执行：
-
-```bash
-task-manager expand --id=5 --prompt="重点关注安全方面"
-```
-
-您还可以展开所有待处理的任务：
-
-```
-请将所有待处理的任务分解为子任务。
-```
-
-代理将执行：
-
-```bash
-task-manager expand --all
-```
-
-对于使用Perplexity AI的研究支持的子任务生成：
-
-```
-请使用研究支持的生成方式分解任务5。
-```
-
-代理将执行：
-
-```bash
-task-manager expand --id=5 --research
-```
-
-## 命令参考
-
-以下是所有可用命令的综合参考：
-
-### 解析PRD
-
-```bash
-# 解析PRD文件并生成任务
-task-manager parse-prd <prd-file.txt>
-
-# 限制生成的任务数量
-task-manager parse-prd <prd-file.txt> --num-tasks=10
-
-# 使用业务知识库解析PRD
-task-manager parse-prd <prd-file.txt> -k docs/
-
-# 使用特定知识文件解析PRD
-task-manager parse-prd <prd-file.txt> -k docs/domain_knowledge.md
-```
-
-### 列出任务
-
-```bash
-# 列出所有任务
-task-manager list
-
-# 列出具有特定状态的任务
-task-manager list --status=<status>
-
-# 列出带有子任务的任务
-task-manager list --with-subtasks
-
-# 列出具有特定状态并包含子任务的任务
-task-manager list --status=<status> --with-subtasks
-```
-
-### 显示下一个任务
-
-```bash
-# 根据依赖关系和状态显示下一个要处理的任务
-task-manager next
-```
-
-### 显示特定任务
-
-```bash
-# 显示特定任务的详细信息
-task-manager show <id>
-# 或
-task-manager show --id=<id>
-
-# 查看特定子任务（例如，任务1的子任务2）
-task-manager show 1.2
-```
-
-### 更新任务
-
-```bash
-# 从特定ID更新任务并提供上下文
-task-manager update --from=<id> --prompt="<prompt>"
-```
-
-### 生成任务文件
-
-```bash
-# 从tasks.json生成单独的任务文件
-task-manager generate
-```
-
-### 设置任务状态
-
-```bash
-# 设置单个任务的状态
-task-manager set-status --id=<id> --status=<status>
-
-# 设置多个任务的状态
-task-manager set-status --id=1,2,3 --status=<status>
-
-# 设置子任务的状态
-task-manager set-status --id=1.1,1.2 --status=<status>
-```
-
-当将任务标记为"done"时，其所有子任务也将自动标记为"done"。
-
-### 展开任务
-
-```bash
-# 使用子任务展开特定任务
-task-manager expand --id=<id> --num=<number>
-
-# 使用额外上下文展开
-task-manager expand --id=<id> --prompt="<context>"
-
-# 展开所有待处理的任务
-task-manager expand --all
-
-# 强制为已有子任务的任务重新生成子任务
-task-manager expand --all --force
-
-# 为特定任务进行研究支持的子任务生成
-task-manager expand --id=<id> --research
-
-# 为所有任务进行研究支持的生成
-task-manager expand --all --research
-```
-
-### 清除子任务
-
-```bash
-# 清除特定任务的子任务
-task-manager clear-subtasks --id=<id>
-
-# 清除多个任务的子任务
-task-manager clear-subtasks --id=1,2,3
-
-# 清除所有任务的子任务
-task-manager clear-subtasks --all
-```
-
-### 分析任务复杂度
-
-```bash
-# 分析所有任务的复杂度
-task-manager analyze-complexity
-
-# 将报告保存到自定义位置
-task-manager analyze-complexity --output=my-report.json
-
-# 使用特定的LLM模型
-task-manager analyze-complexity --model=claude-3-opus-20240229
-
-# 设置自定义复杂度阈值（1-10）
-task-manager analyze-complexity --threshold=6
-
-# 使用替代的任务文件
-task-manager analyze-complexity --file=custom-tasks.json
-
-# 使用Perplexity AI进行研究支持的复杂度分析
-task-manager analyze-complexity --research
-```
-
-### 查看复杂度报告
-
-```bash
-# 显示任务复杂度分析报告
-task-manager complexity-report
-
-# 查看自定义位置的报告
-task-manager complexity-report --file=my-report.json
-```
-
-### 管理任务依赖
-
-```bash
-# 向任务添加依赖
-task-manager add-dependency --id=<id> --depends-on=<id>
-
-# 从任务中移除依赖
-task-manager remove-dependency --id=<id> --depends-on=<id>
-
-# 验证依赖而不修复它们
-task-manager validate-dependencies
-
-# 自动查找并修复无效的依赖
-task-manager fix-dependencies
-```
-
-### 添加新任务
-
-```bash
-# 使用AI辅助添加新任务
-task-manager add-task --prompt="<task description>"
-
-# 添加带有依赖和优先级的任务
-task-manager add-task --prompt="<task description>" --dependencies=1,2 --priority=high
-```
-
-### 服务器命令
-
-```bash
-# 启动任务可视化和管理的Web服务器
-task-manager server
-
-# 使用自定义端口（默认为3002）
-task-manager server --port=4000
-
-# 指定替代的tasks.json文件
-task-manager server --file=custom-tasks.json
-
-# 调试服务器路径解析问题
-task-manager server --debug-paths
-```
-
-## 变更日志
-
-### 最新增强功能
-
-- **模型升级**: 从Claude切换到Gemini 2.5 Pro，提供免费稳定的API访问
-- **知识库集成**: 在任务拆分时融入业务知识背景
-- **中英双语支持**: 同时生成任务的英文指令和中文描述
-- **Web管理界面**: 增加task-manager server命令启动可视化任务管理系统
-- **路由优化**: 修复路由优先级以确保正确处理API端点
-- **API错误处理**: 为API端点添加专用404响应
-- **静态文件解析**: 增强路径检测以可靠地提供静态资产
-- **执行权限处理**: CLI运行器自动设置适当的执行权限
-- **路径调试**: 调试模式帮助排查部署问题
-
-## 若希望了解更多AI探索相关的内容，可关注作者公众号
-<img src="https://wechat-account-1251781786.cos.ap-guangzhou.myqcloud.com/wechat_account.jpeg" width="30%">
+如果这个项目对你有帮助，请给一个 ⭐️ Star 支持！

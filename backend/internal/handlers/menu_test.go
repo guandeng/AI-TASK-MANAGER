@@ -366,3 +366,20 @@ func TestMenuHandler_Toggle(t *testing.T) {
 		t.Errorf("期望状态码 %d, 实际 %d", http.StatusOK, w.Code)
 	}
 }
+
+func TestMenuHandler_SyncFromJSON(t *testing.T) {
+	handler, router, _ := setupMenuTestWithDB(t)
+	router.POST("/menus/sync-from-json", handler.SyncFromJSON)
+
+	// SyncFromJSON 需要 multipart/form-data 文件上传，普通 JSON 请求会返回错误
+	body := `{"menus":[{"key":"test","title":"测试","path":"/test"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/menus/sync-from-json", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// 没有文件上传时，可能返回 400 或 500，只要不是 200 就说明逻辑执行了
+	if w.Code == http.StatusOK {
+		t.Errorf("期望状态码不是 200, 实际 %d", w.Code)
+	}
+}

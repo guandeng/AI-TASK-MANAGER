@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ai-task-manager/backend/internal/config"
 	"github.com/ai-task-manager/backend/internal/database"
@@ -129,6 +130,7 @@ func (s *Server) registerTools() {
 		mcp.WithDescription("获取指定需求下的所有任务，如果提供ID则直接查询，如果提供名称则搜索匹配的需求"),
 		mcp.WithNumber("requirement_id", mcp.Description("需求ID（可选）")),
 		mcp.WithString("requirement_name", mcp.Description("需求名称/关键字（可选）")),
+		mcp.WithString("format", mcp.Description("输出格式：json 或 markdown，默认 json")),
 	), s.handleGetRequirementTasks)
 }
 
@@ -493,6 +495,7 @@ func (s *Server) handleSearchRequirements(ctx context.Context, request mcp.CallT
 func (s *Server) handleGetRequirementTasks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	requirementID := request.GetInt("requirement_id", 0)
 	requirementName := request.GetString("requirement_name", "")
+	format := request.GetString("format", "json")
 
 	// 如果没有提供任何参数
 	if requirementID == 0 && requirementName == "" {
@@ -515,7 +518,7 @@ func (s *Server) handleGetRequirementTasks(ctx context.Context, request mcp.Call
 		if len(requirements) > 1 {
 			result := fmt.Sprintf("找到 %d 个匹配的需求，请确认选择哪个：\n", len(requirements))
 			for _, req := range requirements {
-				result += fmt.Sprintf("  - [ID: %d] %s (状态: %s)\n", req.ID, req.Title, req.Status)
+				result += fmt.Sprintf("  - [ID: %d] %s (状态：%s)\n", req.ID, req.Title, req.Status)
 			}
 			return mcp.NewToolResultText(result), nil
 		}
@@ -539,7 +542,12 @@ func (s *Server) handleGetRequirementTasks(ctx context.Context, request mcp.Call
 		return nil, err
 	}
 
-	// 构建结构化结果
+	// 根据 format 参数决定输出格式
+	if format == "markdown" {
+		return s.buildRequirementTasksMarkdown(&requirement, tasks), nil
+	}
+
+	// 默认 JSON 格式
 	result := make([]map[string]any, 0, len(tasks))
 	for _, task := range tasks {
 		taskData := map[string]any{
@@ -582,10 +590,112 @@ func (s *Server) handleGetRequirementTasks(ctx context.Context, request mcp.Call
 		result = append(result, taskData)
 	}
 
-	// 返回 JSON 格式
 	jsonData, err := json.Marshal(result)
 	if err != nil {
 		return nil, err
 	}
 	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+// buildRequirementTasksMarkdown 构建 Markdown 格式的输出
+func (s *Server) buildRequirementTasksMarkdown(requirement *models.Requirement, tasks []models.Task) *mcp.CallToolResult {
+	var result strings.Builder
+
+	result.WriteString(fmt.Sprintf("# %s [ID: %d]\n\n", requirement.Title, requirement.ID))
+	result.WriteString(fmt.Sprintf("**状态**: %s\n\n", requirement.Status))
+	result.WriteString(fmt.Sprintf("**任务总数**: %d\n\n", len(tasks)))
+
+	for i, task := range tasks {
+		// 任务标题（带序号）
+		result.WriteString(fmt.Sprintf("## %d. %s [ID: %d]\n\n", i+1, task.Title, task.ID))
+
+		// 任务基本信息
+		result.WriteString("| 属性 | 值 |\n")
+		result.WriteString("|------|-----|\n")
+		result.WriteString(fmt.Sprintf("| 状态 | %s |\n", task.Status))
+		result.WriteString(fmt.Sprintf("| 优先级 | %s |\n", task.Priority))
+		if task.Category != "" {
+			result.WriteString(fmt.Sprintf("| 分类 | %s |\n", task.Category))
+		}
+		if task.Module != nil && *task.Module != "" {
+			result.WriteString(fmt.Sprintf("| 模块 | %s |\n", *task.Module))
+		}
+		result.WriteString("\n")
+
+		// 任务描述
+		if task.Description != "" {
+			result.WriteString("**描述**:\n")
+			result.WriteString(fmt.Sprintf("%s\n\n", task.Description))
+		}
+
+		// 详情
+		if task.Details != "" {
+			result.WriteString("**详情**:\n")
+			result.WriteString(fmt.Sprintf("%s\n\n", task.Details))
+		}
+
+		// 验收标准
+		if task.AcceptanceCriteria != nil && *task.AcceptanceCriteria != "" {
+			result.WriteString("**验收标准**:\n")
+			result.WriteString(fmt.Sprintf("%s\n\n", *task.AcceptanceCriteria))
+		}
+
+		// 输入/输出
+		if task.Input != nil && *task.Input != "" {
+			result.WriteString(fmt.Sprintf("**输入**: %s\n\n", *task.Input))
+		}
+		if task.Output != nil && *task.Output != "" {
+			result.WriteString(fmt.Sprintf("**输出**: %s\n\n", *task.Output))
+		}
+
+		// 风险
+		if task.Risk != nil && *task.Risk != "" {
+			result.WriteString(fmt.Sprintf("**风险**: %s\n\n", *task.Risk))
+		}
+
+		// 测试策略
+		if task.TestStrategy != "" {
+			result.WriteString("**测试策略**:\n")
+			result.WriteString(fmt.Sprintf("%s\n\n", task.TestStrategy))
+		}
+
+		// 子任务列表
+		if len(task.Subtasks) > 0 {
+			result.WriteString("### 子任务\n\n")
+			for j, subtask := range task.Subtasks {
+				result.WriteString(fmt.Sprintf("#### %d.%d %s [ID: %d]\n\n", i+1, j+1, subtask.Title, subtask.ID))
+
+				result.WriteString("| 属性 | 值 |\n")
+				result.WriteString("|------|-----|\n")
+				result.WriteString(fmt.Sprintf("| 状态 | %s |\n", subtask.Status))
+				result.WriteString(fmt.Sprintf("| 优先级 | %s |\n", subtask.Priority))
+				result.WriteString("\n")
+
+				if subtask.Description != "" {
+					result.WriteString(fmt.Sprintf("**描述**: %s\n\n", subtask.Description))
+				}
+				if subtask.Details != "" {
+					result.WriteString(fmt.Sprintf("**详情**: %s\n\n", subtask.Details))
+				}
+				if subtask.CodeInterface != nil && *subtask.CodeInterface != "" {
+					result.WriteString("**代码接口**:\n")
+					result.WriteString(fmt.Sprintf("```json\n%s\n```\n\n", *subtask.CodeInterface))
+				}
+				if subtask.AcceptanceCriteria != nil && *subtask.AcceptanceCriteria != "" {
+					result.WriteString(fmt.Sprintf("**验收标准**: %s\n\n", *subtask.AcceptanceCriteria))
+				}
+				if subtask.RelatedFiles != nil && *subtask.RelatedFiles != "" {
+					result.WriteString(fmt.Sprintf("**关联文件**: %s\n\n", *subtask.RelatedFiles))
+				}
+				if subtask.CodeHints != nil && *subtask.CodeHints != "" {
+					result.WriteString("**代码提示**:\n")
+					result.WriteString(fmt.Sprintf("%s\n\n", *subtask.CodeHints))
+				}
+			}
+		}
+
+		result.WriteString("---\n\n")
+	}
+
+	return mcp.NewToolResultText(result.String())
 }

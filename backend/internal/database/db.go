@@ -104,3 +104,8 @@ func Close() error {
 func GetDB() *gorm.DB {
 	return DB
 }
+
+// SetTestDB 设置测试数据库（用于单元测试）
+func SetTestDB(db *gorm.DB) {
+	DB = db
+}

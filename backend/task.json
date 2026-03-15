@@ -1,0 +1,56 @@
+{
+  "$schema": "./task.schema.json",
+  "version": "1.0.0",
+  "description": "AI Task Manager 配置文件 - 由后台管理界面控制",
+
+  "ai": {
+    "provider": "qwen",
+    "providers": {
+      "qwen": {
+        "enabled": true,
+        "apiKey": "sk-sp-761f792b3df348e1b9d61a378aef7f9f",
+        "model": "qwen3.5-plus",
+        "baseUrl": "https://coding.dashscope.aliyuncs.com/v1"
+      },
+      "gemini": {
+        "enabled": false,
+        "apiKey": "",
+        "model": "gemini-2.5-flash",
+        "baseUrl": ""
+      },
+      "perplexity": {
+        "enabled": false,
+        "apiKey": "",
+        "model": "sonar-pro"
+      }
+    },
+    "parameters": {
+      "maxTokens": 8192,
+      "temperature": 0.7
+    }
+  },
+
+  "general": {
+    "debug": false,
+    "logLevel": "info",
+    "defaultSubtasks": 3,
+    "defaultPriority": "medium",
+    "projectName": "AI Task Manager",
+    "useChinese": true
+  },
+
+  "storage": {
+    "type": "db",
+    "database": {
+      "connection": "mysql",
+      "host": "127.0.0.1",
+      "hostSlave": "127.0.0.1",
+      "port": 3306,
+      "database": "ai_task",
+      "username": "root",
+      "password": "123456",
+      "charset": "utf8mb4",
+      "collation": "utf8mb4_unicode_ci"
+    }
+  }
+}

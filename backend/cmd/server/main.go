@@ -37,11 +37,18 @@ func main() {
 	}
 	defer logger.Sync()
 
-	// 初始化数据库
+	// 初始化数据库（支持环境变量 DB_SKIP_MIGRATE 控制是否跳过自动迁移）
 	if err := database.Init(&cfg.Database, logger); err != nil {
 		logger.Fatal("初始化数据库失败", zap.Error(err))
 	}
 	defer database.Close()
+
+	// 输出数据库迁移状态
+	if os.Getenv("DB_SKIP_MIGRATE") == "true" {
+		logger.Info("已跳过自动迁移（DB_SKIP_MIGRATE=true）")
+	} else {
+		logger.Info("数据库自动迁移已完成")
+	}
 
 	// 初始化默认项目模板
 	templateService := services.NewTemplateService(logger)

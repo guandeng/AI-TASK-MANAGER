@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "ai-task-manager": {
+      "command": "npx",
+      "args": ["-y", "--package=ai-task-manager", "task-manager-mcp-server"],
+      "env": {
+        "AI_PROVIDER": "qwen",
+        "QWEN_API_KEY": "YOUR_QWEN_API_KEY_HERE",
+        "QWEN_MODEL": "qwen-plus",
+        "USE_CHINESE": "true",
+        "DEBUG": "false"
+      }
+    }
+  }
+}

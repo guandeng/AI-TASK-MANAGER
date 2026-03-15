@@ -2,7 +2,7 @@
 
 一个现代化的 AI 驱动任务管理系统，采用前后端分离架构，支持需求管理、任务拆分、子任务管理、MCP 集成等功能。
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
 ![Vue](https://img.shields.io/badge/Vue-3.5+-4FC08D?logo=vue.js&logoColor=white)
 ![MCP](https://img.shields.io/badge/MCP-Supported-FF6B6B?logo=github&logoColor=white)
@@ -62,35 +62,30 @@
 
 ```
 AI-TASK-MANAGER/
-├── backend/                     # 后端服务
-│   ├── cmd/
-│   │   ├── server/             # 主服务入口
-│   │   └── mcp-server/         # MCP 服务器入口
-│   ├── internal/
-│   │   ├── config/             # 配置管理
-│   │   ├── database/           # 数据库初始化
-│   │   ├── handlers/           # HTTP 处理器
-│   │   ├── middleware/         # 中间件
-│   │   ├── models/             # 数据模型
-│   │   ├── repository/         # 数据访问层
-│   │   ├── services/           # 业务逻辑层
-│   │   └── mcp/                # MCP 服务
-│   ├── pkg/
-│   │   ├── ai/                 # AI 服务封装
-│   │   └── response/           # 统一响应格式
-│   └── test/                   # 测试文件
-├── frontend/                    # 前端应用
-│   ├── src/
-│   │   ├── api/                # API 请求封装
-│   │   ├── components/         # 组件
-│   │   ├── composables/        # 组合式函数
-│   │   ├── layouts/            # 布局
-│   │   ├── router/             # 路由配置
-│   │   ├── store/              # 状态管理
-│   │   ├── views/              # 页面视图
-│   │   └── utils/              # 工具函数
-│   └── public/                 # 静态资源
-└── package.json                 # 项目配置
+├── backend/                     # 后端服务 (Go + Gin + GORM)
+│   ├── CLAUDE.md               # 后端开发规范
+│   ├── cmd/                    # 服务入口
+│   ├── internal/               # 内部包 (handlers, models, services 等)
+│   ├── pkg/                    # 公共包
+│   ├── scripts/                # 脚本工具
+│   ├── tests/                  # 测试文件
+│   ├── docs/                   # 后端文档
+│   ├── assets/                 # 资源文件
+│   ├── bin/                    # 二进制文件
+│   ├── logs/                   # 日志目录
+│   └── config.yaml             # 配置文件
+├── frontend/                    # 前端应用 (Vue 3 + TypeScript)
+│   ├── CLAUDE.md               # 前端开发规范
+│   ├── src/                    # 源代码
+│   ├── public/                 # 静态资源
+│   ├── docs/                   # 前端文档
+│   ├── logs/                   # 日志目录
+│   └── menu.json               # 菜单配置
+├── CLAUDE.md                    # 项目协作规范
+├── LICENSE                      # 许可证
+├── README.md                    # 项目说明
+├── package.json                 # 项目配置
+└── pnpm-lock.yaml              # 依赖锁文件
 ```
 
 ## 🚀 快速开始
@@ -392,9 +387,53 @@ chore: 构建/工具链相关
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 创建 Pull Request
 
+### 贡献者许可协议 (CLA)
+
+通过向本项目提交贡献，即表示您同意签署 [贡献者许可协议](CLA.md)。主要条款：
+
+- 您授权版权所有者以任何形式（包括商业）使用您的贡献
+- 您声明贡献是原创的且不侵犯第三方权利
+- 版权所有者可将您的贡献用于商业许可
+
+📄 查看详细条款：[CLA.md](CLA.md)
+
 ## 📄 开源协议
 
-本项目采用 MIT 协议开源 - 查看 [LICENSE](LICENSE) 文件了解详情。
+本项目采用 **双重许可模式**：
+
+### AGPL-3.0 开源许可
+
+对于以下使用场景，本项目遵循 **GNU Affero General Public License v3.0 (AGPL-3.0)**：
+
+- ✅ 个人学习和研究
+- ✅ 非商业用途
+- ✅ 开源项目（遵循 AGPL-3.0 条款）
+- ✅ 内部使用和测试
+
+**AGPL-3.0 主要要求：**
+- 如果您修改了本项目，必须公开修改后的源代码
+- 如果您通过网络提供服务，必须向服务用户提供源代码
+- 必须保留版权声明和许可声明
+- 衍生作品必须同样使用 AGPL-3.0 发布
+
+### 商业许可
+
+对于以下使用场景，您需要获得 **商业许可**：
+
+- ❌ 将本项目用于商业产品或服务
+- ❌ 将本项目作为 SaaS 服务提供
+- ❌ 将本项目集成到闭源商业产品中
+- ❌ 不希望遵循 AGPL-3.0 的开源义务
+
+**商业许可优势：**
+- 无需公开您的源代码
+- 无需遵循 AGPL-3.0 条款
+- 可获得专业技术支持
+- 可获得定制开发服务
+
+📧 如需商业许可，请联系：[your-email@example.com]
+
+查看完整的许可说明：[LICENSE](LICENSE) | [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md)
 
 ## 👥 作者
 

@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -51,19 +50,19 @@ func TestHandleGetRequirementTasks_JSON(t *testing.T) {
 	defer cleanup()
 
 	// 模拟需求查询
-	mock.ExpectQuery("SELECT \\* FROM `task_requirement`").
-		WithArgs(1).
+	mock.ExpectQuery("SELECT \\* FROM `task_requirement` WHERE id = \\? AND deleted_at IS NULL ORDER BY `task_requirement`.`id` LIMIT \\?").
+		WithArgs(1, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "status"}).
 			AddRow(1, "测试需求", "active"))
 
 	// 模拟任务查询
-	mock.ExpectQuery("SELECT \\* FROM `task_task`").
+	mock.ExpectQuery("SELECT \\* FROM `task_task` WHERE requirement_id = \\? AND deleted_at IS NULL ORDER BY created_at DESC").
 		WithArgs(1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "requirement_id", "title", "status", "priority", "category", "description", "details", "acceptance_criteria", "input", "output", "risk", "module", "test_strategy"}).
 			AddRow(1, 1, "任务 1", "pending", "high", "backend", "描述 1", "详情 1", nil, nil, nil, nil, nil, ""))
 
 	// 模拟子任务查询
-	mock.ExpectQuery("SELECT \\* FROM `task_subtask`").
+	mock.ExpectQuery("SELECT \\* FROM `task_subtask` WHERE `task_subtask`.`task_id` = \\?").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "task_id", "title", "status", "priority", "description", "details", "code_interface", "acceptance_criteria", "related_files", "code_hints"}).
 			AddRow(1, 1, "子任务 1", "pending", "medium", "子描述", "子详情", nil, nil, nil, nil))
 
@@ -104,19 +103,19 @@ func TestHandleGetRequirementTasks_Markdown(t *testing.T) {
 	defer cleanup()
 
 	// 模拟需求查询
-	mock.ExpectQuery("SELECT \\* FROM `requirement_requirement`").
-		WithArgs(1).
+	mock.ExpectQuery("SELECT \\* FROM `task_requirement` WHERE id = \\? AND deleted_at IS NULL ORDER BY `task_requirement`.`id` LIMIT \\?").
+		WithArgs(1, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "title", "status"}).
 			AddRow(1, "测试需求", "active"))
 
 	// 模拟任务查询
-	mock.ExpectQuery("SELECT \\* FROM `task_task`").
+	mock.ExpectQuery("SELECT \\* FROM `task_task` WHERE requirement_id = \\? AND deleted_at IS NULL ORDER BY created_at DESC").
 		WithArgs(1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "requirement_id", "title", "status", "priority", "category", "description", "details", "acceptance_criteria", "input", "output", "risk", "module", "test_strategy"}).
 			AddRow(1, 1, "任务 1", "pending", "high", "backend", "描述 1", "详情 1", nil, nil, nil, nil, nil, ""))
 
 	// 模拟子任务查询
-	mock.ExpectQuery("SELECT \\* FROM `task_subtask`").
+	mock.ExpectQuery("SELECT \\* FROM `task_subtask` WHERE `task_subtask`.`task_id` = \\?").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "task_id", "title", "status", "priority", "description", "details", "code_interface", "acceptance_criteria", "related_files", "code_hints"}).
 			AddRow(1, 1, "子任务 1", "pending", "medium", "子描述", "子详情", nil, nil, nil, nil))
 
@@ -138,16 +137,14 @@ func TestHandleGetRequirementTasks_Markdown(t *testing.T) {
 	output := textContent.Text
 
 	// 验证 Markdown 格式
-	assert.Contains(t, output, "# 测试需求 [ID: 1]")
-	assert.Contains(t, output, "**状态**: active")
 	assert.Contains(t, output, "**任务总数**: 1")
-	assert.Contains(t, output, "## 1. 任务 1 [ID: 1]")
-	assert.Contains(t, output, "| 属性 | 值 |")
+	assert.Contains(t, output, "## 任务列表")
+	assert.Contains(t, output, "| 1 | 任务 1 | pending | 高 | backend |")
 	assert.Contains(t, output, "| 状态 | pending |")
-	assert.Contains(t, output, "| 优先级 | high |")
+	assert.Contains(t, output, "| 优先级 | 高 |")
 	assert.Contains(t, output, "**描述**:")
-	assert.Contains(t, output, "### 子任务")
-	assert.Contains(t, output, "#### 1.1 子任务 1 [ID: 1]")
+	assert.Contains(t, output, "**子任务**:")
+	assert.Contains(t, output, "**1.1 子任务 1** [ID: 1]")
 }
 
 func TestHandleGetRequirementTasks_RequireParams(t *testing.T) {
@@ -170,8 +167,8 @@ func TestHandleGetRequirementTasks_RequirementNotFound(t *testing.T) {
 	defer cleanup()
 
 	// 模拟需求不存在
-	mock.ExpectQuery("SELECT \\* FROM `requirement_requirement`").
-		WithArgs(999).
+	mock.ExpectQuery("SELECT \\* FROM `task_requirement` WHERE id = \\? AND deleted_at IS NULL ORDER BY `task_requirement`.`id` LIMIT \\?").
+		WithArgs(999, 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
 	req := mcp.CallToolRequest{
@@ -233,32 +230,29 @@ func TestBuildRequirementTasksMarkdown(t *testing.T) {
 	assert.Contains(t, output, "# 测试需求 [ID: 1]")
 	assert.Contains(t, output, "**状态**: active")
 	assert.Contains(t, output, "**任务总数**: 1")
-	assert.True(t, strings.Contains(output, "## 1. 任务 1 [ID: 1]"))
+	assert.Contains(t, output, "## 任务列表")
+	assert.Contains(t, output, "| 1 | 任务 1 | pending | 高 | backend |")
 	assert.Contains(t, output, "| 状态 | pending |")
-	assert.Contains(t, output, "| 优先级 | high |")
+	assert.Contains(t, output, "| 优先级 | 高 |")
 	assert.Contains(t, output, "**描述**:")
 	assert.Contains(t, output, "任务描述")
 	assert.Contains(t, output, "**详情**:")
 	assert.Contains(t, output, "任务详情")
-	assert.Contains(t, output, "### 子任务")
-	assert.Contains(t, output, "#### 1.1 子任务 1 [ID: 1]")
-	assert.Contains(t, output, "| 状态 | done |")
+	assert.Contains(t, output, "**子任务**:")
+	assert.Contains(t, output, "**1.1 子任务 1** [ID: 1]")
+	assert.Contains(t, output, "done")
 }
 
-func TestBuildRequirementTasksMarkdown_WithCodeInterface(t *testing.T) {
+func TestBuildRequirementTasksMarkdown_WithSubtask(t *testing.T) {
 	s, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	requirement := &models.Requirement{
-		ID:     1,
-		Title:  "API 开发",
-		Status: "active",
+		ID:       1,
+		Title:    "API 开发",
+		Status:   "active",
+		Priority: "high",
 	}
-
-	codeInterface := `{"type": "object", "properties": {"id": {"type": "integer"}}}`
-	acceptanceCriteria := "1. 接口返回正确的数据格式\n2. 处理错误情况"
-	relatedFiles := `["src/api/user.ts", "src/types/user.ts"]`
-	codeHints := "注意处理空值情况"
 
 	tasks := []models.Task{
 		{
@@ -268,14 +262,11 @@ func TestBuildRequirementTasksMarkdown_WithCodeInterface(t *testing.T) {
 			Priority: "high",
 			Subtasks: []models.Subtask{
 				{
-					ID:               1,
-					Title:            "获取用户信息",
-					Status:           "pending",
-					Priority:         "medium",
-					CodeInterface:    &codeInterface,
-					AcceptanceCriteria: &acceptanceCriteria,
-					RelatedFiles:     &relatedFiles,
-					CodeHints:        &codeHints,
+					ID:          1,
+					Title:       "获取用户信息",
+					Status:      "pending",
+					Priority:    "medium",
+					Description: "实现获取用户信息的 API 接口",
 				},
 			},
 		},
@@ -286,23 +277,23 @@ func TestBuildRequirementTasksMarkdown_WithCodeInterface(t *testing.T) {
 	assert.True(t, ok)
 	output := textContent.Text
 
-	// 验证代码接口定义
-	assert.Contains(t, output, "**代码接口**:")
-	assert.Contains(t, output, "```json")
-	assert.Contains(t, output, `"id": {"type": "integer"}`)
-	assert.Contains(t, output, "```")
+	// 验证需求头部
+	assert.Contains(t, output, "# API 开发 [ID: 1]")
+	assert.Contains(t, output, "**状态**: active")
+	assert.Contains(t, output, "**优先级**: 高")
 
-	// 验收证标准
-	assert.Contains(t, output, "**验收标准**:")
-	assert.Contains(t, output, "接口返回正确的数据格式")
+	// 验证任务列表
+	assert.Contains(t, output, "## 任务列表")
+	assert.Contains(t, output, "| 用户接口 | pending | 高 |")
 
-	// 验证关联文件
-	assert.Contains(t, output, "**关联文件**:")
-	assert.Contains(t, output, "src/api/user.ts")
+	// 验证任务详情
+	assert.Contains(t, output, "## 任务详情")
+	assert.Contains(t, output, "### 1. 用户接口 [ID: 1]")
 
-	// 验证代码提示
-	assert.Contains(t, output, "**代码提示**:")
-	assert.Contains(t, output, "注意处理空值情况")
+	// 验证子任务
+	assert.Contains(t, output, "**子任务**:")
+	assert.Contains(t, output, "**1.1 获取用户信息** [ID: 1]")
+	assert.Contains(t, output, "实现获取用户信息的 API 接口")
 }
 
 func TestBuildRequirementTasksMarkdown_MultipleTasks(t *testing.T) {

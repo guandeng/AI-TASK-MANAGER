@@ -132,6 +132,20 @@ func (s *Server) registerTools() {
 		mcp.WithString("requirement_name", mcp.Description("需求名称/关键字（可选）")),
 		mcp.WithString("format", mcp.Description("输出格式：json 或 markdown，默认 json")),
 	), s.handleGetRequirementTasks)
+
+	// set_subtask_status 工具
+	s.server.AddTool(mcp.NewTool("set_subtask_status",
+		mcp.WithDescription("设置子任务状态"),
+		mcp.WithNumber("subtask_id", mcp.Required(), mcp.Description("子任务 ID")),
+		mcp.WithString("status", mcp.Required(), mcp.Description("子任务状态 (pending/in_progress/done/cancelled)")),
+	), s.handleSetSubtaskStatus)
+
+	// set_requirement_status 工具
+	s.server.AddTool(mcp.NewTool("set_requirement_status",
+		mcp.WithDescription("设置需求状态"),
+		mcp.WithNumber("requirement_id", mcp.Required(), mcp.Description("需求 ID")),
+		mcp.WithString("status", mcp.Required(), mcp.Description("需求状态 (draft/active/completed/archived)")),
+	), s.handleSetRequirementStatus)
 }
 
 // 处理函数
@@ -535,7 +549,7 @@ func (s *Server) handleGetRequirementTasks(ctx context.Context, request mcp.Call
 
 	// 获取该需求下的所有任务，预加载子任务
 	var tasks []models.Task
-	if err := s.db.Where("requirement_id = ?", requirementID).
+	if err := s.db.Where("requirement_id = ? AND deleted_at IS NULL", requirementID).
 		Preload("Subtasks").
 		Order("created_at DESC").
 		Find(&tasks).Error; err != nil {
@@ -597,23 +611,56 @@ func (s *Server) handleGetRequirementTasks(ctx context.Context, request mcp.Call
 	return mcp.NewToolResultText(string(jsonData)), nil
 }
 
-// buildRequirementTasksMarkdown 构建 Markdown 格式的输出
+// buildRequirementTasksMarkdown 构建 Markdown 格式的输出（需求 + 任务）
 func (s *Server) buildRequirementTasksMarkdown(requirement *models.Requirement, tasks []models.Task) *mcp.CallToolResult {
 	var result strings.Builder
 
+	// 需求头部
 	result.WriteString(fmt.Sprintf("# %s [ID: %d]\n\n", requirement.Title, requirement.ID))
-	result.WriteString(fmt.Sprintf("**状态**: %s\n\n", requirement.Status))
+	result.WriteString(fmt.Sprintf("**状态**: %s  |  **优先级**: %s\n\n", requirement.Status, priorityToChinese(requirement.Priority)))
+
+	if requirement.Tags != nil && *requirement.Tags != "" {
+		result.WriteString(fmt.Sprintf("**标签**: %s\n\n", *requirement.Tags))
+	}
+	if requirement.Assignee != nil && *requirement.Assignee != "" {
+		result.WriteString(fmt.Sprintf("**负责人**: %s\n\n", *requirement.Assignee))
+	}
+
+	// 需求内容
+	if requirement.Content != "" {
+		result.WriteString("## 需求内容\n\n")
+		result.WriteString(fmt.Sprintf("%s\n\n", requirement.Content))
+	}
+
+	// 任务统计
+	result.WriteString("---\n\n")
 	result.WriteString(fmt.Sprintf("**任务总数**: %d\n\n", len(tasks)))
+
+	// 任务列表概览
+	if len(tasks) > 0 {
+		result.WriteString("## 任务列表\n\n")
+		result.WriteString("| # | 任务 | 状态 | 优先级 | 分类 |\n")
+		result.WriteString("|---|------|------|--------|------|\n")
+		for i, task := range tasks {
+			result.WriteString(fmt.Sprintf("| %d | %s | %s | %s | %s |\n",
+				i+1, task.Title, task.Status, priorityToChinese(task.Priority), task.Category))
+		}
+		result.WriteString("\n")
+	}
+
+	// 任务详情
+	result.WriteString("---\n\n")
+	result.WriteString("## 任务详情\n\n")
 
 	for i, task := range tasks {
 		// 任务标题（带序号）
-		result.WriteString(fmt.Sprintf("## %d. %s [ID: %d]\n\n", i+1, task.Title, task.ID))
+		result.WriteString(fmt.Sprintf("### %d. %s [ID: %d]\n\n", i+1, task.Title, task.ID))
 
 		// 任务基本信息
 		result.WriteString("| 属性 | 值 |\n")
 		result.WriteString("|------|-----|\n")
 		result.WriteString(fmt.Sprintf("| 状态 | %s |\n", task.Status))
-		result.WriteString(fmt.Sprintf("| 优先级 | %s |\n", task.Priority))
+		result.WriteString(fmt.Sprintf("| 优先级 | %s |\n", priorityToChinese(task.Priority)))
 		if task.Category != "" {
 			result.WriteString(fmt.Sprintf("| 分类 | %s |\n", task.Category))
 		}
@@ -661,41 +708,161 @@ func (s *Server) buildRequirementTasksMarkdown(requirement *models.Requirement, 
 
 		// 子任务列表
 		if len(task.Subtasks) > 0 {
-			result.WriteString("### 子任务\n\n")
+			result.WriteString("**子任务**:\n\n")
 			for j, subtask := range task.Subtasks {
-				result.WriteString(fmt.Sprintf("#### %d.%d %s [ID: %d]\n\n", i+1, j+1, subtask.Title, subtask.ID))
-
-				result.WriteString("| 属性 | 值 |\n")
-				result.WriteString("|------|-----|\n")
-				result.WriteString(fmt.Sprintf("| 状态 | %s |\n", subtask.Status))
-				result.WriteString(fmt.Sprintf("| 优先级 | %s |\n", subtask.Priority))
-				result.WriteString("\n")
+				result.WriteString(fmt.Sprintf("- **%d.%d %s** [ID: %d] - %s\n",
+					i+1, j+1, subtask.Title, subtask.ID, subtask.Status))
 
 				if subtask.Description != "" {
-					result.WriteString(fmt.Sprintf("**描述**: %s\n\n", subtask.Description))
-				}
-				if subtask.Details != "" {
-					result.WriteString(fmt.Sprintf("**详情**: %s\n\n", subtask.Details))
-				}
-				if subtask.CodeInterface != nil && *subtask.CodeInterface != "" {
-					result.WriteString("**代码接口**:\n")
-					result.WriteString(fmt.Sprintf("```json\n%s\n```\n\n", *subtask.CodeInterface))
-				}
-				if subtask.AcceptanceCriteria != nil && *subtask.AcceptanceCriteria != "" {
-					result.WriteString(fmt.Sprintf("**验收标准**: %s\n\n", *subtask.AcceptanceCriteria))
-				}
-				if subtask.RelatedFiles != nil && *subtask.RelatedFiles != "" {
-					result.WriteString(fmt.Sprintf("**关联文件**: %s\n\n", *subtask.RelatedFiles))
-				}
-				if subtask.CodeHints != nil && *subtask.CodeHints != "" {
-					result.WriteString("**代码提示**:\n")
-					result.WriteString(fmt.Sprintf("%s\n\n", *subtask.CodeHints))
+					result.WriteString(fmt.Sprintf("  > %s\n", subtask.Description))
 				}
 			}
+			result.WriteString("\n")
 		}
 
 		result.WriteString("---\n\n")
 	}
 
 	return mcp.NewToolResultText(result.String())
+}
+
+// priorityToChinese 将优先级转换为中文
+func priorityToChinese(priority string) string {
+	switch priority {
+	case "high":
+		return "高"
+	case "medium":
+		return "中"
+	case "low":
+		return "低"
+	default:
+		return priority
+	}
+}
+
+// handleGetRequirement 获取需求详情
+func (s *Server) handleGetRequirement(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	requirementID := request.GetInt("requirement_id", 0)
+	if requirementID == 0 {
+		return nil, fmt.Errorf("invalid requirement_id")
+	}
+
+	format := request.GetString("format", "json")
+
+	// 获取需求信息
+	var requirement models.Requirement
+	if err := s.db.Where("id = ? AND deleted_at IS NULL", requirementID).First(&requirement).Error; err != nil {
+		return mcp.NewToolResultText(fmt.Sprintf("需求 [ID: %d] 不存在或已删除", requirementID)), nil
+	}
+
+	// 获取需求下的所有任务
+	var tasks []models.Task
+	if err := s.db.Where("requirement_id = ? AND deleted_at IS NULL", requirementID).Order("created_at ASC").Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+
+	if format == "markdown" {
+		return s.buildRequirementMarkdown(&requirement, tasks), nil
+	}
+
+	// JSON 格式
+	result := map[string]any{
+		"id":        requirement.ID,
+		"title":     requirement.Title,
+		"status":    requirement.Status,
+		"priority":  requirement.Priority,
+		"tags":      requirement.Tags,
+		"assignee":  requirement.Assignee,
+		"content":   requirement.Content,
+		"createdAt": requirement.CreatedAt,
+		"updatedAt": requirement.UpdatedAt,
+		"tasks":     tasks,
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+// buildRequirementMarkdown 构建 Markdown 格式的需求输出
+func (s *Server) buildRequirementMarkdown(requirement *models.Requirement, tasks []models.Task) *mcp.CallToolResult {
+	var result strings.Builder
+
+	result.WriteString(fmt.Sprintf("# %s [ID: %d]\n\n", requirement.Title, requirement.ID))
+	result.WriteString(fmt.Sprintf("**状态**: %s  |  **优先级**: %s\n\n", requirement.Status, requirement.Priority))
+
+	if requirement.Tags != nil && *requirement.Tags != "" {
+		result.WriteString(fmt.Sprintf("**标签**: %s\n\n", *requirement.Tags))
+	}
+	if requirement.Assignee != nil && *requirement.Assignee != "" {
+		result.WriteString(fmt.Sprintf("**负责人**: %s\n\n", *requirement.Assignee))
+	}
+
+	if requirement.Content != "" {
+		result.WriteString("## 需求内容\n\n")
+		result.WriteString(fmt.Sprintf("%s\n\n", requirement.Content))
+	}
+
+	// 任务列表
+	if len(tasks) > 0 {
+		result.WriteString("## 任务列表\n\n")
+		result.WriteString(fmt.Sprintf("| # | 任务 | 状态 | 优先级 | 分类 |\n"))
+		result.WriteString(fmt.Sprintf("|---|------|------|--------|------|\n"))
+		for i, task := range tasks {
+			result.WriteString(fmt.Sprintf("| %d | %s | %s | %s | %s |\n",
+				i+1, task.Title, task.Status, task.Priority, task.Category))
+		}
+		result.WriteString("\n")
+
+		// 任务统计
+		doneCount := 0
+		for _, task := range tasks {
+			if task.Status == "done" {
+				doneCount++
+			}
+		}
+		result.WriteString(fmt.Sprintf("**进度**: %d/%d 完成 (%.1f%%)\n", doneCount, len(tasks), float64(doneCount)/float64(len(tasks))*100))
+	}
+
+	return mcp.NewToolResultText(result.String())
+}
+
+// handleSetSubtaskStatus 设置子任务状态
+func (s *Server) handleSetSubtaskStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	subtaskID := request.GetInt("subtask_id", 0)
+	if subtaskID == 0 {
+		return nil, fmt.Errorf("invalid subtask_id")
+	}
+
+	status, err := request.RequireString("status")
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.db.Model(&models.Subtask{}).Where("id = ?", uint64(subtaskID)).Update("status", status).Error; err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("Subtask %d status updated to %s", subtaskID, status)), nil
+}
+
+// handleSetRequirementStatus 设置需求状态
+func (s *Server) handleSetRequirementStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	requirementID := request.GetInt("requirement_id", 0)
+	if requirementID == 0 {
+		return nil, fmt.Errorf("invalid requirement_id")
+	}
+
+	status, err := request.RequireString("status")
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.db.Model(&models.Requirement{}).Where("id = ?", uint64(requirementID)).Update("status", status).Error; err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("Requirement %d status updated to %s", requirementID, status)), nil
 }

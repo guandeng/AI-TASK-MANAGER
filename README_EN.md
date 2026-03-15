@@ -2,7 +2,7 @@
 
 A modern AI-driven task management system with a separated frontend and backend architecture, supporting requirement management, task breakdown, subtask management, and MCP integration.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)
 ![Vue](https://img.shields.io/badge/Vue-3.5+-4FC08D?logo=vue.js&logoColor=white)
 ![MCP](https://img.shields.io/badge/MCP-Supported-FF6B6B?logo=github&logoColor=white)
@@ -392,9 +392,53 @@ Issues and Pull Requests are welcome!
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+### Contributor License Agreement (CLA)
+
+By contributing to this project, you agree to the [Contributor License Agreement](CLA.md). Key terms:
+
+- You grant the copyright holder permission to use your contribution in any form (including commercial)
+- You represent that your contribution is original and does not infringe third-party rights
+- The copyright holder may use your contribution for commercial licensing
+
+📄 View full terms: [CLA.md](CLA.md)
+
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project uses a **Dual Licensing Model**:
+
+### AGPL-3.0 Open Source License
+
+For the following use cases, this project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**:
+
+- ✅ Personal learning and research
+- ✅ Non-commercial use
+- ✅ Open source projects (complying with AGPL-3.0 terms)
+- ✅ Internal use and testing
+
+**AGPL-3.0 Key Requirements:**
+- If you modify this project, you must release the modified source code
+- If you provide network services, you must provide source code to service users
+- You must retain copyright notices and license declarations
+- Derivative works must also use AGPL-3.0
+
+### Commercial License
+
+For the following use cases, you need to obtain a **Commercial License**:
+
+- ❌ Using this project for commercial products or services
+- ❌ Offering this project as a SaaS service
+- ❌ Integrating this project into proprietary commercial products
+- ❌ Not wanting to comply with AGPL-3.0 open source obligations
+
+**Commercial License Benefits:**
+- No need to release your source code
+- No need to comply with AGPL-3.0 terms
+- Access to professional technical support
+- Access to custom development services
+
+📧 For commercial licensing inquiries, contact: [your-email@example.com]
+
+View full license terms: [LICENSE](LICENSE) | [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md)
 
 ## 👥 Authors
 

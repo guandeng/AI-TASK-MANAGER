@@ -1,0 +1,245 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "task.schema.json",
+  "title": "AI Task Manager Configuration",
+  "description": "配置文件 schema for AI Task Manager",
+  "type": "object",
+  "required": ["version", "ai", "general", "storage"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "配置文件版本号"
+    },
+    "description": {
+      "type": "string",
+      "description": "配置文件描述"
+    },
+    "ai": {
+      "type": "object",
+      "description": "AI 服务配置",
+      "required": ["provider"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["gemini", "qwen", "perplexity"],
+          "default": "qwen",
+          "description": "当前使用的 AI 提供商"
+        },
+        "providers": {
+          "type": "object",
+          "description": "各提供商详细配置",
+          "properties": {
+            "qwen": {
+              "$ref": "#/definitions/qwenProvider"
+            },
+            "gemini": {
+              "$ref": "#/definitions/geminiProvider"
+            },
+            "perplexity": {
+              "$ref": "#/definitions/perplexityProvider"
+            }
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "description": "AI 模型通用参数",
+          "properties": {
+            "maxTokens": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 128000,
+              "default": 8192,
+              "description": "最大输出 token 数"
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2,
+              "default": 0.7,
+              "description": "模型温度参数"
+            }
+          }
+        }
+      }
+    },
+    "general": {
+      "type": "object",
+      "description": "通用配置",
+      "properties": {
+        "debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "调试模式"
+        },
+        "logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "日志级别"
+        },
+        "defaultSubtasks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3,
+          "description": "默认子任务数量"
+        },
+        "defaultPriority": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "default": "medium",
+          "description": "默认任务优先级"
+        },
+        "projectName": {
+          "type": "string",
+          "default": "AI Task Manager",
+          "description": "项目名称"
+        },
+        "useChinese": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否使用中文"
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "description": "存储配置",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["db", "file"],
+          "default": "db",
+          "description": "存储类型"
+        },
+        "database": {
+          "type": "object",
+          "description": "数据库配置（当 type=db 时必填）",
+          "required": ["connection", "host", "port", "database", "username", "password"],
+          "properties": {
+            "connection": {
+              "type": "string",
+              "enum": ["mysql", "postgres", "sqlite"],
+              "default": "mysql",
+              "description": "数据库连接类型"
+            },
+            "host": {
+              "type": "string",
+              "description": "数据库主机地址"
+            },
+            "hostSlave": {
+              "type": "string",
+              "description": "从库主机地址（可选）"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "default": 3306,
+              "description": "数据库端口"
+            },
+            "database": {
+              "type": "string",
+              "description": "数据库名称"
+            },
+            "username": {
+              "type": "string",
+              "description": "数据库用户名"
+            },
+            "password": {
+              "type": "string",
+              "description": "数据库密码"
+            },
+            "charset": {
+              "type": "string",
+              "default": "utf8mb4",
+              "description": "字符集"
+            },
+            "collation": {
+              "type": "string",
+              "default": "utf8mb4_unicode_ci",
+              "description": "排序规则"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "qwenProvider": {
+      "type": "object",
+      "description": "阿里云千问配置",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用"
+        },
+        "apiKey": {
+          "type": "string",
+          "description": "API 密钥"
+        },
+        "model": {
+          "type": "string",
+          "default": "qwen3.5-plus",
+          "description": "模型名称"
+        },
+        "baseUrl": {
+          "type": "string",
+          "default": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+          "description": "API 基础 URL"
+        }
+      }
+    },
+    "geminiProvider": {
+      "type": "object",
+      "description": "Google Gemini 配置",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用"
+        },
+        "apiKey": {
+          "type": "string",
+          "description": "API 密钥"
+        },
+        "model": {
+          "type": "string",
+          "default": "gemini-2.5-flash",
+          "description": "模型名称"
+        },
+        "baseUrl": {
+          "type": "string",
+          "description": "API 代理 URL（可选）"
+        }
+      }
+    },
+    "perplexityProvider": {
+      "type": "object",
+      "description": "Perplexity AI 配置",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用"
+        },
+        "apiKey": {
+          "type": "string",
+          "description": "API 密钥"
+        },
+        "model": {
+          "type": "string",
+          "default": "sonar-pro",
+          "description": "模型名称"
+        }
+      }
+    }
+  }
+}

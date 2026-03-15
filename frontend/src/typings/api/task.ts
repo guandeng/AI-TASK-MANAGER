@@ -1,8 +1,11 @@
-/** 任务状态 */
+/** 任务状�� */
 export type TaskStatus = 'pending' | 'done' | 'deferred' | 'in-progress';
 
 /** 任务优先级 */
 export type TaskPriority = 'high' | 'medium' | 'low';
+
+/** 任务分类 */
+export type TaskCategory = 'frontend' | 'backend' | '';
 
 /** 代码接口定义 */
 export interface CodeInterface {
@@ -34,9 +37,12 @@ export interface Subtask {
   sortOrder: number;
   estimatedHours?: number;
   actualHours?: number;
-  codeInterface?: CodeInterface;
-  acceptanceCriteria?: AcceptanceCriteria[];
-  relatedFiles?: string[];
+  /** 代码接口定义 - 后端返回 JSON 字符串 */
+  codeInterface?: string;
+  /** 验收标准 - 后端返回 JSON 字符串 */
+  acceptanceCriteria?: string;
+  /** 关联文件 - 后端返回 JSON 字符串 */
+  relatedFiles?: string;
   codeHints?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -54,6 +60,9 @@ export interface Task {
   descriptionTrans?: string;
   status: TaskStatus;
   priority: TaskPriority;
+  category: TaskCategory;
+  languageId?: number;
+  languageName?: string;
   dependencies: number[];
   details?: string;
   detailsTrans?: string;
@@ -94,6 +103,8 @@ export interface TaskListParams {
   requirementId?: number;
   status?: TaskStatus;
   priority?: TaskPriority;
+  category?: TaskCategory;
+  languageId?: number;
   assignee?: string;
   keyword?: string;
 }

@@ -86,6 +86,17 @@ export const generatedRoutes: GeneratedRoute[] = [
         }
       },
       {
+        name: 'manage_language',
+        path: '/manage/language',
+        component: 'view.manage_language',
+        meta: {
+          title: 'manage_language',
+          i18nKey: 'route.manage_language',
+          icon: 'mdi:code-braces',
+          order: 3
+        }
+      },
+      {
         name: 'manage_menu',
         path: '/manage/menu',
         component: 'view.manage_menu',

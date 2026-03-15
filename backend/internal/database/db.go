@@ -82,6 +82,7 @@ func autoMigrate() error {
 		&models.Backup{},
 		&models.BackupSchedule{},
 		&models.TaskComplexityReport{},
+		&models.Language{},
 	)
 }
 

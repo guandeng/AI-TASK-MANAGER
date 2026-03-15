@@ -48,7 +48,13 @@ func (s *Service) ExpandTask(task *models.Task) ([]models.Subtask, error) {
 // SplitRequirement 将需求拆分为任务
 // taskType: frontend, backend, fullstack
 func (s *Service) SplitRequirement(requirement *models.Requirement, taskType string) ([]models.Task, error) {
-	prompt := s.buildSplitRequirementPrompt(requirement, taskType)
+	return s.SplitRequirementWithLanguage(requirement, taskType, nil)
+}
+
+// SplitRequirementWithLanguage 将需求拆分为任务（带语言信息）
+// taskType: frontend, backend, fullstack
+func (s *Service) SplitRequirementWithLanguage(requirement *models.Requirement, taskType string, language *models.Language) ([]models.Task, error) {
+	prompt := s.buildSplitRequirementPromptWithLanguage(requirement, taskType, language)
 	response, err := s.Chat(prompt)
 	if err != nil {
 		return nil, err
@@ -254,6 +260,10 @@ func (s *Service) chatGemini(prompt string) (string, error) {
 // buildExpandPrompt 构建任务展开提示词
 func (s *Service) buildExpandPrompt(task *models.Task) string {
 	return fmt.Sprintf(`请将以下任务拆分为 %d 个子任务。每个子任务应该是一个具体的、可执行的步骤。
+
+技术栈说明：
+- 后端：Go 语言，使用 Gin 框架和 GORM
+- API 规范：使用 GET 和 POST 请求，删除操作使用 POST + /delete 路径
 
 任务标题：%s
 任务描述：%s
@@ -483,6 +493,7 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
 - title: 任务标题（简洁明了）
 - description: 任务描述（详细说明要做什么）
 - details: 实现细节（技术方案、注意事项等）
+- testStrategy: 测试策略（如何测试这个任务，包括单元测试、集成测试、边界条件等）
 - priority: 优先级（high/medium/low）
 - dependencies: 依赖的任务索引数组（如 [0, 1] 表示依赖第1和第2个任务）
 
@@ -491,6 +502,7 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
 2. 优先级设置：基础架构和高优先级功能设为 high，核心功能设为 medium，辅助功能设为 low
 3. 合理设置依赖关系，确保任务可以按顺序执行
 4. 每个任务应该足够独立，可以单独开发和测试
+5. 为每个任务提供明确的测试策略，说明如何验证功能正确性
 
 示例格式：
 [
@@ -498,6 +510,7 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
     "title": "任务1标题",
     "description": "任务1描述",
     "details": "实现细节",
+    "testStrategy": "1. 单元测试：测试核心逻辑\n2. 边界测试：检查空值、边界值\n3. 集成测试：验证与其他模块的交互",
     "priority": "high",
     "dependencies": []
   },
@@ -505,6 +518,7 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
     "title": "任务2标题",
     "description": "任务2描述",
     "details": "实现细节",
+    "testStrategy": "1. API测试：验证请求响应格式\n2. 异常测试：模拟错误场景",
     "priority": "medium",
     "dependencies": [0]
   }
@@ -512,6 +526,115 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
 
 请只返回 JSON 数组，不要包含其他内容。`,
 		typeGuidance,
+		requirement.Title,
+		requirement.Content,
+	)
+}
+
+// buildSplitRequirementPromptWithLanguage 构建带语言信息的需求拆分提示词
+func (s *Service) buildSplitRequirementPromptWithLanguage(requirement *models.Requirement, taskType string, language *models.Language) string {
+	// 根据任务类型生成不同的提示
+	var typeGuidance string
+	switch taskType {
+	case "frontend":
+		typeGuidance = `IMPORTANT: 只需要生成前端相关的任务，包括：
+- 前端页面和组件开发
+- 前端路由和状态管理
+- 前端 API 调用和数据展示
+- 前端样式和交互效果
+- 前端表单验证和处理
+
+不要包含后端 API 开发、数据库设计、后端逻辑等后端任务。`
+	case "backend":
+		typeGuidance = `IMPORTANT: 只需要生成后端相关的任务，包括：
+- 后端 API 接口开发
+- 数据库设计和操作
+- 后端业务逻辑实现
+- 后端中间件和服务层
+- 后端数据验证和处理
+
+不要包含前端页面、组件、样式等前端任务。`
+	case "fullstack":
+		typeGuidance = `需要生成前端和后端的完整任务，包括：
+- 前端页面和组件开发
+- 后端 API 接口开发
+- 数据库设计和操作
+- 前后端联调
+- 完整的功能实现`
+	default:
+		typeGuidance = `需要生成后端相关的任务。`
+	}
+
+	// 构建语言/技术栈说明
+	var techStackGuidance string
+	if language != nil {
+		techStackGuidance = fmt.Sprintf(`
+技术栈说明：
+- 语言：%s
+- 框架：%s
+- 描述：%s
+`, language.DisplayName, language.Framework, language.Description)
+		if language.CodeHints != "" {
+			techStackGuidance += fmt.Sprintf(`
+代码提示：%s
+`, language.CodeHints)
+		}
+	} else {
+		techStackGuidance = `
+技术栈说明：
+- 后端：Go 语言，使用 Gin 框架和 GORM
+- API 规范：使用 GET 和 POST 请求，删除操作使用 POST + /delete 路径
+`
+	}
+
+	return fmt.Sprintf(`你是一个AI助手，帮助将产品需求文档（PRD）拆分为开发任务。
+
+请分析以下需求并拆分为合适的开发任务。每个任务应该是一个具体的、可执行的开发单元。
+
+%s
+%s
+需求标题：%s
+需求内容：
+%s
+
+请以 JSON 数组格式返回任务列表，每个任务包含以下字段：
+- title: 任务标题（简洁明了）
+- description: 任务描述（详细说明要做什么）
+- details: 实现细节（技术方案、注意事项等）
+- testStrategy: 测试策略（如何测试这个任务，包括单元测试、集成测试、边界条件等）
+- priority: 优先级（high/medium/low）
+- dependencies: 依赖的任务索引数组（如 [0, 1] 表示依赖第1和第2个任务）
+
+拆分原则：
+1. 按照功能模块拆分，每个任务专注于一个功能点
+2. 优先级设置：基础架构和高优先级功能设为 high，核心功能设为 medium，辅助功能设为 low
+3. 合理设置依赖关系，确保任务可以按顺序执行
+4. 每个任务应该足够独立，可以单独开发和测试
+5. 为每个任务提供明确的测试策略，说明如何验证功能正确性
+
+示例格式：
+[
+  {
+    "title": "任务1标题",
+    "description": "任务1描述",
+    "details": "实现细节",
+    "testStrategy": "1. 单元测试：测试核心逻辑\n2. 边界测试：检查空值、边界值\n3. 集成测试：验证与其他模块的交互",
+    "priority": "high",
+    "dependencies": []
+  },
+  {
+    "title": "任务2标题",
+    "description": "任务2描述",
+    "details": "实现细节",
+    "testStrategy": "1. API测试：验证请求响应格式\n2. 异常测试：模拟错误场景",
+    "priority": "medium",
+    "dependencies": [0]
+  }
+]
+
+请只返回 JSON 数组，不要包含其他内容。`,
+		typeGuidance,
+		techStackGuidance,
 		requirement.Title,
 		requirement.Content,
 	)
@@ -596,6 +719,10 @@ func parseIntOrDefault(s string, defaultVal int) int {
 func (s *Service) buildExpandPromptWithKnowledge(task *models.Task, knowledgeContext string) string {
 	return fmt.Sprintf(`请将以下任务拆分为 %d 个子任务。每个子任务应该是一个具体的、可执行的步骤。
 
+技术栈说明：
+- 后端：Go 语言，使用 Gin 框架和 GORM
+- API 规范：使用 GET 和 POST 请求，删除操作使用 POST + /delete 路径
+
 %s
 
 任务标题：%s
@@ -653,6 +780,10 @@ func (s *Service) buildExpandPromptWithKnowledge(task *models.Task, knowledgeCon
 // buildExpandPromptWithResearch 构建带研究结果的任务展开提示词
 func (s *Service) buildExpandPromptWithResearch(task *models.Task, researchResult string) string {
 	return fmt.Sprintf(`基于研究结果，请将以下任务拆分为 %d 个子任务。每个子任务应该是一个具体的、可执行的步骤。
+
+技术栈说明：
+- 后端：Go 语言，使用 Gin 框架和 GORM
+- API 规范：使用 GET 和 POST 请求，删除操作使用 POST + /delete 路径
 
 研究结果：
 %s

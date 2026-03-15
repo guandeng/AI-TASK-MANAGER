@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { NCard, NDataTable, NTag, NSpace, NButton, NInput, NSelect, NStatistic, NGrid, NGi, NProgress, NEmpty, NSpin } from 'naive-ui';
 import type { DataTableColumns, DataTableRowKey, SelectOption } from 'naive-ui';
 import { useTaskStore } from '@/store/modules/task';
-import type { Task, TaskStatus, TaskListParams } from '@/typings/api/task';
+import type { Task, TaskStatus, TaskListParams, TaskCategory } from '@/typings/api/task';
 
 const route = useRoute();
 const router = useRouter();
@@ -16,6 +16,7 @@ function confirmAction(message: string) {
 
 // 筛选状态
 const filterStatus = ref<TaskStatus | 'all'>('all');
+const filterCategory = ref<TaskCategory | 'all'>('all');
 const filterRequirementId = ref<number | 'all'>('all');
 const searchText = ref('');
 const checkedRowKeys = ref<DataTableRowKey[]>([]);
@@ -32,6 +33,13 @@ const statusOptions = [
   { label: '进行中', value: 'in-progress' },
   { label: '已完成', value: 'done' },
   { label: '已延期', value: 'deferred' }
+];
+
+// 分类选项
+const categoryOptions = [
+  { label: '全部分类', value: 'all' },
+  { label: '前端', value: 'frontend' },
+  { label: '后端', value: 'backend' }
 ];
 
 // 负责人选项
@@ -68,6 +76,13 @@ const priorityTextMap: Record<string, string> = {
   high: '高',
   medium: '中',
   low: '低'
+};
+
+// 分类文字映射
+const categoryTextMap: Record<string, string> = {
+  '': '-',
+  frontend: '前端',
+  backend: '后端'
 };
 
 const requirementOptions = computed<SelectOption[]>(() => {
@@ -132,6 +147,27 @@ const columns: DataTableColumns<Task> = [
     key: 'title',
     render(row) {
       return row.titleTrans || row.title;
+    }
+  },
+  {
+    title: '分类',
+    key: 'category',
+    width: 80,
+    align: 'center',
+    render(row) {
+      if (!row.category) return '-';
+      return h(NTag, {
+        type: row.category === 'frontend' ? 'success' : 'info',
+        size: 'small'
+      }, { default: () => categoryTextMap[row.category] || row.category });
+    }
+  },
+  {
+    title: '语言',
+    key: 'languageName',
+    width: 100,
+    render(row) {
+      return row.languageName || '-';
     }
   },
   {
@@ -223,6 +259,10 @@ async function loadTaskListData() {
 
   if (filterStatus.value !== 'all') {
     params.status = filterStatus.value;
+  }
+
+  if (filterCategory.value !== 'all') {
+    params.category = filterCategory.value;
   }
 
   if (searchText.value) {
@@ -338,7 +378,7 @@ watch(
 );
 
 watch(
-  () => [filterRequirementId.value, filterStatus.value, searchText.value],
+  () => [filterRequirementId.value, filterStatus.value, filterCategory.value, searchText.value],
   () => {
     currentPage.value = 1;
     loadTaskListData();

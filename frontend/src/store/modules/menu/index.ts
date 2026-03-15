@@ -78,6 +78,14 @@ export const useMenuStore = defineStore('menu-store', () => {
     return filterEnabled(menuTree.value);
   });
 
+  // 系统管理模块的默认菜单
+  const defaultSystemMenus: MenuItem[] = [
+    { key: 'manage', label: '系统管理', order: 1, enabled: true },
+    { key: 'manage_user', label: '用户管理', parentKey: 'manage', path: '/manage/user', routeName: 'manage_user', order: 1, enabled: true },
+    { key: 'manage_role', label: '角色管理', parentKey: 'manage', path: '/manage/role', routeName: 'manage_role', order: 2, enabled: true },
+    { key: 'manage_menu', label: '菜单管理', parentKey: 'manage', path: '/manage/menu', routeName: 'manage_menu', order: 3, enabled: true }
+  ];
+
   // Actions
   async function loadMenus() {
     loading.value = true;
@@ -87,17 +95,30 @@ export const useMenuStore = defineStore('menu-store', () => {
         // 后端返回格式: { code: 0, message: "success", data: { list, total, page, pageSize } }
         const responseData = (data as any).data || data;
 
+        let menuList: MenuItem[] = [];
         if (Array.isArray(responseData)) {
-          menus.value = responseData;
+          menuList = responseData;
         } else if (responseData && 'list' in responseData) {
-          menus.value = responseData.list || [];
+          menuList = responseData.list || [];
         } else if (responseData && 'menus' in responseData) {
-          menus.value = responseData.menus || [];
+          menuList = responseData.menus || [];
         }
+
+        // 如果菜单数量为 500 或获取不到菜单，只保留系统管理模块
+        if (menuList.length === 500 || menuList.length === 0) {
+          menus.value = defaultSystemMenus;
+        } else {
+          menus.value = menuList;
+        }
+      } else {
+        // 获取失败时使用默认系统管理菜单
+        menus.value = defaultSystemMenus;
       }
     } catch (error) {
       window.$message?.error('加载菜单列表失败');
       console.error('Failed to load menus:', error);
+      // 异常时使用默认系统管理菜单
+      menus.value = defaultSystemMenus;
     } finally {
       loading.value = false;
     }

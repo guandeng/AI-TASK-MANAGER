@@ -289,6 +289,17 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 		api.GET("/knowledge/summary", knowledgeHandler.GetSummary)
 		api.POST("/knowledge/load", knowledgeHandler.Load)
 
+		// 语言管理
+		languageHandler := handlers.NewLanguageHandler(logger)
+		languages := api.Group("/languages")
+		{
+			languages.GET("", languageHandler.List)
+			languages.GET("/:id", languageHandler.Get)
+			languages.POST("", languageHandler.Create)
+			languages.POST("/:id/update", languageHandler.Update)
+			languages.POST("/:id/delete", languageHandler.Delete)
+		}
+
 		// 启动备份调度器
 		backupService.StartScheduler()
 	}

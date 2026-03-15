@@ -15,6 +15,9 @@ type Task struct {
 	DescriptionTrans *string    `gorm:"type:text" json:"descriptionTrans,omitempty"`
 	Status           string     `gorm:"size:50;not null;default:pending;index:idx_status" json:"status"`
 	Priority         string     `gorm:"size:20;not null;default:medium;index:idx_priority" json:"priority"`
+	Category         string     `gorm:"size:20;default:'';index:idx_category" json:"category"` // 任务分类：frontend/backend
+	LanguageID       *uint64    `gorm:"index:idx_language_id" json:"languageId,omitempty"`
+	LanguageName     string     `json:"languageName,omitempty"` // JOIN 查询时获取
 	Details          string     `gorm:"type:text" json:"details"`
 	DetailsTrans     *string    `gorm:"type:text" json:"detailsTrans,omitempty"`
 	TestStrategy     string     `gorm:"type:text" json:"testStrategy"`

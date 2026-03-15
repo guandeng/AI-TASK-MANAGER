@@ -114,13 +114,13 @@ export function splitRequirementToTasks(requirementId: number, taskType: TaskTyp
 }
 
 /** 将需求拆分为任务（异步） */
-export function splitRequirementToTasksAsync(requirementId: number, taskType: TaskType = 'backend') {
+export function splitRequirementToTasksAsync(requirementId: number, taskType: TaskType = 'backend', languageId?: number) {
   return request<{
     messageId: number;
     message: string;
   }>({
     url: `/api/requirements/${requirementId}/split-tasks-async`,
     method: 'post',
-    data: { taskType }
+    data: { taskType, languageId }
   });
 }

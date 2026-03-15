@@ -397,7 +397,8 @@ func getMimeType(ext string) string {
 
 // SplitTasksRequest 拆分任务请求
 type SplitTasksRequest struct {
-	TaskType string `json:"taskType"` // frontend, backend, fullstack
+	TaskType   string `json:"taskType"`   // frontend, backend, fullstack
+	LanguageID uint64 `json:"languageId"` // 语言 ID
 }
 
 // SplitTasks 需求拆分为任务（AI）- 同步版本
@@ -484,6 +485,15 @@ func (h *RequirementHandler) SplitTasksAsync(c *gin.Context) {
 		req.TaskType = "backend"
 	}
 
+	// 获取语言信息
+	var language *models.Language
+	if req.LanguageID > 0 {
+		language = &models.Language{}
+		if err := db.First(language, req.LanguageID).Error; err != nil {
+			language = nil
+		}
+	}
+
 	// 获取需求详情
 	var requirement models.Requirement
 	if err := db.First(&requirement, id).Error; err != nil {
@@ -516,8 +526,8 @@ func (h *RequirementHandler) SplitTasksAsync(c *gin.Context) {
 
 	// 异步执行拆分
 	go func() {
-		// 调用 AI 服务拆分需求
-		tasks, err := h.aiService.SplitRequirement(&requirement, req.TaskType)
+		// 调用 AI 服务拆分需求（传入语言信息）
+		tasks, err := h.aiService.SplitRequirementWithLanguage(&requirement, req.TaskType, language)
 		if err != nil {
 			h.logger.Error("AI 拆分需求失败", zap.Error(err))
 			// 更新消息状态为失败

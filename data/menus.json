@@ -28,6 +28,17 @@
         "enabled": true,
         "parentKey": "requirement",
         "i18nKey": "route.requirement_task-list"
+      },
+      {
+        "key": "manage_language",
+        "label": "语言管理",
+        "icon": "carbon:code",
+        "path": "/manage/language",
+        "routeName": "manage_language",
+        "order": 3,
+        "enabled": true,
+        "parentKey": "requirement",
+        "i18nKey": "route.manage_language"
       }
     ]
   },

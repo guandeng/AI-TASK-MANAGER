@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onMounted, onActivated, ref, computed, h } from 'vue';
+import { onMounted, onActivated, ref, computed, h, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { NButton, NCard, NDataTable, NGrid, NGi, NInput, NSelect, NSpace, NStatistic, NTag, NPopconfirm, NProgress, NSpin, NEmpty, NModal, NRadioGroup, NRadio } from 'naive-ui';
+import { NButton, NCard, NDataTable, NGrid, NGi, NInput, NSelect, NSpace, NStatistic, NTag, NPopconfirm, NProgress, NSpin, NEmpty, NModal, NRadioGroup, NRadio, NDivider, NTabs, NTabPane, NForm, NFormItem, NInputNumber, NSwitch } from 'naive-ui';
 import type { DataTableColumns, SelectOption } from 'naive-ui';
 import { useRequirementStore } from '@/store/modules/requirement';
 import type { Requirement, RequirementStatus, RequirementPriority } from '@/typings/api/requirement';
 import { splitRequirementToTasksAsync, type TaskType } from '@/service/api/requirement';
+import { fetchLanguageList, createLanguage, updateLanguage, deleteLanguage, type Language, type LanguageCategory } from '@/service/api/language';
 
 defineOptions({
   name: 'RequirementList'
@@ -22,13 +23,39 @@ const filterPriority = ref<RequirementPriority | null>(null);
 // 任务类型选择弹框
 const showTaskTypeModal = ref(false);
 const selectedTaskType = ref<TaskType>('backend');
+const selectedLanguageId = ref<number | null>(null);
 const currentSplittingRequirement = ref<Requirement | null>(null);
 
+// 语言列表
+const languages = ref<Language[]>([]);
+const languageLoading = ref(false);
+
+// 语言管理弹框
+const showLanguageModal = ref(false);
+const editingLanguage = ref<Language | null>(null);
+const languageForm = ref({
+  name: '',
+  category: 'backend' as LanguageCategory,
+  displayName: '',
+  framework: '',
+  description: '',
+  codeHints: '',
+  remark: '',
+  isActive: true,
+  sortOrder: 0
+});
+
 // 任务类型选项
-const taskTypeOptions = [
+const taskTypeOptions: SelectOption[] = [
   { label: '后端', value: 'backend' as TaskType },
   { label: '前端', value: 'frontend' as TaskType },
   { label: '前后端', value: 'fullstack' as TaskType }
+];
+
+// 语言分类选项
+const categoryOptions: SelectOption[] = [
+  { label: '后端', value: 'backend' },
+  { label: '前端', value: 'frontend' }
 ];
 
 // 状态选项
@@ -112,6 +139,83 @@ const filteredRequirements = computed(() => {
 
   return list.sort((a, b) => b.id - a.id);
 });
+
+// 根据任务类型筛选语言选项
+const languageOptions = computed(() => {
+  const list = (languages.value || []).filter(l => l.isActive);
+
+  if (selectedTaskType.value === 'fullstack') {
+    // 前后端都选，返回所有
+    return list.map(l => ({ label: `${l.category === 'backend' ? '[后端]' : '[前端]'} ${l.displayName}`, value: l.id }));
+  }
+
+  const category: LanguageCategory = selectedTaskType.value === 'frontend' ? 'frontend' : 'backend';
+  return list.filter(l => l.category === category).map(l => ({ label: l.displayName, value: l.id }));
+});
+
+// 语言表格列
+const languageColumns: DataTableColumns<Language> = [
+  {
+    title: 'ID',
+    key: 'id',
+    width: 60,
+    align: 'center'
+  },
+  {
+    title: '分类',
+    key: 'category',
+    width: 80,
+    align: 'center',
+    render(row) {
+      return h(NTag, { type: row.category === 'backend' ? 'info' : 'success', size: 'small' }, () => row.category === 'backend' ? '后端' : '前端');
+    }
+  },
+  {
+    title: '名称',
+    key: 'name',
+    width: 100
+  },
+  {
+    title: '显示名称',
+    key: 'displayName',
+    width: 180
+  },
+  {
+    title: '框架',
+    key: 'framework',
+    ellipsis: { tooltip: true }
+  },
+  {
+    title: '启用',
+    key: 'isActive',
+    width: 70,
+    align: 'center',
+    render(row) {
+      return h(NTag, { type: row.isActive ? 'success' : 'default', size: 'small' }, () => row.isActive ? '是' : '否');
+    }
+  },
+  {
+    title: '排序',
+    key: 'sortOrder',
+    width: 70,
+    align: 'center'
+  },
+  {
+    title: '操作',
+    key: 'actions',
+    width: 120,
+    align: 'center',
+    render(row) {
+      return h(NSpace, { justify: 'center' }, () => [
+        h(NButton, { size: 'small', type: 'primary', text: true, onClick: () => openEditLanguage(row) }, () => '编辑'),
+        h(NPopconfirm, { onPositiveClick: () => handleDeleteLanguage(row.id) }, {
+          trigger: () => h(NButton, { size: 'small', type: 'error', text: true }, () => '删除'),
+          default: () => '确定删除该语言吗？'
+        })
+      ]);
+    }
+  }
+];
 
 // 表格列定义
 const columns: DataTableColumns<Requirement> = [
@@ -277,16 +381,24 @@ async function handleDelete(id: number) {
 // 打开任务类型选择弹框
 function openTaskTypeModal(row: Requirement) {
   currentSplittingRequirement.value = row;
-  selectedTaskType.value = 'backend'; // 默认选择后端
+  selectedTaskType.value = 'backend';
+  selectedLanguageId.value = null;
   showTaskTypeModal.value = true;
 }
 
-// 确认拆分任务 - 异步版本
+// 监听任务类型变化，重置语言选择
+watch(selectedTaskType, () => {
+  const opts = languageOptions.value;
+  selectedLanguageId.value = opts.length > 0 ? opts[0].value as number : null;
+});
+
+// 确认拆分任务
 async function confirmSplitTasks() {
   if (!currentSplittingRequirement.value) return;
 
   const row = currentSplittingRequirement.value;
   const taskType = selectedTaskType.value;
+  const languageId = selectedLanguageId.value;
 
   showTaskTypeModal.value = false;
 
@@ -298,7 +410,7 @@ async function confirmSplitTasks() {
   splittingTaskIds.value.add(row.id);
 
   try {
-    const { data, error } = await splitRequirementToTasksAsync(row.id, taskType);
+    const { data, error } = await splitRequirementToTasksAsync(row.id, taskType, languageId || undefined);
 
     if (!error && data) {
       const responseData = (data as any)?.data || data;
@@ -319,16 +431,99 @@ async function confirmSplitTasks() {
   }
 }
 
+// 加载语言列表
+async function loadLanguages() {
+  languageLoading.value = true;
+  const { data } = await fetchLanguageList(true);
+  if (data) {
+    languages.value = Array.isArray(data) ? data : ((data as any).data || []);
+  }
+  languageLoading.value = false;
+}
+
+// 打开新建语言弹框
+function openCreateLanguage() {
+  editingLanguage.value = null;
+  languageForm.value = {
+    name: '',
+    category: 'backend',
+    displayName: '',
+    framework: '',
+    description: '',
+    codeHints: '',
+    remark: '',
+    isActive: true,
+    sortOrder: 0
+  };
+  showLanguageModal.value = true;
+}
+
+// 打开编辑语言弹框
+function openEditLanguage(row: Language) {
+  editingLanguage.value = row;
+  languageForm.value = {
+    name: row.name,
+    category: row.category || 'backend',
+    displayName: row.displayName,
+    framework: row.framework || '',
+    description: row.description || '',
+    codeHints: row.codeHints || '',
+    remark: row.remark || '',
+    isActive: row.isActive,
+    sortOrder: row.sortOrder
+  };
+  showLanguageModal.value = true;
+}
+
+// 保存语言
+async function saveLanguage() {
+  if (!languageForm.value.name || !languageForm.value.displayName) {
+    window.$message?.error('名称和显示名称不能为空');
+    return;
+  }
+
+  if (editingLanguage.value) {
+    const { error } = await updateLanguage(editingLanguage.value.id, languageForm.value);
+    if (!error) {
+      window.$message?.success('更新成功');
+      showLanguageModal.value = false;
+      loadLanguages();
+    } else {
+      window.$message?.error('更新失败');
+    }
+  } else {
+    const { error } = await createLanguage(languageForm.value);
+    if (!error) {
+      window.$message?.success('创建成功');
+      showLanguageModal.value = false;
+      loadLanguages();
+    } else {
+      window.$message?.error('创建失败');
+    }
+  }
+}
+
+// 删除语言
+async function handleDeleteLanguage(id: number) {
+  const { error } = await deleteLanguage(id);
+  if (!error) {
+    window.$message?.success('删除成功');
+    loadLanguages();
+  } else {
+    window.$message?.error('删除失败');
+  }
+}
+
 // 加载数据
 async function loadData() {
   await Promise.all([requirementStore.loadRequirements(), requirementStore.loadStatistics()]);
+  loadLanguages();
 }
 
 onMounted(() => {
   loadData();
 });
 
-// 页面激活时重新加载数据
 onActivated(() => {
   loadData();
 });
@@ -389,77 +584,143 @@ onActivated(() => {
       </NGi>
     </NGrid>
 
-    <!-- 搜索和筛选 -->
-    <NCard class="mb-4">
-      <NSpace justify="center">
-        <NInput
-          v-model:value="searchKeyword"
-          placeholder="搜索需求标题或内容"
-          clearable
-          class="w-60"
-        />
-        <NSelect
-          v-model:value="filterStatus"
-          :options="statusOptions"
-          placeholder="状态筛选"
-          clearable
-          class="w-32"
-        />
-        <NSelect
-          v-model:value="filterPriority"
-          :options="priorityOptions"
-          placeholder="优先级筛选"
-          clearable
-          class="w-32"
-        />
-        <NButton type="primary" @click="handleCreate">
-          新建需求
-        </NButton>
-      </NSpace>
-    </NCard>
+    <!-- 标签页 -->
+    <NCard>
+      <NTabs type="line">
+        <NTabPane name="requirements" tab="需求列表">
+          <!-- 搜索和筛选 -->
+          <NSpace class="mb-4 mt-2" justify="space-between">
+            <NSpace>
+              <NInput
+                v-model:value="searchKeyword"
+                placeholder="搜索需求标题或内容"
+                clearable
+                class="w-60"
+              />
+              <NSelect
+                v-model:value="filterStatus"
+                :options="statusOptions"
+                placeholder="状态筛选"
+                clearable
+                class="w-32"
+              />
+              <NSelect
+                v-model:value="filterPriority"
+                :options="priorityOptions"
+                placeholder="优先级筛选"
+                clearable
+                class="w-32"
+              />
+            </NSpace>
+            <NSpace>
+              <NButton @click="loadData">刷新</NButton>
+              <NButton type="primary" @click="handleCreate">新建需求</NButton>
+            </NSpace>
+          </NSpace>
 
-    <!-- 数据表格 -->
-    <NCard title="需求列表">
-      <template #header-extra>
-        <NButton @click="loadData">
-          刷新
-        </NButton>
-      </template>
-      <NSpin :show="requirementStore.loading">
-        <NDataTable
-          :columns="columns"
-          :data="filteredRequirements"
-          :pagination="{
-            pageSize: 20
-          }"
-          :row-key="(row: Requirement) => row.id"
-          striped
-          :bordered="false"
-        />
-        <NEmpty v-if="filteredRequirements.length === 0 && !requirementStore.loading" description="暂无需求数据" />
-      </NSpin>
+          <!-- 需求表格 -->
+          <NSpin :show="requirementStore.loading">
+            <NDataTable
+              :columns="columns"
+              :data="filteredRequirements"
+              :pagination="{ pageSize: 20 }"
+              :row-key="(row: Requirement) => row.id"
+              striped
+              :bordered="false"
+            />
+            <NEmpty v-if="filteredRequirements.length === 0 && !requirementStore.loading" description="暂无需求数据" />
+          </NSpin>
+        </NTabPane>
+
+        <NTabPane name="languages" tab="语言管理">
+          <NSpace class="mb-4 mt-2" justify="end">
+            <NButton @click="loadLanguages">刷新</NButton>
+            <NButton type="primary" @click="openCreateLanguage">新增语言</NButton>
+          </NSpace>
+
+          <NSpin :show="languageLoading">
+            <NDataTable
+              :columns="languageColumns"
+              :data="languages"
+              :pagination="{ pageSize: 10 }"
+              :row-key="(row: Language) => row.id"
+              striped
+              :bordered="false"
+            />
+            <NEmpty v-if="languages.length === 0 && !languageLoading" description="暂无语言数据" />
+          </NSpin>
+        </NTabPane>
+      </NTabs>
     </NCard>
 
     <!-- 任务类型选择弹框 -->
     <NModal
       v-model:show="showTaskTypeModal"
       preset="dialog"
-      title="选择任务类型"
+      title="拆分任务设置"
       positive-text="确认拆分"
       negative-text="取消"
       @positive-click="confirmSplitTasks"
     >
       <div class="py-4">
         <p class="mb-4 text-gray-600">请选择需要生成的任务类型：</p>
-        <NRadioGroup v-model:value="selectedTaskType" class="flex flex-col gap-3">
-          <NRadio
-            v-for="option in taskTypeOptions"
-            :key="option.value"
-            :value="option.value"
-            :label="option.label"
-          />
-        </NRadioGroup>
+        <NSelect
+          v-model:value="selectedTaskType"
+          :options="taskTypeOptions"
+          placeholder="选择任务类型"
+          style="width: 100%;"
+        />
+
+        <NDivider style="margin: 16px 0;" />
+
+        <p class="mb-4 text-gray-600">选择编程语言/技术栈：</p>
+        <NSelect
+          v-model:value="selectedLanguageId"
+          :options="languageOptions"
+          placeholder="请选择语言"
+          style="width: 100%;"
+        />
       </div>
+    </NModal>
+
+    <!-- 语言编辑弹框 -->
+    <NModal
+      v-model:show="showLanguageModal"
+      preset="dialog"
+      :title="editingLanguage ? '编辑语言' : '新增语言'"
+      positive-text="保存"
+      negative-text="取消"
+      @positive-click="saveLanguage"
+    >
+      <NForm label-placement="left" label-width="80">
+        <NFormItem label="分类" required>
+          <NSelect v-model:value="languageForm.category" :options="categoryOptions" placeholder="选择分类" />
+        </NFormItem>
+        <NFormItem label="名称" required>
+          <NInput v-model:value="languageForm.name" placeholder="如: go, java, vue, react" />
+        </NFormItem>
+        <NFormItem label="显示名" required>
+          <NInput v-model:value="languageForm.displayName" placeholder="如: Go (Gin + GORM)" />
+        </NFormItem>
+        <NFormItem label="框架">
+          <NInput v-model:value="languageForm.framework" placeholder="如: Gin + GORM" />
+        </NFormItem>
+        <NFormItem label="描述">
+          <NInput v-model:value="languageForm.description" type="textarea" placeholder="语言描述" />
+        </NFormItem>
+        <NFormItem label="代码提示">
+          <NInput v-model:value="languageForm.codeHints" type="textarea" :rows="4" placeholder="代码提示模板" />
+        </NFormItem>
+        <NFormItem label="备注">
+          <NInput v-model:value="languageForm.remark" type="textarea" placeholder="Claude开发备注" />
+        </NFormItem>
+        <NFormItem label="启用">
+          <NSwitch v-model:value="languageForm.isActive" />
+        </NFormItem>
+        <NFormItem label="排序">
+          <NInputNumber v-model:value="languageForm.sortOrder" :min="0" />
+        </NFormItem>
+      </NForm>
     </NModal>
   </div>
 </template>
@@ -469,7 +730,6 @@ onActivated(() => {
   padding: 16px;
 }
 
-/* 统计卡片样式 - 更紧凑 */
 :deep(.n-grid .n-card) {
   --n-padding-top: 12px;
   --n-padding-bottom: 12px;
@@ -489,7 +749,6 @@ onActivated(() => {
   margin-bottom: 4px;
 }
 
-/* 其他卡片保持原样 */
 :deep(.n-card) {
   --n-padding-top: 16px;
   --n-padding-bottom: 16px;

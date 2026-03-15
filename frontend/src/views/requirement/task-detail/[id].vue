@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NTabs, NTabPane } from 'naive-ui';
+import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NTabs, NTabPane, NCollapse, NCollapseItem, NCheckbox, NCode, NDivider } from 'naive-ui';
 import type { SelectOption } from 'naive-ui';
 import { VueDraggable } from 'vue-draggable-plus';
 import { MdEditor, MdPreview } from 'md-editor-v3';
@@ -14,6 +14,7 @@ import CommentSection from '@/components/task/CommentSection.vue';
 import AssignmentPanel from '@/components/task/AssignmentPanel.vue';
 import ActivityTimeline from '@/components/task/ActivityTimeline.vue';
 import DependencyGraph from '@/components/task/DependencyGraph.vue';
+import SvgIcon from '@/components/custom/svg-icon.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -82,6 +83,33 @@ const editingValue = ref('');
 
 // 预览模式（用于 Markdown 字段）
 const previewFields = ref<Record<string, boolean>>({});
+
+// 子任务展开状态
+const expandedSubtaskIds = ref<Set<number>>(new Set());
+
+// 解析 JSON 字段
+function parseJsonField<T>(field: string | null | undefined): T | null {
+  if (!field) return null;
+  try {
+    return JSON.parse(field) as T;
+  } catch {
+    return null;
+  }
+}
+
+// 切换子任务展开状态
+function toggleSubtaskExpand(subtaskId: number) {
+  if (expandedSubtaskIds.value.has(subtaskId)) {
+    expandedSubtaskIds.value.delete(subtaskId);
+  } else {
+    expandedSubtaskIds.value.add(subtaskId);
+  }
+}
+
+// 检查子任务是否展开
+function isSubtaskExpanded(subtaskId: number): boolean {
+  return expandedSubtaskIds.value.has(subtaskId);
+}
 
 // 获取预览状态 key
 function getPreviewKey(type: 'task' | 'subtask', field: string, subtaskId?: number): string {
@@ -587,11 +615,10 @@ onUnmounted(() => {
                       :key="subtask.id"
                       class="subtask-item"
                     >
+                      <!-- 子任务头部 -->
                       <div class="subtask-header">
                         <span class="drag-handle">
-                          <NIcon :size="16" color="#9ca3af">
-                            <span class="i-mdi:drag-vertical"></span>
-                          </NIcon>
+                          <SvgIcon icon="mdi:drag-vertical" class="text-16px" style="color: #9ca3af" />
                         </span>
                         <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'title'" class="edit-field-inline">
                           <NInput
@@ -602,11 +629,26 @@ onUnmounted(() => {
                           <NButton type="primary" size="tiny" :loading="saveLoading" @click="saveEdit">保存</NButton>
                           <NButton size="tiny" @click="cancelEdit">取消</NButton>
                         </div>
-                        <div v-else class="editable-inline" @click="startEditSubtask(subtask.id, 'title')">
-                          {{ task.id }}.{{ subtask.id }} {{ subtask.titleTrans || subtask.title }}
+                        <div v-else class="editable-inline subtask-title-row" @click="startEditSubtask(subtask.id, 'title')">
+                          <NTag :type="priorityColorMap[subtask.priority] || 'default'" size="small">{{ priorityTextMap[subtask.priority] || '中' }}</NTag>
+                          <span class="subtask-title-text">{{ task.id }}.{{ subtask.id }} {{ subtask.titleTrans || subtask.title }}</span>
                           <NButton text type="primary" size="tiny" class="edit-btn-inline">编辑</NButton>
                         </div>
+                        <NButton
+                          text
+                          size="small"
+                          class="expand-btn"
+                          @click="toggleSubtaskExpand(subtask.id)"
+                        >
+                          <SvgIcon
+                            :icon="isSubtaskExpanded(subtask.id) ? 'mdi:chevron-up' : 'mdi:chevron-down'"
+                            :size="16"
+                            :style="{ color: isSubtaskExpanded(subtask.id) ? '#1890ff' : '#9ca3af' }"
+                          />
+                        </NButton>
                       </div>
+
+                      <!-- 子任务描述（基础信息） -->
                       <div class="subtask-content">
                         <div class="markdown-field">
                           <!-- 编辑模式 -->
@@ -634,6 +676,90 @@ onUnmounted(() => {
                           </div>
                         </div>
                       </div>
+
+                      <!-- 展开的详细信息 -->
+                      <div v-if="isSubtaskExpanded(subtask.id)" class="subtask-details">
+                        <NDivider style="margin: 8px 0 12px;">详细信息</NDivider>
+
+                        <!-- 实现细节 -->
+                        <div v-if="subtask.details || subtask.detailsTrans" class="detail-section">
+                          <div class="detail-label">实现细节</div>
+                          <div class="detail-content">
+                            <MdPreview :model-value="subtask.detailsTrans || subtask.details || ''" class="markdown-preview-wrapper" />
+                          </div>
+                        </div>
+
+                        <!-- 代码接口 -->
+                        <div v-if="subtask.codeInterface" class="detail-section">
+                          <div class="detail-label">代码接口</div>
+                          <div class="detail-content code-interface">
+                            <template v-if="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)">
+                              <div class="interface-name">
+                                <NTag type="info" size="small">函数名</NTag>
+                                <NCode :code="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)!.name" language="typescript" />
+                              </div>
+                              <div class="interface-row">
+                                <span class="interface-label">输入:</span>
+                                <NCode :code="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)!.inputs || ''" language="typescript" />
+                              </div>
+                              <div class="interface-row">
+                                <span class="interface-label">输出:</span>
+                                <NCode :code="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)!.outputs || ''" language="typescript" />
+                              </div>
+                              <div v-if="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)!.example" class="interface-row">
+                                <span class="interface-label">示例:</span>
+                                <NCode :code="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)!.example" language="typescript" />
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+
+                        <!-- 验收标准 -->
+                        <div v-if="subtask.acceptanceCriteria" class="detail-section">
+                          <div class="detail-label">验收标准</div>
+                          <div class="detail-content acceptance-criteria">
+                            <template v-if="parseJsonField<Array<{id: number; description: string; completed: boolean}>>(subtask.acceptanceCriteria)">
+                              <div
+                                v-for="criteria in parseJsonField<Array<{id: number; description: string; completed: boolean}>>(subtask.acceptanceCriteria)"
+                                :key="criteria.id"
+                                class="criteria-item"
+                              >
+                                <NCheckbox :checked="criteria.completed" disabled>
+                                  {{ criteria.description }}
+                                </NCheckbox>
+                              </div>
+                            </template>
+                          </div>
+                        </div>
+
+                        <!-- 关联文件 -->
+                        <div v-if="subtask.relatedFiles" class="detail-section">
+                          <div class="detail-label">关联文件</div>
+                          <div class="detail-content">
+                            <NSpace>
+                              <NTag
+                                v-for="(file, idx) in parseJsonField<string[]>(subtask.relatedFiles)"
+                                :key="idx"
+                                type="default"
+                                size="small"
+                                :bordered="false"
+                              >
+                                {{ file }}
+                              </NTag>
+                            </NSpace>
+                          </div>
+                        </div>
+
+                        <!-- 代码提示 -->
+                        <div v-if="subtask.codeHints" class="detail-section">
+                          <div class="detail-label">代码提示</div>
+                          <div class="detail-content code-hints">
+                            {{ subtask.codeHints }}
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- 子任务底部操作栏 -->
                       <div class="subtask-footer">
                         <NSelect
                           :value="subtask.status"
@@ -973,6 +1099,101 @@ onUnmounted(() => {
   &:hover {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
+}
+
+// 子任务标题行
+.subtask-title-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subtask-title-text {
+  font-weight: 500;
+}
+
+// 展开按钮
+.expand-btn {
+  margin-left: auto;
+}
+
+// 子任务详细信息区域
+.subtask-details {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: #fafafa;
+  border-radius: 6px;
+}
+
+// 详细信息区块
+.detail-section {
+  margin-bottom: 16px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.detail-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
+  padding-left: 8px;
+  border-left: 3px solid #1890ff;
+}
+
+.detail-content {
+  padding-left: 12px;
+}
+
+// 代码接口样式
+.code-interface {
+  font-family: 'Fira Code', 'Monaco', monospace;
+
+  .interface-name {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .interface-row {
+    margin-bottom: 6px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+
+    .interface-label {
+      flex-shrink: 0;
+      font-weight: 500;
+      color: #666;
+      min-width: 50px;
+    }
+  }
+}
+
+// 验收标准样式
+.acceptance-criteria {
+  .criteria-item {
+    padding: 6px 0;
+    border-bottom: 1px dashed #eee;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+// 代码提示样式
+.code-hints {
+  background-color: #fff8e6;
+  border: 1px solid #ffe58f;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #8c6b00;
 }
 
 .subtask-header {

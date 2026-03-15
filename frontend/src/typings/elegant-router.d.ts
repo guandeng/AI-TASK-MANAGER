@@ -24,6 +24,7 @@ declare module "@elegant-router/types" {
     "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?";
     "manage": "/manage";
     "manage_config": "/manage/config";
+    "manage_language": "/manage/language";
     "manage_menu": "/manage/menu";
     "message": "/message";
     "message_list": "/message/list";
@@ -103,6 +104,7 @@ declare module "@elegant-router/types" {
     | "iframe-page"
     | "login"
     | "manage_config"
+    | "manage_language"
     | "manage_menu"
     | "message_list"
     | "requirement_detail"

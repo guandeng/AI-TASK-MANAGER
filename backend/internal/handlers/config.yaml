@@ -38,3 +38,9 @@ general:
     defaultsubtasks: 3
     defaultpriority: medium
     projectname: AI Task Manager
+knowledge:
+    enabled: false
+    paths: []
+    maxsize: 0
+    maxfiles: 0
+    filetypes: []

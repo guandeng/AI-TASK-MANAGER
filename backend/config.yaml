@@ -41,3 +41,15 @@ general:
   default_subtasks: 3
   default_priority: medium
   project_name: AI Task Manager
+
+knowledge:
+  enabled: false
+  paths: []
+  max_size: 500  # KB
+  max_files: 50
+  file_types:
+    - .md
+    - .txt
+    - .json
+    - .yaml
+    - .yml

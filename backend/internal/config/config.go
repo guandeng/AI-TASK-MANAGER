@@ -9,10 +9,11 @@ import (
 
 // Config 全局配置结构
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	AI       AIConfig       `mapstructure:"ai"`
-	General  GeneralConfig  `mapstructure:"general"`
+	Server    ServerConfig    `mapstructure:"server"`
+	Database  DatabaseConfig  `mapstructure:"database"`
+	AI        AIConfig        `mapstructure:"ai"`
+	General   GeneralConfig   `mapstructure:"general"`
+	Knowledge KnowledgeConfig `mapstructure:"knowledge"`
 }
 
 // ServerConfig 服务器配置
@@ -47,6 +48,15 @@ type AIProvider struct {
 	APIKey  string `mapstructure:"api_key"`
 	Model   string `mapstructure:"model"`
 	BaseURL string `mapstructure:"base_url"`
+}
+
+// KnowledgeConfig 知识库配置
+type KnowledgeConfig struct {
+	Enabled    bool     `mapstructure:"enabled"`
+	Paths      []string `mapstructure:"paths"`
+	MaxSize    int      `mapstructure:"max_size"`     // 最大文件大小 KB
+	MaxFiles   int      `mapstructure:"max_files"`    // 最大文件数
+	FileTypes  []string `mapstructure:"file_types"`   // 支持的文件类型
 }
 
 // AIParameters AI 参数配置
@@ -148,6 +158,13 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("general.default_subtasks", 3)
 	v.SetDefault("general.default_priority", "medium")
 	v.SetDefault("general.project_name", "AI Task Manager")
+
+	// 知识库默认值
+	v.SetDefault("knowledge.enabled", false)
+	v.SetDefault("knowledge.paths", []string{})
+	v.SetDefault("knowledge.max_size", 500)
+	v.SetDefault("knowledge.max_files", 50)
+	v.SetDefault("knowledge.file_types", []string{".md", ".txt", ".json", ".yaml", ".yml"})
 }
 
 // GetDSN 获取数据库连接字符串

@@ -268,6 +268,27 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			backupGroup.POST("/:backupId/delete", backupHandler.Delete)
 		}
 
+		// 复杂度分析和依赖管理
+		complexityHandler := handlers.NewComplexityHandler(logger, cfg)
+		dependencyHandler := handlers.NewDependencyHandler(logger)
+
+		// 复杂度分析
+		api.POST("/tasks/:taskId/analyze", complexityHandler.AnalyzeTask)
+		api.POST("/requirements/:id/analyze", complexityHandler.AnalyzeRequirement)
+		api.POST("/requirements/:id/analyze-async", complexityHandler.AnalyzeTasksAsync)
+		api.GET("/requirements/:id/complexity-reports", complexityHandler.GetRequirementReports)
+		api.GET("/complexity/reports/:reportId", complexityHandler.GetComplexityReport)
+
+		// 依赖管理
+		api.GET("/tasks/dependencies/graph", dependencyHandler.GetDependencyGraph)
+		api.POST("/tasks/dependencies/fix", dependencyHandler.FixDependencies)
+		api.GET("/tasks/next", dependencyHandler.GetNextTasks)
+
+		// 知识库
+		knowledgeHandler := handlers.NewKnowledgeHandler(logger, cfg)
+		api.GET("/knowledge/summary", knowledgeHandler.GetSummary)
+		api.POST("/knowledge/load", knowledgeHandler.Load)
+
 		// 启动备份调度器
 		backupService.StartScheduler()
 	}

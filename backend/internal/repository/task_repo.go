@@ -46,8 +46,8 @@ func (r *taskRepository) List(filters map[string]interface{}, page, pageSize int
 	var tasks []models.Task
 	var total int64
 
-	// 构建基础查询
-	baseQuery := r.db.Model(&models.Task{})
+	// 构建基础查询 - 排除已删除的任务
+	baseQuery := r.db.Model(&models.Task{}).Where("deleted_at IS NULL")
 
 	// 应用筛选条件到基础查询
 	if status, ok := filters["status"]; ok {
@@ -74,13 +74,14 @@ func (r *taskRepository) List(filters map[string]interface{}, page, pageSize int
 	// 分页查询，使用 LEFT JOIN 获取需求标题和子任务统计
 	offset := (page - 1) * pageSize
 
-	// 构建查询 - 添加子任务统计子查询
+	// 构建查询 - 添加子任务统计子查询，排除已删除的任务
 	query := r.db.Table("task_task").
 		Select(`task_task.*,
 			task_requirement.title as requirement_title,
 			(SELECT COUNT(*) FROM task_subtask WHERE task_subtask.task_id = task_task.id) as subtask_count,
 			(SELECT COUNT(*) FROM task_subtask WHERE task_subtask.task_id = task_task.id AND task_subtask.status = 'done') as subtask_done_count`).
-		Joins("LEFT JOIN task_requirement ON task_task.requirement_id = task_requirement.id")
+		Joins("LEFT JOIN task_requirement ON task_task.requirement_id = task_requirement.id").
+		Where("task_task.deleted_at IS NULL")
 
 	// 应用相同的筛选条件
 	if status, ok := filters["status"]; ok {
@@ -212,14 +213,16 @@ func (r *taskRepository) Update(task *models.Task) error {
 	return r.db.Save(task).Error
 }
 
-// Delete 删除任务
+// Delete 软删除任务
 func (r *taskRepository) Delete(id uint64) error {
-	return r.db.Delete(&models.Task{}, id).Error
+	now := time.Now()
+	return r.db.Model(&models.Task{}).Where("id = ?", id).Update("deleted_at", &now).Error
 }
 
-// BatchDelete 批量删除任务
+// BatchDelete 批量软删除任务
 func (r *taskRepository) BatchDelete(ids []uint64) error {
-	return r.db.Delete(&models.Task{}, ids).Error
+	now := time.Now()
+	return r.db.Model(&models.Task{}).Where("id IN ?", ids).Update("deleted_at", &now).Error
 }
 
 // GetSubtasks 获取任务的子任务

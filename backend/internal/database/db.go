@@ -81,6 +81,7 @@ func autoMigrate() error {
 		&models.TaskTemplate{},
 		&models.Backup{},
 		&models.BackupSchedule{},
+		&models.TaskComplexityReport{},
 	)
 }
 

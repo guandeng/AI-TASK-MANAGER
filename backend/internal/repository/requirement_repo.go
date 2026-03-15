@@ -20,10 +20,10 @@ func NewRequirementRepository() RequirementRepository {
 	return &requirementRepository{db: database.GetDB()}
 }
 
-// GetByID 根据 ID 获取需求
+// GetByID 根据 ID 获取需求（排除已删除的）
 func (r *requirementRepository) GetByID(id uint64) (*models.Requirement, error) {
 	var requirement models.Requirement
-	err := r.db.First(&requirement, id).Error
+	err := r.db.Where("deleted_at IS NULL").First(&requirement, id).Error
 	if err != nil {
 		return nil, err
 	}

@@ -15,6 +15,7 @@ type Requirement struct {
 	Assignee    *string    `gorm:"size:100;index:idx_assignee" json:"assignee,omitempty"`
 	CreatedAt   time.Time  `gorm:"autoCreateTime;index:idx_created_at" json:"createdAt"`
 	UpdatedAt   time.Time  `gorm:"autoUpdateTime" json:"updatedAt"`
+	DeletedAt   *time.Time `gorm:"index:idx_deleted_at" json:"deletedAt,omitempty"`
 
 	// 关联
 	Documents  []RequirementDocument `gorm:"foreignKey:RequirementID;constraint:OnDelete:CASCADE" json:"documents,omitempty"`

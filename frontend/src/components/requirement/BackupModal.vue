@@ -15,9 +15,10 @@ import {
   NTag,
   NPopconfirm,
   NSpin,
-  NEmpty
+  NEmpty,
+  NPagination
 } from 'naive-ui';
-import type { DataTableColumns } from 'naive-ui';
+import type { DataTableColumns, PaginationProps } from 'naive-ui';
 import { useBackupStore } from '@/store/modules/backup';
 import dayjs from 'dayjs';
 
@@ -43,6 +44,10 @@ const scheduleForm = ref({
 
 // 加载状态
 const submitLoading = ref(false);
+
+// 分页状态
+const currentPage = ref(1);
+const pageSize = ref(20);
 
 // 备份列表列定义
 const columns: DataTableColumns = [
@@ -170,14 +175,38 @@ async function handleDelete(backupId: number) {
   await backupStore.deleteBackupAction(props.requirementId, backupId);
 }
 
+// 分页改变
+function handlePageChange(page: number) {
+  currentPage.value = page;
+  backupStore.loadBackups(props.requirementId, { page, pageSize: pageSize.value });
+}
+
+function handlePageSizeChange(size: number) {
+  pageSize.value = size;
+  currentPage.value = 1;
+  backupStore.loadBackups(props.requirementId, { page: 1, pageSize: size });
+}
+
+// 分页配置
+const paginationProps = computed<PaginationProps>(() => ({
+  page: currentPage.value,
+  pageSize: pageSize.value,
+  itemCount: backupStore.total,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50, 100],
+  onChange: handlePageChange,
+  onUpdatePageSize: handlePageSizeChange
+}));
+
 // 弹框打开时加载数据
 watch(
   () => props.show,
   async (newVal) => {
     if (newVal) {
+      currentPage.value = 1;
       await Promise.all([
         backupStore.loadSchedule(props.requirementId),
-        backupStore.loadBackups(props.requirementId, { pageSize: 50 })
+        backupStore.loadBackups(props.requirementId, { page: 1, pageSize: pageSize.value })
       ]);
       // 填充表单
       if (backupStore.schedule) {
@@ -287,6 +316,9 @@ watch(
             :bordered="false"
             :max-height="400"
           />
+          <div class="mt-16 flex justify-end">
+            <NPagination v-bind="paginationProps" />
+          </div>
           <NEmpty v-if="!backupStore.backups.length && !backupStore.loading" description="暂无备份记录" />
         </NSpin>
       </NCard>
@@ -308,6 +340,18 @@ watch(
 
 .mb-16 {
   margin-bottom: 16px;
+}
+
+.mt-16 {
+  margin-top: 16px;
+}
+
+.flex {
+  display: flex;
+}
+
+.justify-end {
+  justify-content: flex-end;
 }
 
 .text-gray-400 {

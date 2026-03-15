@@ -4,9 +4,25 @@ export type TaskStatus = 'pending' | 'done' | 'deferred' | 'in-progress';
 /** 任务优先级 */
 export type TaskPriority = 'high' | 'medium' | 'low';
 
+/** 代码接口定义 */
+export interface CodeInterface {
+  name: string;
+  inputs?: string;
+  outputs?: string;
+  example?: string;
+}
+
+/** 验收标准 */
+export interface AcceptanceCriteria {
+  id: number;
+  description: string;
+  completed: boolean;
+}
+
 /** 子任务 */
 export interface Subtask {
   id: number;
+  taskId: number;
   title: string;
   titleTrans?: string;
   description?: string;
@@ -14,6 +30,16 @@ export interface Subtask {
   details?: string;
   detailsTrans?: string;
   status: TaskStatus;
+  priority: TaskPriority;
+  sortOrder: number;
+  estimatedHours?: number;
+  actualHours?: number;
+  codeInterface?: CodeInterface;
+  acceptanceCriteria?: AcceptanceCriteria[];
+  relatedFiles?: string[];
+  codeHints?: string;
+  createdAt?: string;
+  updatedAt?: string;
   dependencies?: number[];
 }
 
@@ -45,6 +71,9 @@ export interface Task {
   completedAt?: string;
   estimatedHours?: number;
   actualHours?: number;
+  // AI 扩展状态
+  isExpanding?: boolean;
+  expandMessageId?: number;
   // 扩展字段
   tags?: string[];
   createdAt?: string;
@@ -107,6 +136,13 @@ export interface SubtaskUpdateRequest {
   title?: string;
   description?: string;
   details?: string;
+  priority?: TaskPriority;
+  estimatedHours?: number;
+  actualHours?: number;
+  codeInterface?: CodeInterface;
+  acceptanceCriteria?: AcceptanceCriteria[];
+  relatedFiles?: string[];
+  codeHints?: string;
 }
 
 /** 任务统计 */

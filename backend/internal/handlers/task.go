@@ -370,7 +370,7 @@ func (h *TaskHandler) ExpandTaskAsync(c *gin.Context) {
 	title := "子任务拆分"
 	content := task.Title
 	message := models.Message{
-		TaskID:  taskID,
+		TaskID:  &taskID,
 		Type:    "expand_task",
 		Status:  "processing",
 		Title:   title,
@@ -924,4 +924,81 @@ func (h *TaskHandler) GetReadyTasks(c *gin.Context) {
 	}
 
 	response.Success(c, readyTasks)
+}
+
+// ExpandTaskWithKnowledge 使用知识库展开任务
+// POST /api/tasks/:taskId/expand-with-knowledge
+func (h *TaskHandler) ExpandTaskWithKnowledge(c *gin.Context) {
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+
+	var req struct {
+		KnowledgePaths    []string `json:"knowledgePaths"`
+		AdditionalContext string   `json:"additionalContext"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请求参数格式错误")
+		return
+	}
+
+	// 获取任务
+	task, err := h.service.GetByID(taskID)
+	if err != nil {
+		response.NotFound(c, "任务不存在")
+		return
+	}
+
+	// 检查任务是否已在拆分中
+	if task.IsExpanding {
+		response.Error(c, 400, "任务正在拆分中")
+		return
+	}
+
+	// 这里需要 AI 服务支持知识库
+	// 暂时使用普通展开
+	if err := h.service.ExpandTask(taskID, true); err != nil {
+		h.logger.Error("带知识库展开任务失败", zap.Error(err))
+		response.Error(c, 500, "展开任务失败")
+		return
+	}
+
+	updatedTask, _ := h.service.GetByID(taskID)
+	response.Success(c, updatedTask)
+}
+
+// ExpandTaskWithResearch 使用研究功能展开任务
+// POST /api/tasks/:taskId/expand-with-research
+func (h *TaskHandler) ExpandTaskWithResearch(c *gin.Context) {
+	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的任务 ID")
+		return
+	}
+
+	// 获取任务
+	task, err := h.service.GetByID(taskID)
+	if err != nil {
+		response.NotFound(c, "任务不存在")
+		return
+	}
+
+	// 检查任务是否已在拆分中
+	if task.IsExpanding {
+		response.Error(c, 400, "任务正在拆分中")
+		return
+	}
+
+	// 使用研究功能展开（需要 Perplexity 或其他研究 API）
+	// 暂时使用普通展开
+	if err := h.service.ExpandTask(taskID, true); err != nil {
+		h.logger.Error("带研究展开任务失败", zap.Error(err))
+		response.Error(c, 500, "展开任务失败")
+		return
+	}
+
+	updatedTask, _ := h.service.GetByID(taskID)
+	response.Success(c, updatedTask)
 }

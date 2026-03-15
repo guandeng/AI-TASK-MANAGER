@@ -19,6 +19,7 @@ import (
 type Provider interface {
 	ExpandTask(task *models.Task) ([]models.Subtask, error)
 	Chat(prompt string) (string, error)
+	Research(prompt string) (string, error) // Perplexity 研究功能
 }
 
 // Service AI 服务
@@ -66,6 +67,55 @@ func (s *Service) Chat(prompt string) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported AI provider: %s", provider)
 	}
+}
+
+// Research 使用 Perplexity 进行研究
+func (s *Service) Research(prompt string) (string, error) {
+	// 优先使用 Perplexity，如果没有配置则使用默认 provider
+	if cfg, ok := s.cfg.Providers["perplexity"]; ok && cfg.Enabled {
+		return s.chatOpenAICompat("perplexity", prompt)
+	}
+	// 回退到默认 provider
+	return s.Chat(prompt)
+}
+
+// ExpandTaskWithKnowledge 使用知识库展开任务
+func (s *Service) ExpandTaskWithKnowledge(task *models.Task, knowledgeContext string) ([]models.Subtask, error) {
+	prompt := s.buildExpandPromptWithKnowledge(task, knowledgeContext)
+	response, err := s.Chat(prompt)
+	if err != nil {
+		return nil, err
+	}
+	return s.parseSubtasks(response, task.ID)
+}
+
+// ExpandTaskWithResearch 使用研究功能展开任务
+func (s *Service) ExpandTaskWithResearch(task *models.Task) ([]models.Subtask, error) {
+	// 先进行研究
+	researchPrompt := fmt.Sprintf(`请研究以下任务的实现方案，包括：
+1. 最佳实践
+2. 常见问题和解决方案
+3. 推荐的技术栈和工具
+4. 代码示例（如果有）
+
+任务标题：%s
+任务描述：%s
+任务详情：%s
+
+请提供详细的研究结果。`, task.Title, task.Description, task.Details)
+
+	researchResult, err := s.Research(researchPrompt)
+	if err != nil {
+		return nil, fmt.Errorf("研究失败: %w", err)
+	}
+
+	// 基于研究结果展开任务
+	prompt := s.buildExpandPromptWithResearch(task, researchResult)
+	response, err := s.Chat(prompt)
+	if err != nil {
+		return nil, err
+	}
+	return s.parseSubtasks(response, task.ID)
 }
 
 // chatOpenAICompat 使用 OpenAI 兼容 API 发送请求
@@ -213,11 +263,39 @@ func (s *Service) buildExpandPrompt(task *models.Task) string {
 - title: 子任务标题（必填）
 - description: 子任务描述（可选）
 - details: 详细说明（可选）
+- priority: 优先级（high/medium/low，默认medium）
+- codeInterface: 代码接口定义，JSON对象包含：
+  - name: 函数/方法名称
+  - inputs: 输入参数类型定义（TypeScript格式）
+  - outputs: 输出类型定义（TypeScript格式）
+  - example: 使用示例代码
+- acceptanceCriteria: 验收标准数组，每项包含：
+  - description: 验收条件描述
+  - completed: 是否完成（默认false）
+- relatedFiles: 关联的源文件路径数组（如 ["src/auth/service.ts", "src/auth/types.ts"]）
+- codeHints: 代码实现提示和建议
 
 示例格式：
 [
-  {"title": "子任务1标题", "description": "子任务1描述", "details": "详细说明"},
-  {"title": "子任务2标题", "description": "子任务2描述", "details": "详细说明"}
+  {
+    "title": "验证用户登录",
+    "description": "实现用户登录验证逻辑",
+    "details": "校验用户名密码，生成JWT token",
+    "priority": "high",
+    "codeInterface": {
+      "name": "validateLogin",
+      "inputs": "{ username: string; password: string }",
+      "outputs": "{ success: boolean; token?: string; error?: string }",
+      "example": "const result = await validateLogin({ username: 'admin', password: '123' });"
+    },
+    "acceptanceCriteria": [
+      {"description": "用户名或密码为空返回 success: false", "completed": false},
+      {"description": "密码错误返回 success: false 且 error 包含错误信息", "completed": false},
+      {"description": "验证成功返回 token", "completed": false}
+    ],
+    "relatedFiles": ["src/auth/service.ts", "src/auth/types.ts"],
+    "codeHints": "使用 bcrypt.compare 验证密码，使用 jsonwebtoken 生成 token"
+  }
 ]
 
 请只返回 JSON 数组，不要包含其他内容。`,
@@ -248,25 +326,97 @@ func (s *Service) parseSubtasks(response string, taskID uint64) ([]models.Subtas
 
 	jsonStr := cleanedResponse[jsonStart : jsonEnd+1]
 
-	var subtasks []struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Details     string `json:"details"`
+	// 定义解析结构
+	type CodeInterface struct {
+		Name    string `json:"name"`
+		Inputs  string `json:"inputs"`
+		Outputs string `json:"outputs"`
+		Example string `json:"example"`
 	}
 
-	if err := json.Unmarshal([]byte(jsonStr), &subtasks); err != nil {
+	type AcceptanceCriteria struct {
+		ID          uint   `json:"id"`
+		Description string `json:"description"`
+		Completed   bool   `json:"completed"`
+	}
+
+	var subtasksData []struct {
+		Title              string               `json:"title"`
+		Description        string               `json:"description"`
+		Details            string               `json:"details"`
+		Priority           string               `json:"priority"`
+		CodeInterface      *CodeInterface       `json:"codeInterface"`
+		AcceptanceCriteria []AcceptanceCriteria `json:"acceptanceCriteria"`
+		RelatedFiles       []string             `json:"relatedFiles"`
+		CodeHints          string               `json:"codeHints"`
+	}
+
+	if err := json.Unmarshal([]byte(jsonStr), &subtasksData); err != nil {
 		return nil, fmt.Errorf("failed to parse subtasks: %w", err)
 	}
 
-	result := make([]models.Subtask, len(subtasks))
-	for i, st := range subtasks {
+	result := make([]models.Subtask, len(subtasksData))
+	for i, st := range subtasksData {
+		// 处理优先级
+		priority := st.Priority
+		if priority == "" {
+			priority = "medium"
+		}
+
+		// 处理 codeInterface -> JSON 字符串
+		var codeInterfaceStr *string
+		if st.CodeInterface != nil {
+			jsonBytes, err := json.Marshal(st.CodeInterface)
+			if err == nil {
+				str := string(jsonBytes)
+				codeInterfaceStr = &str
+			}
+		}
+
+		// 处理 acceptanceCriteria -> JSON 字符串
+		var acceptanceCriteriaStr *string
+		if len(st.AcceptanceCriteria) > 0 {
+			// 为每个验收标准分配 ID
+			for j := range st.AcceptanceCriteria {
+				if st.AcceptanceCriteria[j].ID == 0 {
+					st.AcceptanceCriteria[j].ID = uint(j + 1)
+				}
+			}
+			jsonBytes, err := json.Marshal(st.AcceptanceCriteria)
+			if err == nil {
+				str := string(jsonBytes)
+				acceptanceCriteriaStr = &str
+			}
+		}
+
+		// 处理 relatedFiles -> JSON 字符串
+		var relatedFilesStr *string
+		if len(st.RelatedFiles) > 0 {
+			jsonBytes, err := json.Marshal(st.RelatedFiles)
+			if err == nil {
+				str := string(jsonBytes)
+				relatedFilesStr = &str
+			}
+		}
+
+		// 处理 codeHints
+		var codeHintsStr *string
+		if st.CodeHints != "" {
+			codeHintsStr = &st.CodeHints
+		}
+
 		result[i] = models.Subtask{
-			TaskID:      taskID,
-			Title:       st.Title,
-			Description: st.Description,
-			Details:     st.Details,
-			Status:      "pending",
-			SortOrder:   uint(i),
+			TaskID:             taskID,
+			Title:              st.Title,
+			Description:        st.Description,
+			Details:            st.Details,
+			Status:             "pending",
+			Priority:           priority,
+			SortOrder:          uint(i),
+			CodeInterface:      codeInterfaceStr,
+			AcceptanceCriteria: acceptanceCriteriaStr,
+			RelatedFiles:       relatedFilesStr,
+			CodeHints:          codeHintsStr,
 		}
 	}
 
@@ -440,4 +590,92 @@ func parseIntOrDefault(s string, defaultVal int) int {
 		return defaultVal
 	}
 	return val
+}
+
+// buildExpandPromptWithKnowledge 构建带知识库的任务展开提示词
+func (s *Service) buildExpandPromptWithKnowledge(task *models.Task, knowledgeContext string) string {
+	return fmt.Sprintf(`请将以下任务拆分为 %d 个子任务。每个子任务应该是一个具体的、可执行的步骤。
+
+%s
+
+任务标题：%s
+任务描述：%s
+任务详情：%s
+
+请以 JSON 数组格式返回子任务列表，每个子任务包含以下字段：
+- title: 子任务标题（必填）
+- description: 子任务描述（可选）
+- details: 详细说明（可选）
+- priority: 优先级（high/medium/low，默认medium）
+- codeInterface: 代码接口定义，JSON对象包含：
+  - name: 函数/方法名称
+  - inputs: 输入参数类型定义（TypeScript格式）
+  - outputs: 输出类型定义（TypeScript格式）
+  - example: 使用示例代码
+- acceptanceCriteria: 验收标准数组，每项包含：
+  - description: 验收条件描述
+  - completed: 是否完成（默认false）
+- relatedFiles: 关联的源文件路径数组（如 ["src/auth/service.ts", "src/auth/types.ts"]）
+- codeHints: 代码实现提示和建议
+
+示例格式：
+[
+  {
+    "title": "验证用户登录",
+    "description": "实现用户登录验证逻辑",
+    "details": "校验用户名密码，生成JWT token",
+    "priority": "high",
+    "codeInterface": {
+      "name": "validateLogin",
+      "inputs": "{ username: string; password: string }",
+      "outputs": "{ success: boolean; token?: string; error?: string }",
+      "example": "const result = await validateLogin({ username: 'admin', password: '123' });"
+    },
+    "acceptanceCriteria": [
+      {"description": "用户名或密码为空返回 success: false", "completed": false},
+      {"description": "密码错误返回 success: false 且 error 包含错误信息", "completed": false},
+      {"description": "验证成功返回 token", "completed": false}
+    ],
+    "relatedFiles": ["src/auth/service.ts", "src/auth/types.ts"],
+    "codeHints": "使用 bcrypt.compare 验证密码，使用 jsonwebtoken 生成 token"
+  }
+]
+
+请只返回 JSON 数组，不要包含其他内容。`,
+		3, // 默认子任务数量
+		knowledgeContext,
+		task.Title,
+		task.Description,
+		task.Details,
+	)
+}
+
+// buildExpandPromptWithResearch 构建带研究结果的任务展开提示词
+func (s *Service) buildExpandPromptWithResearch(task *models.Task, researchResult string) string {
+	return fmt.Sprintf(`基于研究结果，请将以下任务拆分为 %d 个子任务。每个子任务应该是一个具体的、可执行的步骤。
+
+研究结果：
+%s
+
+任务标题：%s
+任务描述：%s
+任务详情：%s
+
+请根据研究结果中的最佳实践和建议来拆分任务。以 JSON 数组格式返回子任务列表，每个子任务包含以下字段：
+- title: 子任务标题（必填）
+- description: 子任务描述（可选）
+- details: 详细说明（可选）
+- priority: 优先级（high/medium/low，默认medium）
+- codeInterface: 代码接口定义
+- acceptanceCriteria: 验收标准数组
+- relatedFiles: 关联的源文件路径数组
+- codeHints: 代码实现提示和建议
+
+请只返回 JSON 数组，不要包含其他内容。`,
+		3, // 默认子任务数量
+		researchResult,
+		task.Title,
+		task.Description,
+		task.Details,
+	)
 }

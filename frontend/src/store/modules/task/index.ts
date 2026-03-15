@@ -661,7 +661,11 @@ export const useTaskStore = defineStore('task-store', () => {
       const { data, error } = await validateDependenciesApi();
       if (!error && data) {
         const result = extractData(data);
-        return { valid: !result.includes('Circular'), message: result };
+        // result 格式: { message: string, valid: boolean }
+        if (result && typeof result === 'object') {
+          return { valid: result.valid, message: result.message };
+        }
+        return { valid: true, message: '依赖关系有效' };
       }
       return { valid: true, message: '依赖关系有效' };
     } catch (error) {

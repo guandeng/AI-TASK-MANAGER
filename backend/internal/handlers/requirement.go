@@ -50,8 +50,8 @@ func (h *RequirementHandler) List(c *gin.Context) {
 		pageSize = 20
 	}
 
-	// 构建查询
-	query := db.Model(&models.Requirement{})
+	// 构建查询 - 排除已删除的记录
+	query := db.Model(&models.Requirement{}).Where("deleted_at IS NULL")
 
 	// 筛选条件
 	if status := c.Query("status"); status != "" {
@@ -119,7 +119,7 @@ func (h *RequirementHandler) Get(c *gin.Context) {
 	}
 
 	var requirement models.Requirement
-	if err := db.First(&requirement, id).Error; err != nil {
+	if err := db.Where("deleted_at IS NULL").First(&requirement, id).Error; err != nil {
 		response.NotFound(c, "需求不存在")
 		return
 	}
@@ -170,7 +170,7 @@ func (h *RequirementHandler) Update(c *gin.Context) {
 	}
 
 	var req models.Requirement
-	if err := db.First(&req, id).Error; err != nil {
+	if err := db.Where("deleted_at IS NULL").First(&req, id).Error; err != nil {
 		response.NotFound(c, "需求不存在")
 		return
 	}
@@ -202,7 +202,9 @@ func (h *RequirementHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := db.Delete(&models.Requirement{}, id).Error; err != nil {
+	// 软删除：设置 deleted_at
+	now := time.Now()
+	if err := db.Model(&models.Requirement{}).Where("id = ? AND deleted_at IS NULL", id).Update("deleted_at", &now).Error; err != nil {
 		h.logger.Error("删除需求失败", zap.Error(err))
 		response.Error(c, 500, "删除需求失败")
 		return
@@ -498,12 +500,13 @@ func (h *RequirementHandler) SplitTasksAsync(c *gin.Context) {
 	// 创建消息记录
 	title := "需求拆分任务"
 	content := requirement.Title
+	reqID := requirement.ID
 	message := models.Message{
-		TaskID:  0, // 需求拆分没有关联的任务，设为 0
-		Type:    "split_requirement",
-		Status:  "processing",
-		Title:   title,
-		Content: &content,
+		RequirementID: &reqID, // 关联需求ID
+		Type:          "split_requirement",
+		Status:        "processing",
+		Title:         title,
+		Content:       &content,
 	}
 	if err := db.Create(&message).Error; err != nil {
 		h.logger.Error("创建消息记录失败", zap.Error(err))

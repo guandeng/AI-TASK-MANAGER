@@ -137,6 +137,10 @@ func (h *MessageHandler) MarkAllRead(c *gin.Context) {
 // Delete 删除消息
 func (h *MessageHandler) Delete(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		response.ServerError(c, "数据库未初始化")
+		return
+	}
 
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {

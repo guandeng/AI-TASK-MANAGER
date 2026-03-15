@@ -30,6 +30,15 @@ const emit = defineEmits<{
 
 const memberStore = useMemberStore();
 
+// 辅助函数：提取后端返回的 data 字段
+function extractData(responseData: any): any {
+  if (!responseData) return null;
+  if (responseData.data !== undefined) {
+    return responseData.data;
+  }
+  return responseData;
+}
+
 // 获取有效的 memberId：优先使用传入的，否则使用第一个成员
 const effectiveMemberId = computed(() => {
   if (props.memberId) return props.memberId;
@@ -72,7 +81,7 @@ async function loadComments() {
   try {
     const { data, error } = await fetchTaskComments(props.taskId);
     if (!error && data) {
-      comments.value = data;
+      comments.value = extractData(data) || [];
     }
   } finally {
     loading.value = false;
@@ -87,7 +96,7 @@ async function loadReplies(commentId: number) {
   try {
     const { data, error } = await fetchCommentReplies(props.taskId, commentId);
     if (!error && data) {
-      repliesMap.value.set(commentId, data);
+      repliesMap.value.set(commentId, extractData(data) || []);
       expandedComments.value.add(commentId);
     }
   } finally {

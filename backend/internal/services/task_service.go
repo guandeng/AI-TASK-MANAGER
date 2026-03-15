@@ -208,4 +208,6 @@ func (s *taskService) UpdateTime(id uint64, startTime, dueDate *time.Time, estim
 type AIService interface {
 	ExpandTask(task *models.Task) ([]models.Subtask, error)
 	GenerateSubtask(task *models.Task) (*models.Subtask, error)
+	Chat(prompt string) (string, error)
+	Research(prompt string) (string, error)
 }

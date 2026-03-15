@@ -29,6 +29,7 @@ type Task struct {
 	ActualHours      *float64   `gorm:"type:decimal(10,2)" json:"actualHours,omitempty"`
 	CreatedAt        time.Time  `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt        time.Time  `gorm:"autoUpdateTime" json:"updatedAt"`
+	DeletedAt        *time.Time `gorm:"index:idx_deleted_at" json:"deletedAt,omitempty"`
 
 	// 子任务统计（通过子查询获取）
 	SubtaskCount     int `gorm:"-" json:"subtaskCount"`
@@ -57,7 +58,14 @@ type Subtask struct {
 	Details          string    `gorm:"type:text" json:"details"`
 	DetailsTrans     *string   `gorm:"type:text" json:"detailsTrans,omitempty"`
 	Status           string    `gorm:"size:50;not null;default:pending;index:idx_status" json:"status"`
+	Priority         string    `gorm:"size:20;not null;default:medium" json:"priority"`
 	SortOrder        uint      `gorm:"default:0" json:"sortOrder"`
+	EstimatedHours   *float64  `gorm:"type:decimal(10,2)" json:"estimatedHours,omitempty"`
+	ActualHours      *float64  `gorm:"type:decimal(10,2)" json:"actualHours,omitempty"`
+	CodeInterface    *string   `gorm:"type:text" json:"codeInterface,omitempty"`
+	AcceptanceCriteria *string `gorm:"type:text" json:"acceptanceCriteria,omitempty"`
+	RelatedFiles     *string   `gorm:"type:text" json:"relatedFiles,omitempty"`
+	CodeHints        *string   `gorm:"type:text" json:"codeHints,omitempty"`
 	CreatedAt        time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt        time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
@@ -104,4 +112,49 @@ type SubtaskDependency struct {
 // TableName 指定表名
 func (SubtaskDependency) TableName() string {
 	return "task_subtask_dependency"
+}
+
+// TaskComplexityReport 任务复杂度分析报告
+type TaskComplexityReport struct {
+	ID           uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	RequirementID *uint64  `gorm:"index" json:"requirementId,omitempty"`
+	Status       string    `gorm:"size:50;not null;default:pending" json:"status"` // pending, processing, completed, failed
+	ReportData   string    `gorm:"type:longtext" json:"reportData"` // JSON 格式的报告数据
+	ErrorMessage *string   `gorm:"type:text" json:"errorMessage,omitempty"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+}
+
+// TableName 指定表名
+func (TaskComplexityReport) TableName() string {
+	return "task_complexity_report"
+}
+
+// ComplexityAnalysis 单个任务的复杂度分析
+type ComplexityAnalysis struct {
+	TaskID          int      `json:"taskId"`
+	TaskTitle       string   `json:"taskTitle"`
+	ComplexityScore int      `json:"complexityScore"` // 1-10
+	ComplexityLevel string   `json:"complexityLevel"` // low, medium, high
+	Reasoning       string   `json:"reasoning"`
+	SubtaskCount    int      `json:"subtaskCount"`    // 建议的子任务数量
+	TimeEstimate    string   `json:"timeEstimate"`    // 预估时间
+	Dependencies    []int    `json:"dependencies"`    // 依赖的任务ID
+	RiskFactors     []string `json:"riskFactors"`     // 风险因素
+}
+
+// ComplexityReportData 复杂度报告数据结构
+type ComplexityReportData struct {
+	Analyses    []ComplexityAnalysis `json:"analyses"`
+	Summary     ComplexitySummary    `json:"summary"`
+	GeneratedAt string               `json:"generatedAt"`
+}
+
+// ComplexitySummary 复杂度汇总
+type ComplexitySummary struct {
+	TotalTasks       int `json:"totalTasks"`
+	LowComplexity    int `json:"lowComplexity"`
+	MediumComplexity int `json:"mediumComplexity"`
+	HighComplexity   int `json:"highComplexity"`
+	AverageScore     int `json:"averageScore"`
 }

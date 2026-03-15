@@ -66,6 +66,7 @@ export const useTaskStore = defineStore('task-store', () => {
       pending: 0,
       deferred: 0,
       inProgress: 0,
+      paused: 0,
       highPriority: 0,
       mediumPriority: 0,
       lowPriority: 0
@@ -77,6 +78,7 @@ export const useTaskStore = defineStore('task-store', () => {
       else if (task.status === 'pending') stats.pending++;
       else if (task.status === 'deferred') stats.deferred++;
       else if (task.status === 'in-progress') stats.inProgress++;
+      else if (task.status === 'paused') stats.paused++;
 
       // 优先级统计
       if (task.priority === 'high') stats.highPriority++;
@@ -93,7 +95,8 @@ export const useTaskStore = defineStore('task-store', () => {
       pending: tasks.value.filter(t => t.status === 'pending'),
       done: tasks.value.filter(t => t.status === 'done'),
       deferred: tasks.value.filter(t => t.status === 'deferred'),
-      inProgress: tasks.value.filter(t => t.status === 'in-progress')
+      inProgress: tasks.value.filter(t => t.status === 'in-progress'),
+      paused: tasks.value.filter(t => t.status === 'paused')
     };
   });
 
@@ -162,7 +165,14 @@ export const useTaskStore = defineStore('task-store', () => {
         // 更新列表中的任务
         const index = tasks.value.findIndex(t => t.id === id);
         if (index !== -1) {
-          tasks.value[index] = { ...tasks.value[index], ...updatedTask };
+          // 保留原有的子任务统计字段，不被覆盖
+          const existingTask = tasks.value[index];
+          tasks.value[index] = {
+            ...existingTask,
+            ...updatedTask,
+            subtaskCount: existingTask.subtaskCount,
+            subtaskDoneCount: existingTask.subtaskDoneCount
+          };
         }
         // 如果是当前任务，也更新
         if (currentTask.value?.id === id) {
@@ -353,7 +363,7 @@ export const useTaskStore = defineStore('task-store', () => {
       return null;
     } catch (error) {
       console.error('Failed to start async task expansion:', error);
-      window.$message?.error('启动异步拆分失败');
+      // 不在这里显示错误，由视图层处理
       return null;
     }
   }

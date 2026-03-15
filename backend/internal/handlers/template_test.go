@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -547,21 +548,25 @@ func TestTemplateHandler_ScoreProjectTemplate(t *testing.T) {
 	tests := []struct {
 		name       string
 		id         string
+		body       string
 		expectCode int
 		setupMock  func(mock sqlmock.Sqlmock)
 	}{
 		{
-			name:       "无效的 ID",
-			id:         "abc",
+			name:       "请求参数错误",
+			id:         "",
+			body:       `{}`,
 			expectCode: http.StatusBadRequest,
 			setupMock:  func(mock sqlmock.Sqlmock) {},
 		},
 		{
 			name:       "模板不存在",
 			id:         "999",
+			body:       `{"id": 999}`,
 			expectCode: http.StatusNotFound,
 			setupMock: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery("SELECT").
+					WithArgs(999).
 					WillReturnRows(sqlmock.NewRows([]string{"id"}))
 			},
 		},
@@ -570,11 +575,12 @@ func TestTemplateHandler_ScoreProjectTemplate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler, router, mock := setupTemplateTestWithDB(t)
-			router.POST("/project-templates/:id/score", handler.ScoreProjectTemplate)
+			router.POST("/project-templates/score", handler.ScoreProjectTemplate)
 
 			tt.setupMock(mock)
 
-			req := httptest.NewRequest(http.MethodPost, "/project-templates/"+tt.id+"/score", nil)
+			req := httptest.NewRequest(http.MethodPost, "/project-templates/score", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 

@@ -521,7 +521,7 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
 需求内容：
 %s
 
-请以 JSON 数组格式返回任务列表，每个任务必须包含以下 8 个字段：
+请以 JSON 数组格式返回任务列表，每个任务必须包含以下 9 个字段：
 - title: 任务名称（清晰、可搜索）
 - module: 模块归属（MCP 接入/AI 能力/数据处理/接口封装）
 - input: 输入（依赖什么：结构、接口、权限、环境）
@@ -530,10 +530,10 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
 - risk: 风险点（可能的技术风险、依赖风险等）
 - priority: 优先级（high/medium/low）
 - estimatedHours: 预估工时（小时数）
+- details: 实现细节（具体的实现步骤、关键技术点、注意事项）
 
 可选字段：
 - description: 任务描述
-- details: 实现细节
 - testStrategy: 测试策略
 - dependencies: 依赖的任务索引数组
 
@@ -560,6 +560,7 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
     "risk": "密码加密方式变更可能导致旧数据不兼容",
     "priority": "high",
     "estimatedHours": 4,
+    "details": "1. 创建 User 模型，包含用户名、密码哈希等字段\n2. 实现密码加密函数，使用 bcrypt 算法\n3. 创建登录处理函数，验证用户名密码\n4. 密码正确时生成 JWT token 并返回\n5. 密码错误时返回 401 错误\n6. 添加输入参数验证中间件",
     "dependencies": []
   }
 ]
@@ -838,7 +839,7 @@ func (s *Service) buildSplitRequirementPromptWithLanguage(requirement *models.Re
 需求内容：
 %s
 
-请以 JSON 数组格式返回任务列表，每个任务必须包含以下 8 个字段：
+请以 JSON 数组格式返回任务列表，每个任务必须包含以下 9 个字段：
 - title: 任务名称（清晰、可搜索）
 - module: 模块归属（MCP 接入/AI 能力/数据处理/接口封装）
 - input: 输入（依赖什么：结构、接口、权限、环境）
@@ -847,10 +848,10 @@ func (s *Service) buildSplitRequirementPromptWithLanguage(requirement *models.Re
 - risk: 风险点（可能的技术风险、依赖风险等）
 - priority: 优先级（high/medium/low）
 - estimatedHours: 预估工时（小时数）
+- details: 实现细节（具体的实现步骤、关键技术点、注意事项）
 
 可选字段：
 - description: 任务描述
-- details: 实现细节
 - testStrategy: 测试策略
 - dependencies: 依赖的任务索引数组
 
@@ -877,6 +878,7 @@ func (s *Service) buildSplitRequirementPromptWithLanguage(requirement *models.Re
     "risk": "密码加密方式变更可能导致旧数据不兼容",
     "priority": "high",
     "estimatedHours": 4,
+    "details": "1. 创建 User 模型，包含用户名、密码哈希等字段\n2. 实现密码加密函数，使用 bcrypt 算法\n3. 创建登录处理函数，验证用户名密码\n4. 密码正确时生成 JWT token 并返回\n5. 密码错误时返回 401 错误\n6. 添加输入参数验证中间件",
     "dependencies": []
   }
 ]

@@ -9,6 +9,12 @@
 - 使用 `any` 代替 `interface{}`
 - 使用 `:=` 短变量声明
 - 使用泛型时优先类型推断
+- **不要定义或使用枚举类型**，数据库字段使用 `string` 类型配合 GORM 的 `size` 标签
+
+## 数据库字段规范
+- 所有字段使用基本类型（string, int, bool, time.Time 等）
+- 固定值的字段使用 `string` + `size` 标签，不用枚举类型
+- 示例：`Category string `gorm:"size:20"` // 可选值：frontend, backend`
 
 ## API 设计规范
 - 只使用 GET 和 POST 请求

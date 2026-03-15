@@ -30,14 +30,16 @@ const statusTextMap: Record<string, string> = {
   pending: '待处理',
   'in-progress': '进行中',
   done: '已完成',
-  deferred: '已延期'
+  deferred: '已延期',
+  paused: '已暂停'
 };
 
 const statusColorMap: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
   pending: 'default',
   'in-progress': 'info',
   done: 'success',
-  deferred: 'warning'
+  deferred: 'warning',
+  paused: 'warning'
 };
 
 const priorityTextMap: Record<string, string> = {
@@ -56,6 +58,7 @@ const priorityColorMap: Record<string, 'error' | 'warning' | 'success'> = {
 const subtaskStatusOptions: SelectOption[] = [
   { label: '待处理', value: 'pending' },
   { label: '进行中', value: 'in-progress' },
+  { label: '已暂停', value: 'paused' },
   { label: '已完成', value: 'done' },
   { label: '已延期', value: 'deferred' }
 ];
@@ -355,15 +358,13 @@ async function handleExpandTask() {
 
   expandLoading.value = true;
   expandStartTime.value = Date.now(); // 记录开始时间
-  try {
-    const messageId = await taskStore.expandTaskAsync(taskId.value);
-    if (messageId) {
-      window.$message?.success('拆分任务已提交，正在后台处理，完成后会通知您');
-      // 不再跳转到消息列表，保持当前页面
-      pollingMessageId.value = messageId;
-      startPolling();
-    }
-  } catch (err) {
+  const messageId = await taskStore.expandTaskAsync(taskId.value);
+  if (messageId) {
+    window.$message?.success('拆分任务已提交，正在后台处理，完成后会通知您');
+    // 不再跳转到消息列表，保持当前页面
+    pollingMessageId.value = messageId;
+    startPolling();
+  } else {
     window.$message?.error('拆分任务失败');
     expandLoading.value = false;
     expandStartTime.value = null;
@@ -421,6 +422,9 @@ function startPollingMessageStatus() {
     }
   }, interval);
 }
+
+// 别名
+const startPolling = startPollingMessageStatus;
 
 // 停止轮询
 function stopPolling() {
@@ -643,7 +647,22 @@ onUnmounted(() => {
                   <NDescriptionsItem label="ID">{{ task.id }}</NDescriptionsItem>
                   <NDescriptionsItem label="描述">{{ task.descriptionTrans || task.description || '-' }}</NDescriptionsItem>
                   <NDescriptionsItem label="依赖">
-                    {{ task.dependencies?.length ? task.dependencies.map((d: any) => d.dependsOnTaskId || d).join(', ') : '-' }}
+                    <template v-if="task.dependencies?.length">
+                      <NSpace wrap>
+                        <template v-for="d in task.dependencies" :key="d.id">
+                          <NButton
+                            v-if="d.dependsOnTask"
+                            text
+                            type="primary"
+                            @click="router.push(`/requirement/task-detail/${d.dependsOnTask.id}`)"
+                          >
+                            {{ d.dependsOnTask.title }} (ID: {{ d.dependsOnTask.id }})
+                          </NButton>
+                          <NTag v-else type="info">ID: {{ d.dependsOnTaskId }}</NTag>
+                        </template>
+                      </NSpace>
+                    </template>
+                    <span v-else class="text-gray-400">-</span>
                   </NDescriptionsItem>
                   <NDescriptionsItem label="模块归属">
                     <NTag v-if="task.module" type="info">{{ task.module }}</NTag>

@@ -15,6 +15,7 @@ type ProjectTemplate struct {
 	UsageCount  int       `gorm:"default:0" json:"usageCount"`
 	Tags        *string   `gorm:"size:500" json:"tags,omitempty"`
 	FieldSchema *string   `gorm:"type:longtext" json:"fieldSchema,omitempty"` // 字段定义 JSON
+	LastScore   *string   `gorm:"type:text" json:"lastScore,omitempty"` // 最近评分结果 JSON
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 	DeletedAt   *time.Time `gorm:"index:idx_deleted_at" json:"deletedAt,omitempty"`

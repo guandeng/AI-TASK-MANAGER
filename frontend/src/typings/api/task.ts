@@ -1,5 +1,5 @@
 /** 任务状�� */
-export type TaskStatus = 'pending' | 'done' | 'deferred' | 'in-progress';
+export type TaskStatus = 'pending' | 'in-progress' | 'done' | 'deferred' | 'paused';
 
 /** 任务优先级 */
 export type TaskPriority = 'high' | 'medium' | 'low';
@@ -178,6 +178,7 @@ export interface TaskStatistics {
   pending: number;
   deferred: number;
   inProgress: number;
+  paused: number;
   highPriority: number;
   mediumPriority: number;
   lowPriority: number;
@@ -188,6 +189,7 @@ export interface TaskDependency {
   id: number;
   taskId: number;
   dependsOnTaskId: number;
+  dependsOnTask?: Task; // 依赖的任务对象（包含标题）
   createdAt?: string;
 }
 

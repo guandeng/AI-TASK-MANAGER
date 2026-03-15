@@ -259,8 +259,8 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			projectTemplates.POST("/:id/delete", templateHandler.DeleteProjectTemplate)
 			projectTemplates.POST("/:id/instantiate", templateHandler.InstantiateProjectTemplate)
 			// 项目模板打分
-			projectTemplates.POST("/:id/score", templateHandler.ScoreProjectTemplate)
-			projectTemplates.POST("/:id/score-async", templateHandler.ScoreProjectTemplateAsync)
+			projectTemplates.POST("/score", templateHandler.ScoreProjectTemplate)
+			projectTemplates.POST("/score-async", templateHandler.ScoreProjectTemplateAsync)
 		}
 
 		// 任务模板

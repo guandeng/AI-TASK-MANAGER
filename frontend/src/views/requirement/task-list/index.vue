@@ -54,6 +54,7 @@ const statusOptions = [
   { label: '全部', value: 'all' },
   { label: '待处理', value: 'pending' },
   { label: '进行中', value: 'in-progress' },
+  { label: '已暂停', value: 'paused' },
   { label: '已完成', value: 'done' },
   { label: '已延期', value: 'deferred' }
 ];
@@ -90,6 +91,7 @@ const priorityColorMap: Record<string, 'error' | 'warning' | 'success'> = {
 const statusColorMap: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
   pending: 'default',
   'in-progress': 'info',
+  paused: 'warning',
   done: 'success',
   deferred: 'warning'
 };
@@ -98,6 +100,7 @@ const statusColorMap: Record<string, 'default' | 'success' | 'warning' | 'error'
 const statusTextMap: Record<string, string> = {
   pending: '待处理',
   'in-progress': '进行中',
+  paused: '已暂停',
   done: '已完成',
   deferred: '已延期'
 };
@@ -380,8 +383,11 @@ const paginationConfig = computed(() => ({
   showSizePicker: true,
   showQuickJumper: true,
   pageSizes: [10, 20, 50, 100],
-  onChange: (page: number) => {
+  onChange: (page: number, size?: number) => {
     currentPage.value = page;
+    if (size && size !== pageSize.value) {
+      pageSize.value = size;
+    }
   },
   onUpdatePageSize: (size: number) => {
     pageSize.value = size;

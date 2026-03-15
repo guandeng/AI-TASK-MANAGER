@@ -89,20 +89,22 @@ export function instantiateProjectTemplate(id: number, data?: InstantiateTemplat
 /**
  * 对项目模板进行评分（同步）
  */
-export function scoreProjectTemplate(id: number) {
+export function scoreProjectTemplate(data: { id: number }) {
   return request<any>({
-    url: `${API_BASE}/templates/projects/${id}/score`,
-    method: 'POST'
+    url: `${API_BASE}/templates/projects/score`,
+    method: 'POST',
+    data
   });
 }
 
 /**
  * 对项目模板进行评分（异步）
  */
-export function scoreProjectTemplateAsync(id: number) {
+export function scoreProjectTemplateAsync(data: { id: number }) {
   return request<{ messageId: number; message: string }>({
-    url: `${API_BASE}/templates/projects/${id}/score-async`,
-    method: 'POST'
+    url: `${API_BASE}/templates/projects/score-async`,
+    method: 'POST',
+    data
   });
 }
 

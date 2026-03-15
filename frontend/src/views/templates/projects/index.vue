@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, computed, onMounted, onActivated, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   NCard,
   NDataTable,
@@ -46,6 +47,7 @@ import {
 } from '@/typings/api/template';
 
 const message = useMessage();
+const router = useRouter();
 
 // 状态
 const loading = ref(false);
@@ -152,13 +154,14 @@ const columns: DataTableColumns<ProjectTemplate> = [
   {
     title: '操作',
     key: 'actions',
-    width: 320,
+    width: 280,
     render(row) {
       return h(NSpace, {}, () => [
         h(NButton, {
           size: 'small',
-          onClick: () => handleView(row)
-        }, () => '查看'),
+          type: 'primary',
+          onClick: () => router.push(`/templates/projects/${row.id}`)
+        }, () => '详情'),
         h(NButton, {
           size: 'small',
           onClick: () => handleEdit(row)
@@ -166,7 +169,7 @@ const columns: DataTableColumns<ProjectTemplate> = [
         h(NButton, {
           size: 'small',
           type: 'info',
-          onClick: () => openScoreDrawer(row)
+          onClick: () => router.push(`/templates/projects/${row.id}`)
         }, () => '评分'),
         h(NButton, {
           size: 'small',
@@ -313,7 +316,7 @@ async function handleDelete(template: ProjectTemplate) {
 async function handleScore(template: ProjectTemplate) {
   scoreLoading.value = true;
   try {
-    const { data, error } = await scoreProjectTemplateAsync(template.id);
+    const { data, error } = await scoreProjectTemplateAsync({ id: template.id });
     if (!error && data) {
       const result = data.data || data;
       message.info(result.message || '评分已开始，完成后会通知您');

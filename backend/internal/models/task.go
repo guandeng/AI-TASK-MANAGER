@@ -93,14 +93,14 @@ func (Subtask) TableName() string {
 
 // TaskDependency 任务依赖关系
 type TaskDependency struct {
-	ID             uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	TaskID         uint64    `gorm:"not null;uniqueIndex:uk_task_dependency;index:idx_depends_on" json:"taskId"`
-	DependsOnTaskID uint64   `gorm:"not null;uniqueIndex:uk_task_dependency" json:"dependsOnTaskId"`
-	CreatedAt      time.Time `gorm:"autoCreateTime" json:"createdAt"`
+	ID              uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	TaskID          uint64    `gorm:"not null;uniqueIndex:uk_task_dependency;index:idx_depends_on" json:"taskId"`
+	DependsOnTaskID uint64    `gorm:"not null;uniqueIndex:uk_task_dependency" json:"dependsOnTaskId"`
+	DependsOnTask   *Task     `gorm:"foreignKey:DependsOnTaskID;constraint:OnDelete:CASCADE" json:"dependsOnTask,omitempty"`
+	CreatedAt       time.Time `gorm:"autoCreateTime" json:"createdAt"`
 
-	// 关联
-	Task         Task `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"-"`
-	DependsOnTask Task `gorm:"foreignKey:DependsOnTaskID;constraint:OnDelete:CASCADE" json:"-"`
+	// 关联（Task 字段保留用于其他场景）
+	Task Task `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
 // TableName 指定表名

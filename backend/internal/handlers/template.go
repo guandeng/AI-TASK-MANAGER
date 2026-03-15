@@ -681,17 +681,22 @@ func (h *TemplateHandler) InstantiateTaskTemplate(c *gin.Context) {
 
 // ============ 项目模板打分 ============
 
+// ScoreTemplateRequest 评分请求
+type ScoreTemplateRequest struct {
+	ID uint64 `json:"id" binding:"required"`
+}
+
 // ScoreProjectTemplate 对项目模板进行打分（同步版本）
 func (h *TemplateHandler) ScoreProjectTemplate(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的模板 ID")
+	var req ScoreTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请求参数错误：需要 id")
 		return
 	}
 
 	db := database.GetDB()
 	var template models.ProjectTemplate
-	if err := db.Preload("Tasks.Subtasks").First(&template, id).Error; err != nil {
+	if err := db.Where("deleted_at IS NULL").Preload("Tasks.Subtasks").First(&template, req.ID).Error; err != nil {
 		response.NotFound(c, "模板不存在")
 		return
 	}
@@ -702,7 +707,7 @@ func (h *TemplateHandler) ScoreProjectTemplate(c *gin.Context) {
 	// 调用 AI 进行评分
 	aiResponse, err := h.aiSvc.Chat(prompt)
 	if err != nil {
-		h.logger.Error("AI 评分失败", zap.Uint64("templateID", id), zap.Error(err))
+		h.logger.Error("AI 评分失败", zap.Uint64("templateID", req.ID), zap.Error(err))
 		response.Error(c, 500, "AI 评分失败："+err.Error())
 		return
 	}
@@ -710,10 +715,23 @@ func (h *TemplateHandler) ScoreProjectTemplate(c *gin.Context) {
 	// 解析评分结果
 	scoreResult, totalScore, err := h.parseScoreResponse(aiResponse)
 	if err != nil {
-		h.logger.Error("解析评分结果失败", zap.Uint64("templateID", id), zap.Error(err))
+		h.logger.Error("解析评分结果失败", zap.Uint64("templateID", req.ID), zap.Error(err))
 		response.Error(c, 500, "解析评分结果失败："+err.Error())
 		return
 	}
+
+	// 保存评分结果到模板
+	scoreJSON, _ := json.Marshal(gin.H{
+		"totalScore":  totalScore,
+		"scores":      scoreResult.Scores,
+		"strengths":   scoreResult.Strengths,
+		"weaknesses":  scoreResult.Weaknesses,
+		"suggestions": scoreResult.Suggestions,
+		"analysis":    scoreResult.Analysis,
+		"scoredAt":    time.Now().Format(time.RFC3339),
+	})
+	scoreStr := string(scoreJSON)
+	db.Model(&template).Update("last_score", &scoreStr)
 
 	response.Success(c, gin.H{
 		"score":       scoreResult,
@@ -724,15 +742,15 @@ func (h *TemplateHandler) ScoreProjectTemplate(c *gin.Context) {
 
 // ScoreProjectTemplateAsync 异步对项目模板进行打分
 func (h *TemplateHandler) ScoreProjectTemplateAsync(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的模板 ID")
+	var req ScoreTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请求参数错误：需要 id")
 		return
 	}
 
 	db := database.GetDB()
 	var template models.ProjectTemplate
-	if err := db.Preload("Tasks.Subtasks").First(&template, id).Error; err != nil {
+	if err := db.Where("deleted_at IS NULL").Preload("Tasks.Subtasks").First(&template, req.ID).Error; err != nil {
 		response.NotFound(c, "模板不存在")
 		return
 	}
@@ -754,18 +772,25 @@ func (h *TemplateHandler) ScoreProjectTemplateAsync(c *gin.Context) {
 	}
 
 	// 异步执行评分
-	go func() {
+	go func(templateID uint64) {
 		defer func() {
 			// 完成后清理
 		}()
 
+		// 重新获取模板（确保在 goroutine 中使用最新数据）
+		var tmpl models.ProjectTemplate
+		if err := db.Where("deleted_at IS NULL").Preload("Tasks.Subtasks").First(&tmpl, templateID).Error; err != nil {
+			h.logger.Error("获取模板失败", zap.Uint64("templateID", templateID), zap.Error(err))
+			return
+		}
+
 		// 构建评分提示词
-		prompt := h.buildScorePrompt(&template)
+		prompt := h.buildScorePrompt(&tmpl)
 
 		// 调用 AI 进行评分
 		aiResponse, err := h.aiSvc.Chat(prompt)
 		if err != nil {
-			h.logger.Error("异步评分失败", zap.Uint64("templateID", id), zap.Error(err))
+			h.logger.Error("异步评分失败", zap.Uint64("templateID", templateID), zap.Error(err))
 			// 更新消息状态为失败
 			errMsg := err.Error()
 			db.Model(&message).Updates(map[string]interface{}{
@@ -774,15 +799,29 @@ func (h *TemplateHandler) ScoreProjectTemplateAsync(c *gin.Context) {
 			})
 		} else {
 			// 解析评分结果
-			_, totalScore, _ := h.parseScoreResponse(aiResponse)
+			scoreResult, totalScore, _ := h.parseScoreResponse(aiResponse)
 			resultSummary := fmt.Sprintf("评分完成，总分：%.1f", totalScore)
+
+			// 保存评分结果到模板
+			scoreJSON, _ := json.Marshal(gin.H{
+				"totalScore":  totalScore,
+				"scores":      scoreResult.Scores,
+				"strengths":   scoreResult.Strengths,
+				"weaknesses":  scoreResult.Weaknesses,
+				"suggestions": scoreResult.Suggestions,
+				"analysis":    scoreResult.Analysis,
+				"scoredAt":    time.Now().Format(time.RFC3339),
+			})
+			scoreStr := string(scoreJSON)
+			db.Model(&tmpl).Update("last_score", &scoreStr)
+
 			// 更新消息状态为成功
 			db.Model(&message).Updates(map[string]interface{}{
 				"status":         "success",
 				"result_summary": &resultSummary,
 			})
 		}
-	}()
+	}(req.ID)
 
 	response.Success(c, gin.H{
 		"messageId": message.ID,

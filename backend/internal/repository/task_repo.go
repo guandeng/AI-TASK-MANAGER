@@ -239,9 +239,18 @@ func (r *taskRepository) GetByID(id uint64) (*models.Task, error) {
 	}
 	task.Subtasks = subtasks
 
-	// 加载依赖关系
+	// 设置子任务统计字段
+	task.SubtaskCount = len(subtasks)
+	task.SubtaskDoneCount = 0
+	for _, st := range subtasks {
+		if st.Status == "done" {
+			task.SubtaskDoneCount++
+		}
+	}
+
+	// 加载依赖关系（预加载依赖任务）
 	var dependencies []models.TaskDependency
-	if err := r.db.Where("task_id = ?", id).Find(&dependencies).Error; err != nil {
+	if err := r.db.Where("task_id = ?", id).Preload("DependsOnTask").Find(&dependencies).Error; err != nil {
 		return nil, err
 	}
 	task.Dependencies = dependencies

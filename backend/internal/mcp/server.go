@@ -118,7 +118,8 @@ func (s *Server) registerTools() {
 // 处理函数
 func (s *Server) handleListTasks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var tasks []models.Task
-	if err := s.db.Order("created_at DESC").Find(&tasks).Error; err != nil {
+	// 排除暂停状态的任务
+	if err := s.db.Where("status != ?", "paused").Order("created_at DESC").Find(&tasks).Error; err != nil {
 		return nil, err
 	}
 
@@ -196,7 +197,8 @@ func (s *Server) handleExpandTask(ctx context.Context, request mcp.CallToolReque
 
 func (s *Server) handleNextTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var task models.Task
-	if err := s.db.Where("status = ?", "pending").Order("priority DESC, created_at ASC").First(&task).Error; err != nil {
+	// 排除暂停状态的任务
+	if err := s.db.Where("status = ?", "pending").Where("status != ?", "paused").Order("priority DESC, created_at ASC").First(&task).Error; err != nil {
 		return mcp.NewToolResultText("No pending tasks found"), nil
 	}
 
@@ -341,9 +343,9 @@ func (s *Server) handleValidateDependencies(ctx context.Context, request mcp.Cal
 }
 
 func (s *Server) handleGetReadyTasks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	// 获取所有 pending 状态的任务
+	// 获取所有 pending 状态的任务，排除暂停状态
 	var pendingTasks []models.Task
-	if err := s.db.Where("status = ?", "pending").Find(&pendingTasks).Error; err != nil {
+	if err := s.db.Where("status = ?", "pending").Where("status != ?", "paused").Find(&pendingTasks).Error; err != nil {
 		return nil, err
 	}
 

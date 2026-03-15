@@ -27,6 +27,7 @@ export interface ProjectTemplate {
   usageCount: number;
   tags?: string[];
   fieldSchema?: FieldSchema;
+  lastScore?: string; // 最近评分结果 JSON 字符串
   createdAt: string;
   updatedAt: string;
   tasks?: TemplateTask[];

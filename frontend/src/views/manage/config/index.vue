@@ -1,30 +1,30 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
+  NButton,
   NCard,
-  NTabs,
-  NTabPane,
+  NCollapse,
+  NCollapseItem,
+  NDivider,
   NForm,
   NFormItem,
   NInput,
   NInputNumber,
-  NSwitch,
   NSelect,
-  NButton,
   NSpace,
-  NDivider,
-  NCollapse,
-  NCollapseItem,
+  NSwitch,
+  NTabPane,
+  NTabs,
   useMessage
 } from 'naive-ui';
 import {
-  fetchConfig,
-  updateConfig,
-  switchAIProvider,
-  updateProviderConfig,
-  resetConfig,
+  type AIProviderConfig,
   type AppConfig,
-  type AIProviderConfig
+  fetchConfig,
+  resetConfig,
+  switchAIProvider,
+  updateConfig,
+  updateProviderConfig
 } from '@/service/api/config';
 
 const message = useMessage();
@@ -159,9 +159,7 @@ onMounted(() => {
   <div class="config-page">
     <NCard title="系统配置">
       <template #header-extra>
-        <NButton type="warning" :loading="loading" @click="handleReset">
-          重置配置
-        </NButton>
+        <NButton type="warning" :loading="loading" @click="handleReset">重置配置</NButton>
       </template>
 
       <NTabs type="line">
@@ -169,28 +167,13 @@ onMounted(() => {
         <NTabPane name="ai" tab="AI 配置">
           <NForm label-placement="left" label-width="120px">
             <NFormItem label="当前提供商">
-              <NSelect
-                v-model:value="aiForm.provider"
-                :options="providerOptions"
-                style="width: 200px"
-              />
+              <NSelect v-model:value="aiForm.provider" :options="providerOptions" style="width: 200px" />
             </NFormItem>
             <NFormItem label="最大 Token">
-              <NInputNumber
-                v-model:value="aiForm.maxTokens"
-                :min="100"
-                :max="128000"
-                style="width: 200px"
-              />
+              <NInputNumber v-model:value="aiForm.maxTokens" :min="100" :max="128000" style="width: 200px" />
             </NFormItem>
             <NFormItem label="温度">
-              <NInputNumber
-                v-model:value="aiForm.temperature"
-                :min="0"
-                :max="2"
-                :step="0.1"
-                style="width: 200px"
-              />
+              <NInputNumber v-model:value="aiForm.temperature" :min="0" :max="2" :step="0.1" style="width: 200px" />
             </NFormItem>
           </NForm>
 
@@ -211,18 +194,10 @@ onMounted(() => {
                   />
                 </NFormItem>
                 <NFormItem label="模型">
-                  <NInput
-                    v-model:value="providerForms.qwen.model"
-                    placeholder="如: qwen-max"
-                    style="width: 200px"
-                  />
+                  <NInput v-model:value="providerForms.qwen.model" placeholder="如: qwen-max" style="width: 200px" />
                 </NFormItem>
                 <NFormItem label="Base URL">
-                  <NInput
-                    v-model:value="providerForms.qwen.baseUrl"
-                    placeholder="可选"
-                    style="width: 300px"
-                  />
+                  <NInput v-model:value="providerForms.qwen.baseUrl" placeholder="可选" style="width: 300px" />
                 </NFormItem>
               </NForm>
             </NCollapseItem>
@@ -248,11 +223,7 @@ onMounted(() => {
                   />
                 </NFormItem>
                 <NFormItem label="Base URL">
-                  <NInput
-                    v-model:value="providerForms.gemini.baseUrl"
-                    placeholder="可选"
-                    style="width: 300px"
-                  />
+                  <NInput v-model:value="providerForms.gemini.baseUrl" placeholder="可选" style="width: 300px" />
                 </NFormItem>
               </NForm>
             </NCollapseItem>
@@ -278,20 +249,14 @@ onMounted(() => {
                   />
                 </NFormItem>
                 <NFormItem label="Base URL">
-                  <NInput
-                    v-model:value="providerForms.perplexity.baseUrl"
-                    placeholder="可选"
-                    style="width: 300px"
-                  />
+                  <NInput v-model:value="providerForms.perplexity.baseUrl" placeholder="可选" style="width: 300px" />
                 </NFormItem>
               </NForm>
             </NCollapseItem>
           </NCollapse>
 
           <NSpace class="mt-16px">
-            <NButton type="primary" :loading="loading" @click="saveAIConfig">
-              保存 AI 配置
-            </NButton>
+            <NButton type="primary" :loading="loading" @click="saveAIConfig">保存 AI 配置</NButton>
           </NSpace>
         </NTabPane>
 
@@ -299,36 +264,19 @@ onMounted(() => {
         <NTabPane name="general" tab="通用配置">
           <NForm label-placement="left" label-width="120px">
             <NFormItem label="项目名称">
-              <NInput
-                v-model:value="generalForm.projectName"
-                placeholder="请输入项目名称"
-                style="width: 300px"
-              />
+              <NInput v-model:value="generalForm.projectName" placeholder="请输入项目名称" style="width: 300px" />
             </NFormItem>
             <NFormItem label="调试模式">
               <NSwitch v-model:value="generalForm.debug" />
             </NFormItem>
             <NFormItem label="日志级别">
-              <NSelect
-                v-model:value="generalForm.logLevel"
-                :options="logLevelOptions"
-                style="width: 200px"
-              />
+              <NSelect v-model:value="generalForm.logLevel" :options="logLevelOptions" style="width: 200px" />
             </NFormItem>
             <NFormItem label="默认子任务数">
-              <NInputNumber
-                v-model:value="generalForm.defaultSubtasks"
-                :min="1"
-                :max="10"
-                style="width: 150px"
-              />
+              <NInputNumber v-model:value="generalForm.defaultSubtasks" :min="1" :max="10" style="width: 150px" />
             </NFormItem>
             <NFormItem label="默认优先级">
-              <NSelect
-                v-model:value="generalForm.defaultPriority"
-                :options="priorityOptions"
-                style="width: 150px"
-              />
+              <NSelect v-model:value="generalForm.defaultPriority" :options="priorityOptions" style="width: 150px" />
             </NFormItem>
             <NFormItem label="使用中文输出">
               <NSwitch v-model:value="generalForm.useChinese" />
@@ -336,9 +284,7 @@ onMounted(() => {
           </NForm>
 
           <NSpace class="mt-16px">
-            <NButton type="primary" :loading="loading" @click="saveGeneralConfig">
-              保存通用配置
-            </NButton>
+            <NButton type="primary" :loading="loading" @click="saveGeneralConfig">保存通用配置</NButton>
           </NSpace>
         </NTabPane>
       </NTabs>

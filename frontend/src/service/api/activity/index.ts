@@ -1,5 +1,5 @@
 import { request } from '@/service/request';
-import type { Activity, ActivityStatistics, ActivityQueryParams } from '@/typings/api/activity';
+import type { Activity, ActivityQueryParams, ActivityStatistics } from '@/typings/api/activity';
 
 const API_BASE = '/api';
 

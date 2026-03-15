@@ -1,11 +1,6 @@
-import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import {
-  fetchMessages,
-  fetchUnreadCount,
-  markMessageRead,
-  deleteMessage
-} from '@/service/api/message';
+import { defineStore } from 'pinia';
+import { deleteMessage, fetchMessages, fetchUnreadCount, markMessageRead } from '@/service/api/message';
 import type { Message, MessageListParams } from '@/typings/api/message';
 
 // 辅助函数：提取后端返回的 data 字段
@@ -125,7 +120,7 @@ export const useMessageStore = defineStore('message-store', () => {
     }
 
     const poll = async () => {
-      const { data, error } = await fetchMessages({ taskId: parseInt(key, 10) });
+      const { data, error } = await fetchMessages({ taskId: Number.parseInt(key, 10) });
 
       if (!error && data) {
         const responseData = extractData(data);

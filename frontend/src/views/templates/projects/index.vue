@@ -1,48 +1,44 @@
 <script setup lang="ts">
-import { h, computed, onMounted, onActivated, ref } from 'vue';
+import { computed, h, onActivated, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  NCard,
-  NDataTable,
-  NTag,
-  NSpace,
+  NAlert,
   NButton,
-  NInput,
-  NSelect,
-  NModal,
-  NForm,
-  NFormItem,
-  NSwitch,
-  NInputNumber,
+  NCard,
+  NCard as NCardComp,
+  NDataTable,
   NDescriptions,
   NDescriptionsItem,
   NDivider,
-  NEmpty,
-  NSpin,
-  NPopconfirm,
-  NAlert,
   NDrawer,
   NDrawerContent,
-  NCard as NCardComp,
+  NEmpty,
+  NForm,
+  NFormItem,
+  NInput,
+  NInputNumber,
+  NModal,
+  NPopconfirm,
+  NSelect,
+  NSpace,
+  NSpin,
+  NSwitch,
+  NTag,
   useMessage
 } from 'naive-ui';
 import type { DataTableColumns, FormInst, FormRules } from 'naive-ui';
 import { MdEditor, MdPreview } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import {
-  fetchProjectTemplates,
-  fetchProjectTemplate,
   createProjectTemplate,
-  updateProjectTemplate,
   deleteProjectTemplate,
-  instantiateProjectTemplate
+  fetchProjectTemplate,
+  fetchProjectTemplates,
+  instantiateProjectTemplate,
+  updateProjectTemplate
 } from '@/service/api/template';
-import type { ProjectTemplate, CreateProjectTemplateRequest, TemplateTask } from '@/typings/api/template';
-import {
-  TEMPLATE_CATEGORY_OPTIONS,
-  TEMPLATE_PRIORITY_LABELS,
-  TEMPLATE_PRIORITY_COLORS
-} from '@/typings/api/template';
+import type { CreateProjectTemplateRequest, ProjectTemplate, TemplateTask } from '@/typings/api/template';
+import { TEMPLATE_CATEGORY_OPTIONS, TEMPLATE_PRIORITY_COLORS, TEMPLATE_PRIORITY_LABELS } from '@/typings/api/template';
 
 const message = useMessage();
 const router = useRouter();
@@ -90,10 +86,7 @@ const filteredTemplates = computed(() => {
     }
     if (filterKeyword.value) {
       const keyword = filterKeyword.value.toLowerCase();
-      return (
-        t.name.toLowerCase().includes(keyword) ||
-        (t.description?.toLowerCase().includes(keyword))
-      );
+      return t.name.toLowerCase().includes(keyword) || t.description?.toLowerCase().includes(keyword);
     }
     return true;
   });
@@ -138,10 +131,14 @@ const columns: DataTableColumns<ProjectTemplate> = [
     key: 'isPublic',
     width: 80,
     render(row) {
-      return h(NTag, {
-        type: row.isPublic ? 'success' : 'default',
-        size: 'small'
-      }, () => row.isPublic ? '是' : '否');
+      return h(
+        NTag,
+        {
+          type: row.isPublic ? 'success' : 'default',
+          size: 'small'
+        },
+        () => (row.isPublic ? '是' : '否')
+      );
     }
   },
   {
@@ -150,26 +147,42 @@ const columns: DataTableColumns<ProjectTemplate> = [
     width: 280,
     render(row) {
       return h(NSpace, {}, () => [
-        h(NButton, {
-          size: 'small',
-          type: 'primary',
-          onClick: () => router.push(`/templates/projects/${row.id}`)
-        }, () => '详情'),
-        h(NButton, {
-          size: 'small',
-          onClick: () => handleEdit(row)
-        }, () => '编辑'),
-        h(NButton, {
-          size: 'small',
-          type: 'primary',
-          onClick: () => handleOpenInstantiate(row)
-        }, () => '使用'),
-        h(NPopconfirm, {
-          onPositiveClick: () => handleDelete(row)
-        }, {
-          trigger: () => h(NButton, { size: 'small', type: 'error' }, () => '删除'),
-          default: () => '确认删除此模板？'
-        })
+        h(
+          NButton,
+          {
+            size: 'small',
+            type: 'primary',
+            onClick: () => router.push(`/templates/projects/${row.id}`)
+          },
+          () => '详情'
+        ),
+        h(
+          NButton,
+          {
+            size: 'small',
+            onClick: () => handleEdit(row)
+          },
+          () => '编辑'
+        ),
+        h(
+          NButton,
+          {
+            size: 'small',
+            type: 'primary',
+            onClick: () => handleOpenInstantiate(row)
+          },
+          () => '使用'
+        ),
+        h(
+          NPopconfirm,
+          {
+            onPositiveClick: () => handleDelete(row)
+          },
+          {
+            trigger: () => h(NButton, { size: 'small', type: 'error' }, () => '删除'),
+            default: () => '确认删除此模板？'
+          }
+        )
       ]);
     }
   }
@@ -241,20 +254,21 @@ async function handleEdit(template: ProjectTemplate) {
       category: templateData.category || 'other',
       isPublic: templateData.isPublic,
       tags: templateData.tags || [],
-      tasks: templateData.tasks?.map((t: any) => ({
-        title: t.title,
-        description: t.description || '',
-        priority: t.priority,
-        order: t.order,
-        estimatedHours: t.estimatedHours,
-        dependencies: t.dependencies,
-        subtasks: t.subtasks?.map((s: any) => ({
-          title: s.title,
-          description: s.description || '',
-          order: s.order,
-          estimatedHours: s.estimatedHours
-        }))
-      })) || []
+      tasks:
+        templateData.tasks?.map((t: any) => ({
+          title: t.title,
+          description: t.description || '',
+          priority: t.priority,
+          order: t.order,
+          estimatedHours: t.estimatedHours,
+          dependencies: t.dependencies,
+          subtasks: t.subtasks?.map((s: any) => ({
+            title: s.title,
+            description: s.description || '',
+            order: s.order,
+            estimatedHours: s.estimatedHours
+          }))
+        })) || []
     };
     showModal.value = true;
   }
@@ -393,12 +407,7 @@ onActivated(() => {
 
       <!-- 筛选栏 -->
       <NSpace class="mb-16px">
-        <NInput
-          v-model:value="filterKeyword"
-          placeholder="搜索模板名称"
-          clearable
-          style="width: 200px"
-        />
+        <NInput v-model:value="filterKeyword" placeholder="搜索模板名称" clearable style="width: 200px" />
         <NSelect
           v-model:value="filterCategory"
           :options="[{ label: '全部分类', value: '' }, ...TEMPLATE_CATEGORY_OPTIONS]"
@@ -441,9 +450,15 @@ onActivated(() => {
           <NDescriptionsItem label="使用次数">{{ editingTemplate.usageCount }}</NDescriptionsItem>
           <NDescriptionsItem label="描述" :span="2">
             <div v-if="!editingDescription" class="description-view">
-              <MdPreview v-if="editingTemplate.description" :modelValue="editingTemplate.description" />
+              <MdPreview v-if="editingTemplate.description" :model-value="editingTemplate.description" />
               <span v-else>-</span>
-              <NButton size="small" text type="primary" @click="startEditDescription(editingTemplate)" class="edit-desc-btn">
+              <NButton
+                size="small"
+                text
+                type="primary"
+                class="edit-desc-btn"
+                @click="startEditDescription(editingTemplate)"
+              >
                 编辑
               </NButton>
             </div>
@@ -470,9 +485,7 @@ onActivated(() => {
             <div v-if="task.description" class="task-desc">{{ task.description }}</div>
             <div v-if="task.estimatedHours" class="task-hours">预估: {{ task.estimatedHours }}h</div>
             <div v-if="task.subtasks && task.subtasks.length > 0" class="subtask-list">
-              <div v-for="subtask in task.subtasks" :key="subtask.id" class="subtask-item">
-                • {{ subtask.title }}
-              </div>
+              <div v-for="subtask in task.subtasks" :key="subtask.id" class="subtask-item">• {{ subtask.title }}</div>
             </div>
           </div>
         </div>
@@ -517,12 +530,7 @@ onActivated(() => {
     </NModal>
 
     <!-- 实例化模态框 -->
-    <NModal
-      v-model:show="showInstantiateModal"
-      title="使用模板创建项目"
-      preset="card"
-      style="width: 500px"
-    >
+    <NModal v-model:show="showInstantiateModal" title="使用模板创建项目" preset="card" style="width: 500px">
       <NForm label-placement="left" label-width="80">
         <NFormItem label="项目名称">
           <NInput v-model:value="instantiateForm.name" placeholder="请输入项目名称" />
@@ -540,13 +548,10 @@ onActivated(() => {
       <template #footer>
         <NSpace justify="end">
           <NButton @click="showInstantiateModal = false">取消</NButton>
-          <NButton type="primary" :loading="instantiateLoading" @click="handleInstantiate">
-            创建
-          </NButton>
+          <NButton type="primary" :loading="instantiateLoading" @click="handleInstantiate">创建</NButton>
         </NSpace>
       </template>
     </NModal>
-
   </div>
 </template>
 

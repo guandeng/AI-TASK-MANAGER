@@ -1,31 +1,31 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue';
+import { computed, h, onMounted, ref } from 'vue';
 import {
-  NCard,
-  NSpace,
+  type FormInst,
+  type FormRules,
   NButton,
-  NInput,
-  NTree,
-  NModal,
+  NCard,
+  NEmpty,
   NForm,
   NFormItem,
-  NInputNumber,
-  NSwitch,
-  NPopconfirm,
-  NEmpty,
-  NTooltip,
-  NTag,
   NIcon,
+  NInput,
+  NInputNumber,
+  NModal,
+  NPopconfirm,
   NSelect,
-  useMessage,
-  type TreeOption,
+  NSpace,
+  NSwitch,
+  NTag,
+  NTooltip,
+  NTree,
   type TreeDropInfo,
-  type FormInst,
-  type FormRules
+  type TreeOption,
+  useMessage
 } from 'naive-ui';
 import { Icon } from '@iconify/vue';
 import { useMenuStore } from '@/store/modules/menu';
-import type { MenuItem, MenuFormData, MenuTreeNode } from '@/typings/api/menu';
+import type { MenuFormData, MenuItem, MenuTreeNode } from '@/typings/api/menu';
 
 defineOptions({
   name: 'MenuManage'
@@ -87,10 +87,7 @@ const parentOptions = computed(() => {
     return options;
   };
 
-  return [
-    { label: '顶级菜单', value: '' },
-    ...buildOptions(menuStore.menuTree)
-  ];
+  return [{ label: '顶级菜单', value: '' }, ...buildOptions(menuStore.menuTree)];
 });
 
 // 过滤后的菜单树
@@ -139,9 +136,7 @@ function convertToTreeOption(node: MenuTreeNode): TreeOption {
         node.enabled
           ? h(NTag, { size: 'small', type: 'success' }, () => '启用')
           : h(NTag, { size: 'small', type: 'default' }, () => '禁用'),
-        node.hideInMenu
-          ? h(NTag, { size: 'small', type: 'warning' }, () => '隐藏')
-          : null,
+        node.hideInMenu ? h(NTag, { size: 'small', type: 'warning' }, () => '隐藏') : null,
         h(NSpace, { size: 'small' }, () => [
           h(
             NTooltip,
@@ -190,21 +185,21 @@ function convertToTreeOption(node: MenuTreeNode): TreeOption {
               trigger: () =>
                 h(
                   NPopconfirm,
-                    { onPositiveClick: () => handleDelete(node.key) },
-                    {
-                      trigger: () =>
-                        h(
-                          NButton,
-                          {
-                            size: 'tiny',
-                            text: true,
-                            type: 'error',
-                            onClick: (e: Event) => e.stopPropagation()
-                          },
-                          { icon: () => h(NIcon, null, { default: () => h(Icon, { icon: 'mdi:delete-outline' }) }) }
-                        ),
-                      default: () => '确定删除此菜单吗？'
-                    }
+                  { onPositiveClick: () => handleDelete(node.key) },
+                  {
+                    trigger: () =>
+                      h(
+                        NButton,
+                        {
+                          size: 'tiny',
+                          text: true,
+                          type: 'error',
+                          onClick: (e: Event) => e.stopPropagation()
+                        },
+                        { icon: () => h(NIcon, null, { default: () => h(Icon, { icon: 'mdi:delete-outline' }) }) }
+                      ),
+                    default: () => '确定删除此菜单吗？'
+                  }
                 ),
               default: () => '删除'
             }
@@ -394,21 +389,14 @@ onMounted(() => {
     <NCard title="菜单管理">
       <template #header-extra>
         <NSpace>
-          <NButton type="primary" @click="handleCreate">
-            新建菜单
-          </NButton>
+          <NButton type="primary" @click="handleCreate">新建菜单</NButton>
         </NSpace>
       </template>
 
       <div class="menu-content">
         <!-- 工具栏 -->
         <div class="toolbar">
-          <NInput
-            v-model:value="searchKey"
-            placeholder="搜索菜单名称、标识或路径"
-            clearable
-            style="width: 300px"
-          >
+          <NInput v-model:value="searchKey" placeholder="搜索菜单名称、标识或路径" clearable style="width: 300px">
             <template #prefix>
               <NIcon>
                 <Icon icon="mdi:magnify" />
@@ -419,12 +407,7 @@ onMounted(() => {
           <NSpace>
             <NPopconfirm @positive-click="handleBatchDelete">
               <template #trigger>
-                <NButton
-                  type="error"
-                  :disabled="checkedKeys.length === 0"
-                >
-                  批量删除 ({{ checkedKeys.length }})
-                </NButton>
+                <NButton type="error" :disabled="checkedKeys.length === 0">批量删除 ({{ checkedKeys.length }})</NButton>
               </template>
               确定删除选中的 {{ checkedKeys.length }} 个菜单吗？
             </NPopconfirm>
@@ -449,9 +432,7 @@ onMounted(() => {
             <template #empty>
               <NEmpty description="暂无菜单数据" style="margin: 20px 0">
                 <template #extra>
-                  <NButton type="primary" size="small" @click="handleCreate">
-                    新建菜单
-                  </NButton>
+                  <NButton type="primary" size="small" @click="handleCreate">新建菜单</NButton>
                 </template>
               </NEmpty>
             </template>
@@ -468,13 +449,7 @@ onMounted(() => {
       :style="{ width: '600px' }"
       :mask-closable="false"
     >
-      <NForm
-        ref="formRef"
-        :model="formData"
-        :rules="formRules"
-        label-placement="left"
-        label-width="100px"
-      >
+      <NForm ref="formRef" :model="formData" :rules="formRules" label-placement="left" label-width="100px">
         <NFormItem label="父级菜单" path="parentKey">
           <NSelect
             v-model:value="formData.parentKey"

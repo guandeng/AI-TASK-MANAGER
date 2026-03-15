@@ -1,35 +1,35 @@
 <script setup lang="tsx">
-import { onMounted, ref, computed, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   NButton,
   NCard,
-  NSpace,
-  NInput,
-  NSelect,
-  NUpload,
-  NUploadDragger,
-  NIcon,
-  NText,
   NDataTable,
-  NTag,
-  NPopconfirm,
-  NSpin,
-  NGrid,
-  NGi,
-  NFormItem,
-  NForm,
-  NTabs,
-  NTabPane,
   NDivider,
-  NEmpty
+  NEmpty,
+  NForm,
+  NFormItem,
+  NGi,
+  NGrid,
+  NIcon,
+  NInput,
+  NPopconfirm,
+  NSelect,
+  NSpace,
+  NSpin,
+  NTabPane,
+  NTabs,
+  NTag,
+  NText,
+  NUpload,
+  NUploadDragger
 } from 'naive-ui';
 import type { UploadFileInfo } from 'naive-ui';
 import { MdEditor, MdPreview } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
-import { useRequirementStore } from '@/store/modules/requirement';
-import type { RequirementStatus, RequirementPriority, RequirementDocument } from '@/typings/api/requirement';
 import { getDocumentDownloadUrl } from '@/service/api/requirement';
+import { useRequirementStore } from '@/store/modules/requirement';
+import type { RequirementDocument, RequirementPriority, RequirementStatus } from '@/typings/api/requirement';
 import BackupModal from '@/components/requirement/BackupModal.vue';
 
 defineOptions({
@@ -194,7 +194,11 @@ const documentColumns = [
           </NButton>
           <NPopconfirm onPositiveClick={() => handleDeleteDocument(row.id)}>
             {{
-              trigger: () => <NButton size="small" type="error" text>删除</NButton>,
+              trigger: () => (
+                <NButton size="small" type="error" text>
+                  删除
+                </NButton>
+              ),
               default: () => '确定要删除这个文档吗？'
             }}
           </NPopconfirm>
@@ -210,7 +214,7 @@ function formatFileSize(bytes: number): string {
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return `${Number.parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
 }
 
 // 加载需求详情
@@ -343,7 +347,10 @@ onMounted(() => {
                 <span class="text-lg font-medium">
                   {{ isNew ? '新建需求' : '编辑需求' }}
                 </span>
-                <NTag v-if="!isNew && requirementStore.currentRequirement" :type="statusColors[requirementStore.currentRequirement.status] as any">
+                <NTag
+                  v-if="!isNew && requirementStore.currentRequirement"
+                  :type="statusColors[requirementStore.currentRequirement.status] as any"
+                >
                   {{ statusText[requirementStore.currentRequirement.status] }}
                 </NTag>
               </div>
@@ -368,7 +375,7 @@ onMounted(() => {
                   :toolbars="editorToolbars"
                   placeholder="请输入需求内容，支持 Markdown 格式"
                   :style="{ height: '500px' }"
-                  @onUploadImg="handleUploadImg"
+                  @on-upload-img="handleUploadImg"
                 />
               </NFormItem>
             </div>
@@ -381,18 +388,12 @@ onMounted(() => {
             <!-- 操作按钮 -->
             <NCard title="操作" size="small">
               <NSpace vertical>
-                <NButton type="primary" @click="handleSave" block>
-                  保存
-                </NButton>
-                <NButton v-if="!isNew" @click="togglePreview" block>
+                <NButton type="primary" block @click="handleSave">保存</NButton>
+                <NButton v-if="!isNew" block @click="togglePreview">
                   {{ previewMode ? '编辑' : '预览' }}
                 </NButton>
-                <NButton v-if="!isNew" type="success" @click="showBackupModal = true" block>
-                  定时备份
-                </NButton>
-                <NButton @click="handleBack" block>
-                  返回列表
-                </NButton>
+                <NButton v-if="!isNew" type="success" block @click="showBackupModal = true">定时备份</NButton>
+                <NButton block @click="handleBack">返回列表</NButton>
               </NSpace>
             </NCard>
 
@@ -422,15 +423,11 @@ onMounted(() => {
                 >
                   <NUploadDragger>
                     <div class="py-4">
-                      <div class="text-2xl text-gray-400 mb-2">
+                      <div class="mb-2 text-2xl text-gray-400">
                         <span class="i-mdi:cloud-upload"></span>
                       </div>
-                      <NText class="text-sm">
-                        点击或拖拽文件到此处上传
-                      </NText>
-                      <p class="text-xs text-gray-400 mt-1">
-                        支持 PDF, Word, Excel, PPT, TXT, MD, 图片等格式
-                      </p>
+                      <NText class="text-sm">点击或拖拽文件到此处上传</NText>
+                      <p class="mt-1 text-xs text-gray-400">支持 PDF, Word, Excel, PPT, TXT, MD, 图片等格式</p>
                     </div>
                   </NUploadDragger>
                 </NUpload>
@@ -446,12 +443,15 @@ onMounted(() => {
                   :pagination="false"
                 />
 
-                <NEmpty v-else-if="!requirementStore.currentRequirement?.documents?.length" description="暂无文档" size="small" class="mt-4" />
+                <NEmpty
+                  v-else-if="!requirementStore.currentRequirement?.documents?.length"
+                  description="暂无文档"
+                  size="small"
+                  class="mt-4"
+                />
               </template>
               <template v-else>
-                <NText depth="3" class="text-sm">
-                  请先保存需求后再上传文档
-                </NText>
+                <NText depth="3" class="text-sm">请先保存需求后再上传文档</NText>
               </template>
             </NCard>
 
@@ -473,10 +473,7 @@ onMounted(() => {
       </NGrid>
 
       <!-- 备份弹框 -->
-      <BackupModal
-        v-model:show="showBackupModal"
-        :requirement-id="requirementId"
-      />
+      <BackupModal v-model:show="showBackupModal" :requirement-id="requirementId" />
     </NSpin>
   </div>
 </template>

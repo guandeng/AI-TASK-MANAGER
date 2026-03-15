@@ -9,11 +9,7 @@ const { baseURL } = getServiceBaseURL(import.meta.env, isHttpProxy);
  * 任务管理器 API 请求
  * 返回 { data, error } 格式，便于错误处理
  */
-export const request = createFlatRequest<
-  any,
-  any,
-  Record<string, unknown>
->(
+export const request = createFlatRequest<any, any, Record<string, unknown>>(
   {
     baseURL,
     timeout: 60000 // 60 秒超时

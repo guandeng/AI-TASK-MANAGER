@@ -1,16 +1,16 @@
-import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
+import { defineStore } from 'pinia';
 import {
-  fetchMenuList,
-  createMenu as createMenuApi,
-  updateMenu as updateMenuApi,
-  deleteMenu as deleteMenuApi,
   batchDeleteMenus as batchDeleteMenusApi,
-  reorderMenus as reorderMenusApi,
+  createMenu as createMenuApi,
+  deleteMenu as deleteMenuApi,
+  fetchMenuList,
   moveMenu as moveMenuApi,
-  toggleMenuEnabled as toggleMenuEnabledApi
+  reorderMenus as reorderMenusApi,
+  toggleMenuEnabled as toggleMenuEnabledApi,
+  updateMenu as updateMenuApi
 } from '@/service/api/menu';
-import type { MenuItem, MenuFormData, MenuTreeNode } from '@/typings/api/menu';
+import type { MenuFormData, MenuItem, MenuTreeNode } from '@/typings/api/menu';
 
 export const useMenuStore = defineStore('menu-store', () => {
   // 状态
@@ -81,9 +81,33 @@ export const useMenuStore = defineStore('menu-store', () => {
   // 系统管理模块的默认菜单
   const defaultSystemMenus: MenuItem[] = [
     { key: 'manage', label: '系统管理', order: 1, enabled: true },
-    { key: 'manage_user', label: '用户管理', parentKey: 'manage', path: '/manage/user', routeName: 'manage_user', order: 1, enabled: true },
-    { key: 'manage_role', label: '角色管理', parentKey: 'manage', path: '/manage/role', routeName: 'manage_role', order: 2, enabled: true },
-    { key: 'manage_menu', label: '菜单管理', parentKey: 'manage', path: '/manage/menu', routeName: 'manage_menu', order: 3, enabled: true }
+    {
+      key: 'manage_user',
+      label: '用户管理',
+      parentKey: 'manage',
+      path: '/manage/user',
+      routeName: 'manage_user',
+      order: 1,
+      enabled: true
+    },
+    {
+      key: 'manage_role',
+      label: '角色管理',
+      parentKey: 'manage',
+      path: '/manage/role',
+      routeName: 'manage_role',
+      order: 2,
+      enabled: true
+    },
+    {
+      key: 'manage_menu',
+      label: '菜单管理',
+      parentKey: 'manage',
+      path: '/manage/menu',
+      routeName: 'manage_menu',
+      order: 3,
+      enabled: true
+    }
   ];
 
   // Actions

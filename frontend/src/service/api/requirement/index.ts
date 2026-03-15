@@ -2,8 +2,8 @@ import { request } from '@/service/request';
 import type {
   Requirement,
   RequirementDocument,
-  RequirementListParams,
   RequirementFormData,
+  RequirementListParams,
   RequirementStatistics
 } from '@/typings/api/requirement';
 
@@ -114,7 +114,12 @@ export function splitRequirementToTasks(requirementId: number, taskType: TaskTyp
 }
 
 /** 将需求拆分为任务（异步） */
-export function splitRequirementToTasksAsync(requirementId: number, taskType: TaskType = 'backend', languageId?: number, projectTemplateId?: number) {
+export function splitRequirementToTasksAsync(
+  requirementId: number,
+  taskType: TaskType = 'backend',
+  languageId?: number,
+  projectTemplateId?: number
+) {
   return request<{
     messageId: number;
     message: string;

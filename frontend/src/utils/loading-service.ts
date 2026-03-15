@@ -75,9 +75,8 @@ export class LoadingService {
     }
 
     // 显示新的 loading 消息
-    const stepInfo = this.options && this.options.steps.length > 1
-      ? ` (${this.currentStep + 1}/${this.options.steps.length})`
-      : '';
+    const stepInfo =
+      this.options && this.options.steps.length > 1 ? ` (${this.currentStep + 1}/${this.options.steps.length})` : '';
 
     this.messageInstance = window.$message?.loading(`${message}${stepInfo}`, {
       duration: 0, // 不自动关闭
@@ -169,11 +168,7 @@ export const LOADING_PRESETS = {
   /** 重写子任务 */
   regenerateSubtask: {
     title: '重写子任务',
-    steps: [
-      { message: '正在分析原子任务...' },
-      { message: '正在调用 AI 重新生成...' },
-      { message: '正在保存...' }
-    ],
+    steps: [{ message: '正在分析原子任务...' }, { message: '正在调用 AI 重新生成...' }, { message: '正在保存...' }],
     successMessage: '子任务重写成功'
   },
 
@@ -192,19 +187,14 @@ export const LOADING_PRESETS = {
   /** 批量删除 */
   batchDelete: {
     title: '批量删除',
-    steps: [
-      { message: '正在删除...' }
-    ],
+    steps: [{ message: '正在删除...' }],
     successMessage: '批量删除成功'
   },
 
   /** 复制任务 */
   copyTask: {
     title: '复制任务',
-    steps: [
-      { message: '正在复制任务...' },
-      { message: '正在复制子任务...' }
-    ],
+    steps: [{ message: '正在复制任务...' }, { message: '正在复制子任务...' }],
     successMessage: '任务复制成功'
   }
 } as const;

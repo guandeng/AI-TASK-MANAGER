@@ -1,11 +1,25 @@
 <script setup lang="ts">
-import { h, computed, onMounted, onActivated, ref, watch } from 'vue';
+import { computed, h, onActivated, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { NCard, NDataTable, NTag, NSpace, NButton, NInput, NSelect, NStatistic, NGrid, NGi, NProgress, NEmpty, NSpin } from 'naive-ui';
+import {
+  NButton,
+  NCard,
+  NDataTable,
+  NEmpty,
+  NGi,
+  NGrid,
+  NInput,
+  NProgress,
+  NSelect,
+  NSpace,
+  NSpin,
+  NStatistic,
+  NTag
+} from 'naive-ui';
 import type { DataTableColumns, DataTableRowKey, SelectOption } from 'naive-ui';
-import { useTaskStore } from '@/store/modules/task';
 import { fetchLanguageList } from '@/service/api/language';
-import type { Task, TaskStatus, TaskListParams, TaskCategory } from '@/typings/api/task';
+import { useTaskStore } from '@/store/modules/task';
+import type { Task, TaskCategory, TaskListParams, TaskStatus } from '@/typings/api/task';
 
 const route = useRoute();
 const router = useRouter();
@@ -190,10 +204,14 @@ const columns: DataTableColumns<Task> = [
     align: 'center',
     render(row) {
       if (!row.category) return '-';
-      return h(NTag, {
-        type: row.category === 'frontend' ? 'success' : 'info',
-        size: 'small'
-      }, { default: () => categoryTextMap[row.category] || row.category });
+      return h(
+        NTag,
+        {
+          type: row.category === 'frontend' ? 'success' : 'info',
+          size: 'small'
+        },
+        { default: () => categoryTextMap[row.category] || row.category }
+      );
     }
   },
   {
@@ -468,7 +486,7 @@ watch(
       <NGi>
         <NCard>
           <div class="flex flex-col">
-            <span class="text-gray-500 mb-8px">完成进度</span>
+            <span class="mb-8px text-gray-500">完成进度</span>
             <NProgress
               type="line"
               :percentage="completionRate"
@@ -485,44 +503,26 @@ watch(
     <NCard title="任务列表">
       <template #header-extra>
         <NSpace>
-          <NButton type="primary" @click="$router.push('/requirement/task-create')">
-            新建任务
-          </NButton>
-          <NButton @click="loadTaskListData">
-            刷新
-          </NButton>
+          <NButton type="primary" @click="$router.push('/requirement/task-create')">新建任务</NButton>
+          <NButton @click="loadTaskListData">刷新</NButton>
           <NSelect
             v-model:value="filterRequirementId"
             :options="requirementOptions"
             style="width: 150px"
             placeholder="需求筛选"
           />
-          <NSelect
-            v-model:value="filterCategory"
-            :options="categoryOptions"
-            style="width: 100px"
-            placeholder="分类"
-          />
-          <NSelect
-            v-model:value="filterStatus"
-            :options="statusOptions"
-            style="width: 120px"
-          />
-          <NInput
-            v-model:value="searchText"
-            placeholder="搜索任务..."
-            clearable
-            style="width: 180px"
-          />
+          <NSelect v-model:value="filterCategory" :options="categoryOptions" style="width: 100px" placeholder="分类" />
+          <NSelect v-model:value="filterStatus" :options="statusOptions" style="width: 120px" />
+          <NInput v-model:value="searchText" placeholder="搜索任务..." clearable style="width: 180px" />
         </NSpace>
       </template>
 
       <NSpin :show="taskStore.loading">
         <NDataTable
+          v-model:checked-row-keys="checkedRowKeys"
           :columns="columns"
           :data="taskStore.tasks"
           :row-key="(row: Task) => row.id"
-          v-model:checked-row-keys="checkedRowKeys"
           :bordered="false"
           :pagination="paginationConfig"
         />

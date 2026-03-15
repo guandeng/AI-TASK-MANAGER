@@ -61,7 +61,10 @@ export function analyzeTask(taskId: number) {
 /**
  * 分析需求复杂度
  */
-export function analyzeRequirement(requirementId: number, data?: { knowledgePaths?: string[]; useKnowledge?: boolean }) {
+export function analyzeRequirement(
+  requirementId: number,
+  data?: { knowledgePaths?: string[]; useKnowledge?: boolean }
+) {
   return request<{ reportId: number; analysis: ComplexityReportData }>({
     url: `/api/requirements/${requirementId}/analyze`,
     method: 'POST',
@@ -72,7 +75,10 @@ export function analyzeRequirement(requirementId: number, data?: { knowledgePath
 /**
  * 异步分析需求复杂度
  */
-export function analyzeRequirementAsync(requirementId: number, data?: { knowledgePaths?: string[]; useKnowledge?: boolean }) {
+export function analyzeRequirementAsync(
+  requirementId: number,
+  data?: { knowledgePaths?: string[]; useKnowledge?: boolean }
+) {
   return request<{ messageId: number; message: string }>({
     url: `/api/requirements/${requirementId}/analyze-async`,
     method: 'POST',
@@ -164,7 +170,10 @@ export function getNextTasks(requirementId?: number, limit?: number) {
 /**
  * 带知识库展开任务
  */
-export function expandTaskWithKnowledge(taskId: number, data: { knowledgePaths?: string[]; additionalContext?: string }) {
+export function expandTaskWithKnowledge(
+  taskId: number,
+  data: { knowledgePaths?: string[]; additionalContext?: string }
+) {
   return request<any>({
     url: `/api/tasks/${taskId}/expand-with-knowledge`,
     method: 'POST',

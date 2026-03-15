@@ -1,5 +1,5 @@
 import { request } from '@/service/request';
-import type { MessageListParams, Message } from '@/typings/api/message';
+import type { Message, MessageListParams } from '@/typings/api/message';
 
 const API_BASE = '/api';
 

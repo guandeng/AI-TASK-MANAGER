@@ -1,13 +1,45 @@
 <script setup lang="ts">
-import { onMounted, onActivated, ref, computed, h, watch } from 'vue';
+import { computed, h, onActivated, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { NButton, NCard, NDataTable, NGrid, NGi, NInput, NSelect, NSpace, NStatistic, NTag, NPopconfirm, NProgress, NSpin, NEmpty, NModal, NRadioGroup, NRadio, NDivider, NTabs, NTabPane, NForm, NFormItem, NInputNumber, NSwitch } from 'naive-ui';
+import {
+  NButton,
+  NCard,
+  NDataTable,
+  NDivider,
+  NEmpty,
+  NForm,
+  NFormItem,
+  NGi,
+  NGrid,
+  NInput,
+  NInputNumber,
+  NModal,
+  NPopconfirm,
+  NProgress,
+  NRadio,
+  NRadioGroup,
+  NSelect,
+  NSpace,
+  NSpin,
+  NStatistic,
+  NSwitch,
+  NTabPane,
+  NTabs,
+  NTag
+} from 'naive-ui';
 import type { DataTableColumns, SelectOption } from 'naive-ui';
-import { useRequirementStore } from '@/store/modules/requirement';
-import type { Requirement, RequirementStatus, RequirementPriority } from '@/typings/api/requirement';
-import { splitRequirementToTasksAsync, type TaskType } from '@/service/api/requirement';
-import { fetchLanguageList, createLanguage, updateLanguage, deleteLanguage, type Language, type LanguageCategory } from '@/service/api/language';
+import { type TaskType, splitRequirementToTasksAsync } from '@/service/api/requirement';
+import {
+  type Language,
+  type LanguageCategory,
+  createLanguage,
+  deleteLanguage,
+  fetchLanguageList,
+  updateLanguage
+} from '@/service/api/language';
 import { fetchProjectTemplates } from '@/service/api/template';
+import { useRequirementStore } from '@/store/modules/requirement';
+import type { Requirement, RequirementPriority, RequirementStatus } from '@/typings/api/requirement';
 import type { ProjectTemplate } from '@/typings/api/template';
 
 defineOptions({
@@ -139,11 +171,7 @@ const filteredRequirements = computed(() => {
 
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase();
-    list = list.filter(
-      req =>
-        req.title.toLowerCase().includes(keyword) ||
-        req.content.toLowerCase().includes(keyword)
-    );
+    list = list.filter(req => req.title.toLowerCase().includes(keyword) || req.content.toLowerCase().includes(keyword));
   }
 
   if (filterStatus.value) {
@@ -163,7 +191,10 @@ const languageOptions = computed(() => {
 
   if (selectedTaskType.value === 'fullstack') {
     // 前后端都选，返回所有
-    return list.map(l => ({ label: `${l.category === 'backend' ? '[后端]' : '[前端]'} ${l.displayName}`, value: l.id }));
+    return list.map(l => ({
+      label: `${l.category === 'backend' ? '[后端]' : '[前端]'} ${l.displayName}`,
+      value: l.id
+    }));
   }
 
   const category: LanguageCategory = selectedTaskType.value === 'frontend' ? 'frontend' : 'backend';
@@ -184,7 +215,9 @@ const languageColumns: DataTableColumns<Language> = [
     width: 80,
     align: 'center',
     render(row) {
-      return h(NTag, { type: row.category === 'backend' ? 'info' : 'success', size: 'small' }, () => row.category === 'backend' ? '后端' : '前端');
+      return h(NTag, { type: row.category === 'backend' ? 'info' : 'success', size: 'small' }, () =>
+        row.category === 'backend' ? '后端' : '前端'
+      );
     }
   },
   {
@@ -208,7 +241,7 @@ const languageColumns: DataTableColumns<Language> = [
     width: 70,
     align: 'center',
     render(row) {
-      return h(NTag, { type: row.isActive ? 'success' : 'default', size: 'small' }, () => row.isActive ? '是' : '否');
+      return h(NTag, { type: row.isActive ? 'success' : 'default', size: 'small' }, () => (row.isActive ? '是' : '否'));
     }
   },
   {
@@ -225,10 +258,14 @@ const languageColumns: DataTableColumns<Language> = [
     render(row) {
       return h(NSpace, { justify: 'center' }, () => [
         h(NButton, { size: 'small', type: 'primary', text: true, onClick: () => openEditLanguage(row) }, () => '编辑'),
-        h(NPopconfirm, { onPositiveClick: () => handleDeleteLanguage(row.id) }, {
-          trigger: () => h(NButton, { size: 'small', type: 'error', text: true }, () => '删除'),
-          default: () => '确定删除该语言吗？'
-        })
+        h(
+          NPopconfirm,
+          { onPositiveClick: () => handleDeleteLanguage(row.id) },
+          {
+            trigger: () => h(NButton, { size: 'small', type: 'error', text: true }, () => '删除'),
+            default: () => '确定删除该语言吗？'
+          }
+        )
       ]);
     }
   }
@@ -340,7 +377,7 @@ const columns: DataTableColumns<Requirement> = [
             disabled: isSplitting,
             onClick: () => openTaskTypeModal(row)
           },
-          () => isSplitting ? '拆分中...' : '拆分任务'
+          () => (isSplitting ? '拆分中...' : '拆分任务')
         ),
         h(
           NPopconfirm,
@@ -399,7 +436,7 @@ async function handleDelete(id: number) {
 async function loadProjectTemplates() {
   const { data } = await fetchProjectTemplates();
   if (data) {
-    projectTemplates.value = Array.isArray(data) ? data : ((data as any).data || []);
+    projectTemplates.value = Array.isArray(data) ? data : (data as any).data || [];
   }
 }
 
@@ -416,7 +453,7 @@ function openTaskTypeModal(row: Requirement) {
 // 监听任务类型变化，重置语言选择
 watch(selectedTaskType, () => {
   const opts = languageOptions.value;
-  selectedLanguageId.value = opts.length > 0 ? opts[0].value as number : null;
+  selectedLanguageId.value = opts.length > 0 ? (opts[0].value as number) : null;
 });
 
 // 确认拆分任务
@@ -438,7 +475,12 @@ async function confirmSplitTasks() {
   splittingTaskIds.value.add(row.id);
 
   try {
-    const { data, error } = await splitRequirementToTasksAsync(row.id, taskType, languageId || undefined, projectTemplateId || undefined);
+    const { data, error } = await splitRequirementToTasksAsync(
+      row.id,
+      taskType,
+      languageId || undefined,
+      projectTemplateId || undefined
+    );
 
     if (!error && data) {
       const responseData = (data as any)?.data || data;
@@ -464,7 +506,7 @@ async function loadLanguages() {
   languageLoading.value = true;
   const { data } = await fetchLanguageList(true);
   if (data) {
-    languages.value = Array.isArray(data) ? data : ((data as any).data || []);
+    languages.value = Array.isArray(data) ? data : (data as any).data || [];
   }
   languageLoading.value = false;
 }
@@ -610,7 +652,7 @@ onActivated(() => {
                 :show-indicator="false"
                 :height="20"
                 :border-radius="4"
-                style="margin-top: 8px;"
+                style="margin-top: 8px"
               />
             </template>
           </NStatistic>
@@ -625,12 +667,7 @@ onActivated(() => {
           <!-- 搜索和筛选 -->
           <NSpace class="mb-4 mt-2" justify="space-between">
             <NSpace>
-              <NInput
-                v-model:value="searchKeyword"
-                placeholder="搜索需求标题或内容"
-                clearable
-                class="w-60"
-              />
+              <NInput v-model:value="searchKeyword" placeholder="搜索需求标题或内容" clearable class="w-60" />
               <NSelect
                 v-model:value="filterStatus"
                 :options="statusOptions"
@@ -702,20 +739,20 @@ onActivated(() => {
           v-model:value="selectedTaskType"
           :options="taskTypeOptions"
           placeholder="选择任务类型"
-          style="width: 100%;"
+          style="width: 100%"
         />
 
-        <NDivider style="margin: 16px 0;" />
+        <NDivider style="margin: 16px 0" />
 
         <p class="mb-4 text-gray-600">选择编程语言/技术栈：</p>
         <NSelect
           v-model:value="selectedLanguageId"
           :options="languageOptions"
           placeholder="请选择语言"
-          style="width: 100%;"
+          style="width: 100%"
         />
 
-        <NDivider style="margin: 16px 0;" />
+        <NDivider style="margin: 16px 0" />
 
         <p class="mb-4 text-gray-600">选择项目模板（可选）：</p>
         <NSelect
@@ -723,7 +760,7 @@ onActivated(() => {
           :options="projectTemplateOptions"
           placeholder="选择项目模板，将按模板定义的字段格式生成任务"
           clearable
-          style="width: 100%;"
+          style="width: 100%"
         />
       </div>
     </NModal>

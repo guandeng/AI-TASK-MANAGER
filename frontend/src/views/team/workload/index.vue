@@ -1,26 +1,28 @@
 <script setup lang="ts">
-import { computed, onMounted, onActivated, ref } from 'vue';
+import { computed, h, onActivated, onMounted, ref } from 'vue';
 import {
-  NCard,
-  NGrid,
-  NGi,
-  NDataTable,
-  NTag,
-  NSpace,
-  NProgress,
   NAvatar,
-  NEmpty,
-  NSpin,
-  NSelect,
+  NCard,
+  NDataTable,
   NDatePicker,
+  NEmpty,
+  NGi,
+  NGrid,
+  NNumberAnimation,
+  NProgress,
+  NSelect,
+  NSpace,
+  NSpin,
   NStatistic,
-  NNumberAnimation
+  NTag
 } from 'naive-ui';
 import type { DataTableColumns, SelectOption } from 'naive-ui';
+import { fetchMemberAssignments, fetchMemberWorkload } from '@/service/api/assignment';
 import { useMemberStore } from '@/store/modules/member';
-import { fetchMemberWorkload, fetchMemberAssignments } from '@/service/api/assignment';
-import type { MemberWorkload, MemberAssignment } from '@/typings/api/assignment';
+import type { MemberAssignment, MemberWorkload } from '@/typings/api/assignment';
 import type { Member } from '@/typings/api/member';
+
+// 引入 h 函数
 
 const memberStore = useMemberStore();
 
@@ -186,7 +188,11 @@ const assignmentColumns: DataTableColumns<MemberAssignment> = [
         completed: '已完成',
         cancelled: '已取消'
       };
-      return h(NTag, { type: statusColors[row.taskStatus] || 'default', size: 'small' }, () => statusLabels[row.taskStatus] || row.taskStatus);
+      return h(
+        NTag,
+        { type: statusColors[row.taskStatus] || 'default', size: 'small' },
+        () => statusLabels[row.taskStatus] || row.taskStatus
+      );
     }
   },
   {
@@ -266,9 +272,6 @@ async function loadData() {
   await loadWorkload();
 }
 
-// 引入 h 函数
-import { h } from 'vue';
-
 onMounted(() => {
   loadData();
 });
@@ -303,7 +306,8 @@ onActivated(() => {
         <NGi>
           <NStatistic label="平均利用率">
             <template #default>
-              <NNumberAnimation :from="0" :to="statistics.avgUtilization" />%
+              <NNumberAnimation :from="0" :to="statistics.avgUtilization" />
+              %
             </template>
           </NStatistic>
         </NGi>

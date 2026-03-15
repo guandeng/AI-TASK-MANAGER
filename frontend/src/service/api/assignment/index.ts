@@ -2,9 +2,9 @@ import { request } from '@/service/request';
 import type {
   Assignment,
   AssignmentOverview,
+  CreateAssignmentRequest,
   MemberAssignment,
   MemberWorkload,
-  CreateAssignmentRequest,
   TaskTimeInfo
 } from '@/typings/api/assignment';
 

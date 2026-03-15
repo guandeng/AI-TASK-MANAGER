@@ -1,7 +1,25 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { NCard, NTabs, NTabPane, NInput, NButton, NSpace, NTag, NIcon, NEmpty, NDescriptions, NDescriptionsItem, NCheckbox, NCollapse, NCollapseItem, NCode, NPopconfirm, NSpin } from 'naive-ui';
-import type { Task, Subtask, CodeInterface, AcceptanceCriteria } from '@/typings/api/task';
+import {
+  NButton,
+  NCard,
+  NCheckbox,
+  NCode,
+  NCollapse,
+  NCollapseItem,
+  NDescriptions,
+  NDescriptionsItem,
+  NEmpty,
+  NIcon,
+  NInput,
+  NPopconfirm,
+  NSpace,
+  NSpin,
+  NTabPane,
+  NTabs,
+  NTag
+} from 'naive-ui';
+import type { AcceptanceCriteria, CodeInterface, Subtask, Task } from '@/typings/api/task';
 
 interface Props {
   task: Task | null;
@@ -54,9 +72,7 @@ function toggleAcceptanceCriteria(subtaskId: number, criteriaId: number, complet
   const subtask = props.task?.subtasks?.find(s => s.id === subtaskId);
   if (!subtask?.acceptanceCriteria) return;
 
-  const updatedCriteria = subtask.acceptanceCriteria.map(c =>
-    c.id === criteriaId ? { ...c, completed } : c
-  );
+  const updatedCriteria = subtask.acceptanceCriteria.map(c => (c.id === criteriaId ? { ...c, completed } : c));
   emit('update:acceptanceCriteria', subtaskId, updatedCriteria);
 }
 
@@ -71,10 +87,14 @@ const subtaskProgress = computed(() => {
 // 获取状态图标
 function getStatusIcon(status: string): string {
   switch (status) {
-    case 'done': return '✅';
-    case 'in-progress': return '🔄';
-    case 'deferred': return '📌';
-    default: return '⏱️';
+    case 'done':
+      return '✅';
+    case 'in-progress':
+      return '🔄';
+    case 'deferred':
+      return '📌';
+    default:
+      return '⏱️';
   }
 }
 </script>
@@ -92,18 +112,17 @@ function getStatusIcon(status: string): string {
                 <div class="node-header">
                   <NIcon class="i-mdi:cube-outline" :size="18" />
                   <span class="node-title">{{ task?.titleTrans || task?.title }}</span>
-                  <NTag :type="task?.status === 'done' ? 'success' : task?.status === 'in-progress' ? 'info' : 'default'" size="small">
+                  <NTag
+                    :type="task?.status === 'done' ? 'success' : task?.status === 'in-progress' ? 'info' : 'default'"
+                    size="small"
+                  >
                     {{ task?.status }}
                   </NTag>
                 </div>
 
                 <!-- 子任务树 -->
                 <div v-if="task?.subtasks?.length" class="subtask-tree">
-                  <div
-                    v-for="subtask in task.subtasks"
-                    :key="subtask.id"
-                    class="tree-node subtask-node"
-                  >
+                  <div v-for="subtask in task.subtasks" :key="subtask.id" class="tree-node subtask-node">
                     <div class="node-header">
                       <span class="tree-line">├──</span>
                       <NIcon class="i-mdi:cube-send-outline" :size="16" />
@@ -116,7 +135,7 @@ function getStatusIcon(status: string): string {
                     <!-- 关联文件 -->
                     <div v-if="subtask.relatedFiles?.length" class="node-files">
                       <div v-for="file in subtask.relatedFiles" :key="file" class="file-item">
-                        <span class="tree-line">│   └──</span>
+                        <span class="tree-line">│ └──</span>
                         <NIcon class="i-mdi:file-code-outline" :size="14" />
                         <code class="file-path">{{ file }}</code>
                       </div>
@@ -132,7 +151,9 @@ function getStatusIcon(status: string): string {
               <div class="progress-bar">
                 <div
                   class="progress-fill"
-                  :style="{ width: `${subtaskProgress.total > 0 ? (subtaskProgress.completed / subtaskProgress.total * 100) : 0}%` }"
+                  :style="{
+                    width: `${subtaskProgress.total > 0 ? (subtaskProgress.completed / subtaskProgress.total) * 100 : 0}%`
+                  }"
                 />
               </div>
             </div>
@@ -183,13 +204,7 @@ function getStatusIcon(status: string): string {
             <template #header>
               <NSpace align="center" justify="space-between">
                 <span>任务代码提示</span>
-                <NButton
-                  v-if="!editingCodeHints"
-                  size="small"
-                  @click="startEditCodeHints"
-                >
-                  编辑
-                </NButton>
+                <NButton v-if="!editingCodeHints" size="small" @click="startEditCodeHints">编辑</NButton>
               </NSpace>
             </template>
 
@@ -215,11 +230,7 @@ function getStatusIcon(status: string): string {
             <template #header>子任务代码提示</template>
 
             <div v-if="task?.subtasks?.length" class="subtask-hints-list">
-              <div
-                v-for="subtask in task.subtasks"
-                :key="subtask.id"
-                class="subtask-hint-item"
-              >
+              <div v-for="subtask in task.subtasks" :key="subtask.id" class="subtask-hint-item">
                 <div class="subtask-hint-header">
                   <span class="subtask-label">{{ task.id }}.{{ subtask.id }}</span>
                   <span class="subtask-title">{{ subtask.titleTrans || subtask.title }}</span>
@@ -239,12 +250,7 @@ function getStatusIcon(status: string): string {
                 </div>
                 <div v-else class="subtask-hint-content">
                   <div class="pre-wrap">{{ subtask.codeHints || '暂无提示' }}</div>
-                  <NButton
-                    text
-                    type="primary"
-                    size="small"
-                    @click="startEditSubtaskCodeHints(subtask.id)"
-                  >
+                  <NButton text type="primary" size="small" @click="startEditSubtaskCodeHints(subtask.id)">
                     编辑
                   </NButton>
                 </div>
@@ -260,11 +266,7 @@ function getStatusIcon(status: string): string {
         <div class="acceptance-view">
           <NCard size="small">
             <div v-if="task?.subtasks?.length" class="acceptance-list">
-              <div
-                v-for="subtask in task.subtasks"
-                :key="subtask.id"
-                class="acceptance-item"
-              >
+              <div v-for="subtask in task.subtasks" :key="subtask.id" class="acceptance-item">
                 <div class="acceptance-header">
                   <NSpace align="center">
                     <span class="status-icon">{{ getStatusIcon(subtask.status) }}</span>
@@ -274,11 +276,7 @@ function getStatusIcon(status: string): string {
                 </div>
 
                 <div v-if="subtask.acceptanceCriteria?.length" class="criteria-list">
-                  <div
-                    v-for="criteria in subtask.acceptanceCriteria"
-                    :key="criteria.id"
-                    class="criteria-item"
-                  >
+                  <div v-for="criteria in subtask.acceptanceCriteria" :key="criteria.id" class="criteria-item">
                     <NCheckbox
                       :checked="criteria.completed"
                       @update:checked="(checked: boolean) => toggleAcceptanceCriteria(subtask.id, criteria.id, checked)"
@@ -293,8 +291,11 @@ function getStatusIcon(status: string): string {
 
                 <!-- 验收进度 -->
                 <div v-if="subtask.acceptanceCriteria?.length" class="criteria-progress">
-                  <span class="text-gray-500 text-12px">
-                    {{ subtask.acceptanceCriteria.filter(c => c.completed).length }}/{{ subtask.acceptanceCriteria.length }} 完成
+                  <span class="text-12px text-gray-500">
+                    {{ subtask.acceptanceCriteria.filter(c => c.completed).length }}/{{
+                      subtask.acceptanceCriteria.length
+                    }}
+                    完成
                   </span>
                 </div>
               </div>
@@ -346,7 +347,10 @@ function getStatusIcon(status: string): string {
               </div>
             </div>
 
-            <NEmpty v-if="!task?.relatedFiles?.length && !task?.subtasks?.some(s => s.relatedFiles?.length)" description="暂无关联文件" />
+            <NEmpty
+              v-if="!task?.relatedFiles?.length && !task?.subtasks?.some(s => s.relatedFiles?.length)"
+              description="暂无关联文件"
+            />
           </NCard>
         </div>
       </NTabPane>

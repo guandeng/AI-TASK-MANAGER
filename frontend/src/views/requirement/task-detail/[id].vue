@@ -1,17 +1,39 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NTabs, NTabPane, NCollapse, NCollapseItem, NCheckbox, NCode, NDivider, NAlert, NDropdown } from 'naive-ui';
-import type { SelectOption, DropdownOption } from 'naive-ui';
+import {
+  NAlert,
+  NButton,
+  NCard,
+  NCheckbox,
+  NCode,
+  NCollapse,
+  NCollapseItem,
+  NDescriptions,
+  NDescriptionsItem,
+  NDivider,
+  NDropdown,
+  NEmpty,
+  NIcon,
+  NInput,
+  NModal,
+  NSelect,
+  NSpace,
+  NSpin,
+  NTabPane,
+  NTabs,
+  NTag
+} from 'naive-ui';
+import type { DropdownOption, SelectOption } from 'naive-ui';
 import { VueDraggable } from 'vue-draggable-plus';
 import { MdEditor, MdPreview } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
+import { fetchTaskList } from '@/service/api/task';
 import { useTaskStore } from '@/store/modules/task';
 import { useRequirementStore } from '@/store/modules/requirement';
 import { useMemberStore } from '@/store/modules/member';
 import { useMessageStore } from '@/store/modules/message';
-import { fetchTaskList } from '@/service/api/task';
-import type { TaskStatus, Subtask, Task } from '@/typings/api/task';
+import type { Subtask, Task, TaskStatus } from '@/typings/api/task';
 import CommentSection from '@/components/task/CommentSection.vue';
 import AssignmentPanel from '@/components/task/AssignmentPanel.vue';
 import ActivityTimeline from '@/components/task/ActivityTimeline.vue';
@@ -146,7 +168,14 @@ const actualExpandDisabled = computed(() => {
 
 // 编辑模式状态
 type EditableTaskField = 'title' | 'details' | 'testStrategy';
-type EditableSubtaskField = 'title' | 'description' | 'details' | 'codeInterface' | 'acceptanceCriteria' | 'relatedFiles' | 'codeHints';
+type EditableSubtaskField =
+  | 'title'
+  | 'description'
+  | 'details'
+  | 'codeInterface'
+  | 'acceptanceCriteria'
+  | 'relatedFiles'
+  | 'codeHints';
 const editingType = ref<'task' | 'subtask' | null>(null);
 const editingField = ref<EditableTaskField | EditableSubtaskField | null>(null);
 const editingSubtaskId = ref<number | null>(null);
@@ -344,7 +373,11 @@ async function saveEdit() {
       } else {
         return;
       }
-      console.log('[saveEdit] 调用 updateSubtask API', { taskId: taskId.value, subtaskId: editingSubtaskId.value, updateData });
+      console.log('[saveEdit] 调用 updateSubtask API', {
+        taskId: taskId.value,
+        subtaskId: editingSubtaskId.value,
+        updateData
+      });
       const success = await taskStore.updateSubtask(taskId.value, editingSubtaskId.value, updateData);
       console.log('[saveEdit] updateSubtask 结果', success);
       if (success) {
@@ -546,11 +579,7 @@ async function handleConfirmRegenerate() {
   regeneratingSubtaskIds.value.add(subtaskId);
 
   try {
-    await taskStore.regenerateSubtask(
-      taskId.value,
-      subtaskId,
-      regeneratePrompt.value || undefined
-    );
+    await taskStore.regenerateSubtask(taskId.value, subtaskId, regeneratePrompt.value || undefined);
   } finally {
     regeneratingSubtaskIds.value.delete(subtaskId);
   }
@@ -564,7 +593,7 @@ const localSubtasks = ref<Subtask[]>([]);
 // 监听 task.subtasks 变化
 watch(
   () => task.value?.subtasks,
-  (newSubtasks) => {
+  newSubtasks => {
     if (!newSubtasks) {
       localSubtasks.value = [];
       return;
@@ -608,7 +637,7 @@ async function loadRequirementTasks() {
 // 监听任务变化，加载对应的需求任务列表
 watch(
   () => task.value?.requirementId,
-  (newRequirementId) => {
+  newRequirementId => {
     if (newRequirementId) {
       loadRequirementTasks();
     } else {
@@ -652,7 +681,7 @@ onUnmounted(() => {
           :disabled="actualExpandDisabled"
           @click="handleExpandTask"
         >
-          {{ isExpandTimeout ? '重新拆分' : (task?.isExpanding ? '拆分中...' : '拆分子任务') }}
+          {{ isExpandTimeout ? '重新拆分' : task?.isExpanding ? '拆分中...' : '拆分子任务' }}
         </NButton>
         <NButton
           type="error"
@@ -663,16 +692,10 @@ onUnmounted(() => {
         >
           清空子任务
         </NButton>
-        <NButton type="error" :loading="deleteLoading" @click="handleDeleteTask">
-          删除任务
-        </NButton>
+        <NButton type="error" :loading="deleteLoading" @click="handleDeleteTask">删除任务</NButton>
         <NDivider vertical />
-        <NButton type="info" :loading="scoreLoading" @click="handleScoreTask">
-          质量评分
-        </NButton>
-        <NButton @click="openScoreHistory">
-          评分历史
-        </NButton>
+        <NButton type="info" :loading="scoreLoading" @click="handleScoreTask">质量评分</NButton>
+        <NButton @click="openScoreHistory">评分历史</NButton>
       </NSpace>
       <!-- 右侧：需求任务列表下拉框 -->
       <div v-if="requirementTaskList.length > 0" class="task-dropdown-wrapper">
@@ -704,11 +727,7 @@ onUnmounted(() => {
             <NCard>
               <template #header>
                 <div v-if="editingType === 'task' && editingField === 'title'" class="edit-field">
-                  <NInput
-                    v-model:value="editingValue"
-                    placeholder="请输入任务标题"
-                    style="width: 100%;"
-                  />
+                  <NInput v-model:value="editingValue" placeholder="请输入任务标题" style="width: 100%" />
                   <NSpace class="mt-8px">
                     <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
                     <NButton size="small" @click="cancelEdit">取消</NButton>
@@ -735,7 +754,9 @@ onUnmounted(() => {
 
                 <NDescriptions bordered :column="1" label-placement="left" :label-style="{ width: '15%' }">
                   <NDescriptionsItem label="ID">{{ task.id }}</NDescriptionsItem>
-                  <NDescriptionsItem label="描述">{{ task.descriptionTrans || task.description || '-' }}</NDescriptionsItem>
+                  <NDescriptionsItem label="描述">
+                    {{ task.descriptionTrans || task.description || '-' }}
+                  </NDescriptionsItem>
                   <NDescriptionsItem label="依赖">
                     <template v-if="task.dependencies?.length">
                       <NSpace wrap>
@@ -765,7 +786,7 @@ onUnmounted(() => {
                     {{ task.output || '-' }}
                   </NDescriptionsItem>
                   <NDescriptionsItem label="风险点">
-                    <NAlert v-if="task.risk" type="warning" style="margin-top: 8px;">
+                    <NAlert v-if="task.risk" type="warning" style="margin-top: 8px">
                       {{ task.risk }}
                     </NAlert>
                     <span v-else class="text-gray-400">-</span>
@@ -831,7 +852,11 @@ onUnmounted(() => {
                         </NSpace>
                       </div>
                       <!-- 预览模式 -->
-                      <div v-else class="markdown-preview-container editable-field" @click="startEditTask('testStrategy')">
+                      <div
+                        v-else
+                        class="markdown-preview-container editable-field"
+                        @click="startEditTask('testStrategy')"
+                      >
                         <MdPreview
                           v-if="task.testStrategyTrans || task.testStrategy"
                           :model-value="task.testStrategyTrans || task.testStrategy || ''"
@@ -842,7 +867,7 @@ onUnmounted(() => {
                       </div>
                     </div>
                   </NDescriptionsItem>
-                  <NDescriptionsItem label="自定义字段" v-if="task.customFields">
+                  <NDescriptionsItem v-if="task.customFields" label="自定义字段">
                     <div v-if="parseJsonField<Record<string, any>>(task.customFields)" class="custom-fields">
                       <div
                         v-for="(value, key) in parseJsonField<Record<string, any>>(task.customFields)"
@@ -856,12 +881,7 @@ onUnmounted(() => {
                           </template>
                           <template v-else-if="Array.isArray(value)">
                             <NSpace>
-                              <NTag
-                                v-for="(item, idx) in value"
-                                :key="idx"
-                                type="info"
-                                size="small"
-                              >
+                              <NTag v-for="(item, idx) in value" :key="idx" type="info" size="small">
                                 {{ typeof item === 'object' ? JSON.stringify(item) : item }}
                               </NTag>
                             </NSpace>
@@ -885,36 +905,36 @@ onUnmounted(() => {
                     class="subtask-list"
                     @end="handleDragEnd"
                   >
-                    <div
-                      v-for="subtask in localSubtasks"
-                      :key="subtask.id"
-                      class="subtask-item"
-                    >
+                    <div v-for="subtask in localSubtasks" :key="subtask.id" class="subtask-item">
                       <!-- 子任务头部 -->
                       <div class="subtask-header">
                         <span class="drag-handle">
                           <SvgIcon icon="mdi:drag-vertical" class="text-16px" style="color: #9ca3af" />
                         </span>
-                        <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'title'" class="edit-field-inline">
-                          <NInput
-                            v-model:value="editingValue"
-                            placeholder="请输入子任务标题"
-                            style="width: 300px;"
-                          />
+                        <div
+                          v-if="
+                            editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'title'
+                          "
+                          class="edit-field-inline"
+                        >
+                          <NInput v-model:value="editingValue" placeholder="请输入子任务标题" style="width: 300px" />
                           <NButton type="primary" size="tiny" :loading="saveLoading" @click="saveEdit">保存</NButton>
                           <NButton size="tiny" @click="cancelEdit">取消</NButton>
                         </div>
-                        <div v-else class="editable-inline subtask-title-row" @click="startEditSubtask(subtask.id, 'title')">
-                          <NTag :type="priorityColorMap[subtask.priority] || 'default'" size="small">{{ priorityTextMap[subtask.priority] || '中' }}</NTag>
-                          <span class="subtask-title-text">{{ task.id }}.{{ subtask.id }} {{ subtask.titleTrans || subtask.title }}</span>
+                        <div
+                          v-else
+                          class="editable-inline subtask-title-row"
+                          @click="startEditSubtask(subtask.id, 'title')"
+                        >
+                          <NTag :type="priorityColorMap[subtask.priority] || 'default'" size="small">
+                            {{ priorityTextMap[subtask.priority] || '中' }}
+                          </NTag>
+                          <span class="subtask-title-text">
+                            {{ task.id }}.{{ subtask.id }} {{ subtask.titleTrans || subtask.title }}
+                          </span>
                           <NButton text type="primary" size="tiny" class="edit-btn-inline">编辑</NButton>
                         </div>
-                        <NButton
-                          text
-                          size="small"
-                          class="expand-btn"
-                          @click="toggleSubtaskExpand(subtask.id)"
-                        >
+                        <NButton text size="small" class="expand-btn" @click="toggleSubtaskExpand(subtask.id)">
                           <SvgIcon
                             :icon="isSubtaskExpanded(subtask.id) ? 'mdi:chevron-up' : 'mdi:chevron-down'"
                             :size="16"
@@ -927,7 +947,10 @@ onUnmounted(() => {
                       <div class="subtask-content">
                         <div class="markdown-field">
                           <!-- 编辑模式 -->
-                          <div v-if="!isPreviewMode('subtask', 'description', subtask.id)" class="markdown-editor-wrapper">
+                          <div
+                            v-if="!isPreviewMode('subtask', 'description', subtask.id)"
+                            class="markdown-editor-wrapper"
+                          >
                             <MdEditor
                               v-model="editingValue"
                               language="zh-CN"
@@ -935,12 +958,18 @@ onUnmounted(() => {
                               :style="{ height: '200px' }"
                             />
                             <NSpace class="mt-8px">
-                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">
+                                保存
+                              </NButton>
                               <NButton size="small" @click="cancelEdit">取消</NButton>
                             </NSpace>
                           </div>
                           <!-- 预览模式 -->
-                          <div v-else class="markdown-preview-container editable-field" @click="startEditSubtask(subtask.id, 'description')">
+                          <div
+                            v-else
+                            class="markdown-preview-container editable-field"
+                            @click="startEditSubtask(subtask.id, 'description')"
+                          >
                             <MdPreview
                               v-if="subtask.descriptionTrans || subtask.description"
                               :model-value="subtask.descriptionTrans || subtask.description || ''"
@@ -954,21 +983,34 @@ onUnmounted(() => {
 
                       <!-- 展开��详细信息 -->
                       <div v-if="isSubtaskExpanded(subtask.id)" class="subtask-details">
-                        <NDivider style="margin: 8px 0 12px;">详细信息</NDivider>
+                        <NDivider style="margin: 8px 0 12px">详细信息</NDivider>
 
                         <!-- 实现细节 -->
                         <div class="detail-section">
                           <div class="detail-header">
                             <div class="detail-label">实现细节</div>
                             <NButton
-                              v-if="!(editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'details')"
+                              v-if="
+                                !(
+                                  editingType === 'subtask' &&
+                                  editingSubtaskId === subtask.id &&
+                                  editingField === 'details'
+                                )
+                              "
                               text
                               type="primary"
                               size="tiny"
                               @click="startEditSubtask(subtask.id, 'details')"
-                            >编辑</NButton>
+                            >
+                              编辑
+                            </NButton>
                           </div>
-                          <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'details'" class="detail-content">
+                          <div
+                            v-if="
+                              editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'details'
+                            "
+                            class="detail-content"
+                          >
                             <MdEditor
                               v-model="editingValue"
                               language="zh-CN"
@@ -976,12 +1018,17 @@ onUnmounted(() => {
                               :style="{ height: '200px' }"
                             />
                             <NSpace class="mt-8px">
-                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">
+                                保存
+                              </NButton>
                               <NButton size="small" @click="cancelEdit">取消</NButton>
                             </NSpace>
                           </div>
                           <div v-else-if="subtask.details || subtask.detailsTrans" class="detail-content">
-                            <MdPreview :model-value="subtask.detailsTrans || subtask.details || ''" class="markdown-preview-wrapper" />
+                            <MdPreview
+                              :model-value="subtask.detailsTrans || subtask.details || ''"
+                              class="markdown-preview-wrapper"
+                            />
                           </div>
                           <div v-else class="detail-content text-gray-400">点击编辑实现细节</div>
                         </div>
@@ -991,14 +1038,29 @@ onUnmounted(() => {
                           <div class="detail-header">
                             <div class="detail-label">代码接口</div>
                             <NButton
-                              v-if="!(editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'codeInterface')"
+                              v-if="
+                                !(
+                                  editingType === 'subtask' &&
+                                  editingSubtaskId === subtask.id &&
+                                  editingField === 'codeInterface'
+                                )
+                              "
                               text
                               type="primary"
                               size="tiny"
                               @click="startEditSubtask(subtask.id, 'codeInterface')"
-                            >编辑</NButton>
+                            >
+                              编辑
+                            </NButton>
                           </div>
-                          <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'codeInterface'" class="detail-content">
+                          <div
+                            v-if="
+                              editingType === 'subtask' &&
+                              editingSubtaskId === subtask.id &&
+                              editingField === 'codeInterface'
+                            "
+                            class="detail-content"
+                          >
                             <NInput
                               v-model:value="editingValue"
                               type="textarea"
@@ -1006,27 +1068,70 @@ onUnmounted(() => {
                               :rows="6"
                             />
                             <NSpace class="mt-8px">
-                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">
+                                保存
+                              </NButton>
                               <NButton size="small" @click="cancelEdit">取消</NButton>
                             </NSpace>
                           </div>
                           <div v-else-if="subtask.codeInterface" class="detail-content code-interface">
-                            <template v-if="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)">
+                            <template
+                              v-if="
+                                parseJsonField<{ name: string; inputs: string; outputs: string; example: string }>(
+                                  subtask.codeInterface
+                                )
+                              "
+                            >
                               <div class="interface-name">
                                 <NTag type="info" size="small">函数名</NTag>
-                                <NCode :code="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)!.name" language="typescript" />
+                                <NCode
+                                  :code="
+                                    parseJsonField<{ name: string; inputs: string; outputs: string; example: string }>(
+                                      subtask.codeInterface
+                                    )!.name
+                                  "
+                                  language="typescript"
+                                />
                               </div>
                               <div class="interface-row">
                                 <span class="interface-label">输入:</span>
-                                <NCode :code="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)!.inputs || ''" language="typescript" />
+                                <NCode
+                                  :code="
+                                    parseJsonField<{ name: string; inputs: string; outputs: string; example: string }>(
+                                      subtask.codeInterface
+                                    )!.inputs || ''
+                                  "
+                                  language="typescript"
+                                />
                               </div>
                               <div class="interface-row">
                                 <span class="interface-label">输出:</span>
-                                <NCode :code="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)!.outputs || ''" language="typescript" />
+                                <NCode
+                                  :code="
+                                    parseJsonField<{ name: string; inputs: string; outputs: string; example: string }>(
+                                      subtask.codeInterface
+                                    )!.outputs || ''
+                                  "
+                                  language="typescript"
+                                />
                               </div>
-                              <div v-if="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)!.example" class="interface-row">
+                              <div
+                                v-if="
+                                  parseJsonField<{ name: string; inputs: string; outputs: string; example: string }>(
+                                    subtask.codeInterface
+                                  )!.example
+                                "
+                                class="interface-row"
+                              >
                                 <span class="interface-label">示例:</span>
-                                <NCode :code="parseJsonField<{name: string; inputs: string; outputs: string; example: string}>(subtask.codeInterface)!.example" language="typescript" />
+                                <NCode
+                                  :code="
+                                    parseJsonField<{ name: string; inputs: string; outputs: string; example: string }>(
+                                      subtask.codeInterface
+                                    )!.example
+                                  "
+                                  language="typescript"
+                                />
                               </div>
                             </template>
                           </div>
@@ -1038,14 +1143,29 @@ onUnmounted(() => {
                           <div class="detail-header">
                             <div class="detail-label">验收标准</div>
                             <NButton
-                              v-if="!(editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'acceptanceCriteria')"
+                              v-if="
+                                !(
+                                  editingType === 'subtask' &&
+                                  editingSubtaskId === subtask.id &&
+                                  editingField === 'acceptanceCriteria'
+                                )
+                              "
                               text
                               type="primary"
                               size="tiny"
                               @click="startEditSubtask(subtask.id, 'acceptanceCriteria')"
-                            >编辑</NButton>
+                            >
+                              编辑
+                            </NButton>
                           </div>
-                          <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'acceptanceCriteria'" class="detail-content">
+                          <div
+                            v-if="
+                              editingType === 'subtask' &&
+                              editingSubtaskId === subtask.id &&
+                              editingField === 'acceptanceCriteria'
+                            "
+                            class="detail-content"
+                          >
                             <NInput
                               v-model:value="editingValue"
                               type="textarea"
@@ -1053,14 +1173,24 @@ onUnmounted(() => {
                               :rows="6"
                             />
                             <NSpace class="mt-8px">
-                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">
+                                保存
+                              </NButton>
                               <NButton size="small" @click="cancelEdit">取消</NButton>
                             </NSpace>
                           </div>
                           <div v-else-if="subtask.acceptanceCriteria" class="detail-content acceptance-criteria">
-                            <template v-if="parseJsonField<Array<{id: number; description: string; completed: boolean}>>(subtask.acceptanceCriteria)">
+                            <template
+                              v-if="
+                                parseJsonField<Array<{ id: number; description: string; completed: boolean }>>(
+                                  subtask.acceptanceCriteria
+                                )
+                              "
+                            >
                               <div
-                                v-for="criteria in parseJsonField<Array<{id: number; description: string; completed: boolean}>>(subtask.acceptanceCriteria)"
+                                v-for="criteria in parseJsonField<
+                                  Array<{ id: number; description: string; completed: boolean }>
+                                >(subtask.acceptanceCriteria)"
                                 :key="criteria.id"
                                 class="criteria-item"
                               >
@@ -1078,14 +1208,29 @@ onUnmounted(() => {
                           <div class="detail-header">
                             <div class="detail-label">关联文件</div>
                             <NButton
-                              v-if="!(editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'relatedFiles')"
+                              v-if="
+                                !(
+                                  editingType === 'subtask' &&
+                                  editingSubtaskId === subtask.id &&
+                                  editingField === 'relatedFiles'
+                                )
+                              "
                               text
                               type="primary"
                               size="tiny"
                               @click="startEditSubtask(subtask.id, 'relatedFiles')"
-                            >编辑</NButton>
+                            >
+                              编辑
+                            </NButton>
                           </div>
-                          <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'relatedFiles'" class="detail-content">
+                          <div
+                            v-if="
+                              editingType === 'subtask' &&
+                              editingSubtaskId === subtask.id &&
+                              editingField === 'relatedFiles'
+                            "
+                            class="detail-content"
+                          >
                             <NInput
                               v-model:value="editingValue"
                               type="textarea"
@@ -1093,7 +1238,9 @@ onUnmounted(() => {
                               :rows="4"
                             />
                             <NSpace class="mt-8px">
-                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">
+                                保存
+                              </NButton>
                               <NButton size="small" @click="cancelEdit">取消</NButton>
                             </NSpace>
                           </div>
@@ -1118,14 +1265,29 @@ onUnmounted(() => {
                           <div class="detail-header">
                             <div class="detail-label">代码提示</div>
                             <NButton
-                              v-if="!(editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'codeHints')"
+                              v-if="
+                                !(
+                                  editingType === 'subtask' &&
+                                  editingSubtaskId === subtask.id &&
+                                  editingField === 'codeHints'
+                                )
+                              "
                               text
                               type="primary"
                               size="tiny"
                               @click="startEditSubtask(subtask.id, 'codeHints')"
-                            >编辑</NButton>
+                            >
+                              编辑
+                            </NButton>
                           </div>
-                          <div v-if="editingType === 'subtask' && editingSubtaskId === subtask.id && editingField === 'codeHints'" class="detail-content">
+                          <div
+                            v-if="
+                              editingType === 'subtask' &&
+                              editingSubtaskId === subtask.id &&
+                              editingField === 'codeHints'
+                            "
+                            class="detail-content"
+                          >
                             <NInput
                               v-model:value="editingValue"
                               type="textarea"
@@ -1133,7 +1295,9 @@ onUnmounted(() => {
                               :rows="4"
                             />
                             <NSpace class="mt-8px">
-                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">
+                                保存
+                              </NButton>
                               <NButton size="small" @click="cancelEdit">取消</NButton>
                             </NSpace>
                           </div>
@@ -1162,12 +1326,7 @@ onUnmounted(() => {
                                   </template>
                                   <template v-else-if="Array.isArray(value)">
                                     <NSpace>
-                                      <NTag
-                                        v-for="(item, idx) in value"
-                                        :key="idx"
-                                        type="info"
-                                        size="small"
-                                      >
+                                      <NTag v-for="(item, idx) in value" :key="idx" type="info" size="small">
                                         {{ typeof item === 'object' ? JSON.stringify(item) : item }}
                                       </NTag>
                                     </NSpace>
@@ -1233,7 +1392,7 @@ onUnmounted(() => {
                 </NTabPane>
                 <NTabPane name="dependencies" tab="依赖">
                   <div class="sidebar-content">
-                    <DependencyGraph :taskId="taskId" :height="300" />
+                    <DependencyGraph :task-id="taskId" :height="300" />
                   </div>
                 </NTabPane>
                 <NTabPane name="activities" tab="活动">
@@ -1560,7 +1719,9 @@ onUnmounted(() => {
   border: 1px solid #e0e0e6;
   border-radius: 8px;
   background-color: #fff;
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition:
+    box-shadow 0.2s,
+    transform 0.2s;
 
   &:hover {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -1717,7 +1878,9 @@ onUnmounted(() => {
   align-items: center;
   padding: 4px;
   border-radius: 4px;
-  transition: color 0.2s, background-color 0.2s;
+  transition:
+    color 0.2s,
+    background-color 0.2s;
 
   &:hover {
     color: #1890ff;

@@ -1,26 +1,26 @@
 <script setup lang="ts">
-import { computed, ref, watch, h } from 'vue';
+import { computed, h, ref, watch } from 'vue';
 import {
-  NModal,
-  NCard,
-  NSpace,
   NButton,
+  NCard,
+  NDataTable,
+  NEmpty,
   NForm,
   NFormItem,
-  NSwitch,
-  NRadioGroup,
-  NRadio,
   NInputNumber,
-  NDataTable,
-  NTag,
+  NModal,
+  NPagination,
   NPopconfirm,
+  NRadio,
+  NRadioGroup,
+  NSpace,
   NSpin,
-  NEmpty,
-  NPagination
+  NSwitch,
+  NTag
 } from 'naive-ui';
 import type { DataTableColumns, PaginationProps } from 'naive-ui';
-import { useBackupStore } from '@/store/modules/backup';
 import dayjs from 'dayjs';
+import { useBackupStore } from '@/store/modules/backup';
 
 interface Props {
   show: boolean;
@@ -105,23 +105,36 @@ const columns: DataTableColumns<BackupRow> = [
     fixed: 'right',
     render(row) {
       return h(NSpace, [
-        h(NButton, {
-          size: 'small',
-          type: 'info',
-          text: true,
-          onClick: () => handleRestore(row.id)
-        }, () => '恢复'),
-        h(NPopconfirm, {
-          onPositiveClick: () => handleDelete(row.id),
-          defaultShow: false
-        }, {
-          trigger: () => h(NButton, {
+        h(
+          NButton,
+          {
             size: 'small',
-            type: 'error',
-            text: true
-          }, () => '删除'),
-          default: () => '确认删除此备份？'
-        })
+            type: 'info',
+            text: true,
+            onClick: () => handleRestore(row.id)
+          },
+          () => '恢复'
+        ),
+        h(
+          NPopconfirm,
+          {
+            onPositiveClick: () => handleDelete(row.id),
+            defaultShow: false
+          },
+          {
+            trigger: () =>
+              h(
+                NButton,
+                {
+                  size: 'small',
+                  type: 'error',
+                  text: true
+                },
+                () => '删除'
+              ),
+            default: () => '确认删除此备份？'
+          }
+        )
       ]);
     }
   }
@@ -209,7 +222,7 @@ const paginationProps = computed<PaginationProps>(() => ({
 // 弹框打开时加载数据
 watch(
   () => props.show,
-  async (newVal) => {
+  async newVal => {
     if (newVal) {
       currentPage.value = 1;
       await Promise.all([
@@ -249,7 +262,7 @@ watch(
     :closable="true"
     :close-on-esc="true"
     class="backup-modal"
-    @update:show="(val) => emit('update:show', val)"
+    @update:show="val => emit('update:show', val)"
   >
     <div class="backup-content">
       <!-- 备份配置 -->
@@ -281,10 +294,14 @@ watch(
               :max="100"
               :disabled="!scheduleForm.enabled"
             />
-            <span class="text-gray-400 text-sm ml-2">最近保留的备份数量</span>
+            <span class="ml-2 text-sm text-gray-400">最近保留的备份数量</span>
           </NFormItem>
           <NFormItem label="上次备份">
-            {{ backupStore.schedule?.lastBackupAt ? dayjs(backupStore.schedule.lastBackupAt).format('YYYY-MM-DD HH:mm:ss') : '-' }}
+            {{
+              backupStore.schedule?.lastBackupAt
+                ? dayjs(backupStore.schedule.lastBackupAt).format('YYYY-MM-DD HH:mm:ss')
+                : '-'
+            }}
           </NFormItem>
           <NFormItem label=" ">
             <NSpace>
@@ -312,9 +329,7 @@ watch(
       <!-- 备份历史 -->
       <NCard title="备份历史" size="small">
         <template #header-extra>
-          <NButton type="success" :loading="submitLoading" @click="handleCreateBackup">
-            立即备份
-          </NButton>
+          <NButton type="success" :loading="submitLoading" @click="handleCreateBackup">立即备份</NButton>
         </template>
         <NSpin :show="backupStore.loading">
           <NDataTable

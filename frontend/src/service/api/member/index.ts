@@ -2,10 +2,10 @@ import { request } from '@/service/request';
 import type {
   Member,
   MemberCreateRequest,
-  MemberUpdateRequest,
   MemberListParams,
   MemberListResponse,
-  MemberStatistics
+  MemberStatistics,
+  MemberUpdateRequest
 } from '@/typings/api/member';
 
 const API_BASE = '/api';

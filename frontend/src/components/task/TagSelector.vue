@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
-import { NSelect, NTag, NSpace, NButton, NInput } from 'naive-ui';
-import type { SelectOption, SelectGroupOption } from 'naive-ui';
+import { computed, ref, watch } from 'vue';
+import { NButton, NInput, NSelect, NSpace, NTag } from 'naive-ui';
+import type { SelectGroupOption, SelectOption } from 'naive-ui';
 
 interface Props {
   modelValue?: string[];
@@ -31,14 +31,21 @@ const selectedTags = ref<string[]>([...props.modelValue]);
 const inputValue = ref('');
 
 // 监听外部值变化
-watch(() => props.modelValue, (newVal) => {
-  selectedTags.value = [...newVal];
-});
+watch(
+  () => props.modelValue,
+  newVal => {
+    selectedTags.value = [...newVal];
+  }
+);
 
 // 监听选中变化
-watch(selectedTags, (newVal) => {
-  emit('update:modelValue', newVal);
-}, { deep: true });
+watch(
+  selectedTags,
+  newVal => {
+    emit('update:modelValue', newVal);
+  },
+  { deep: true }
+);
 
 // 生成选项
 const options = computed(() => {
@@ -75,15 +82,8 @@ function removeTag(tag: string) {
 <template>
   <div class="tag-selector">
     <!-- 已选标签展示 -->
-    <NSpace wrap v-if="selectedTags.length > 0" class="selected-tags">
-      <NTag
-        v-for="tag in selectedTags"
-        :key="tag"
-        closable
-        type="info"
-        size="small"
-        @close="removeTag(tag)"
-      >
+    <NSpace v-if="selectedTags.length > 0" wrap class="selected-tags">
+      <NTag v-for="tag in selectedTags" :key="tag" closable type="info" size="small" @close="removeTag(tag)">
         {{ tag }}
       </NTag>
     </NSpace>
@@ -97,12 +97,7 @@ function removeTag(tag: string) {
         class="tag-input"
         @keydown.enter.prevent="handleCreate(inputValue)"
       />
-      <NButton
-        v-if="creatable && inputValue.trim()"
-        type="primary"
-        size="small"
-        @click="handleCreate(inputValue)"
-      >
+      <NButton v-if="creatable && inputValue.trim()" type="primary" size="small" @click="handleCreate(inputValue)">
         添加
       </NButton>
     </div>

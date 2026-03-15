@@ -1,45 +1,45 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { NBadge, NIcon, NPopover, NList, NListItem, NEmpty, NSpin } from 'naive-ui'
-import { useMessageStore } from '@/store/modules/message'
-import { useRouter } from 'vue-router'
-import type { Message } from '@/typings/api/message'
+import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { NBadge, NEmpty, NIcon, NList, NListItem, NPopover, NSpin } from 'naive-ui';
+import { useMessageStore } from '@/store/modules/message';
+import type { Message } from '@/typings/api/message';
 
-const messageStore = useMessageStore()
-const router = useRouter()
+const messageStore = useMessageStore();
+const router = useRouter();
 
-const showPopover = ref(false)
-const loading = ref(false)
+const showPopover = ref(false);
+const loading = ref(false);
 
 // 未读消息数量
-const unreadCount = computed(() => messageStore.unreadCount)
+const unreadCount = computed(() => messageStore.unreadCount);
 
 // 消息列表
-const messages = computed(() => messageStore.messages)
+const messages = computed(() => messageStore.messages);
 
 // 跳转到消息列表
 function goToMessageList() {
-  showPopover.value = false
-  router.push('/message/list')
+  showPopover.value = false;
+  router.push('/message/list');
 }
 
 // 查看消息详情
 async function viewMessage(message: Message) {
-  loading.value = true
+  loading.value = true;
   try {
-    await messageStore.markAsRead(message.id)
+    await messageStore.markAsRead(message.id);
     if (message.status === 'success') {
       // 可以跳转到任务详情
-      router.push(`/requirement/task-detail/${message.taskId}`)
+      router.push(`/requirement/task-detail/${message.taskId}`);
     }
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 // 关闭弹窗
 function handleClose() {
-  showPopover.value = false
+  showPopover.value = false;
 }
 
 // 获取消息类型文本
@@ -47,8 +47,8 @@ function getMessageTypeText(type: string): string {
   const typeMap: Record<string, string> = {
     expand_task: '任务拆分',
     regenerate_subtask: '重写子任务'
-  }
-  return typeMap[type] || type
+  };
+  return typeMap[type] || type;
 }
 
 // 获取消息状态文本
@@ -58,8 +58,8 @@ function getMessageStatusText(status: string): string {
     processing: '处理中',
     success: '成功',
     failed: '失败'
-  }
-  return statusMap[status] || status
+  };
+  return statusMap[status] || status;
 }
 
 // 获取消息状态颜色
@@ -69,36 +69,45 @@ function getMessageStatusColor(status: string): string {
     processing: 'info',
     success: 'success',
     failed: 'error'
-  }
-  return colorMap[status] || 'default'
+  };
+  return colorMap[status] || 'default';
 }
 </script>
 
 <template>
-  <NPopover
-    v-model:show="showPopover"
-    trigger="click"
-    placement="bottom-end"
-    :show-arrow="false"
-  >
+  <NPopover v-model:show="showPopover" trigger="click" placement="bottom-end" :show-arrow="false">
     <template #trigger>
       <div class="message-bell" @click.stop.prevent>
         <span class="bell-icon" :class="showPopover ? 'active' : ''">
-          <svg v-if="unreadCount > 0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-            <path d="M21 19v1H3v-1l2-2v-6c0-3.1 2.03-5.83 5-6.71V4a2 2 0 0 1 4 0v.29c2.97.88 5 3.61 5 6.71v6l2 2zm-7 2a2 2 0 0 1-4 0"/>
+          <svg
+            v-if="unreadCount > 0"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            width="20"
+            height="20"
+          >
+            <path
+              d="M21 19v1H3v-1l2-2v-6c0-3.1 2.03-5.83 5-6.71V4a2 2 0 0 1 4 0v.29c2.97.88 5 3.61 5 6.71v6l2 2zm-7 2a2 2 0 0 1-4 0"
+            />
           </svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          <svg
+            v-else
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="20"
+            height="20"
+          >
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
         </span>
-        <NBadge
-          v-if="unreadCount > 0"
-          :value="unreadCount"
-          :max="99"
-          type="error"
-          class="badge"
-        />
+        <NBadge v-if="unreadCount > 0" :value="unreadCount" :max="99" type="error" class="badge" />
       </div>
     </template>
     <div class="message-list-wrapper">
@@ -158,7 +167,7 @@ function getMessageStatusColor(status: string): string {
   height: 20px;
 }
 
-.bell-icon svg[fill="currentColor"] {
+.bell-icon svg[fill='currentColor'] {
   color: #faad14;
 }
 

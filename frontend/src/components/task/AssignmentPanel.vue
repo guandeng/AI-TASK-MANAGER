@@ -1,12 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { NCard, NSpace, NButton, NAvatar, NTag, NSelect, NModal, NInputNumber, NEmpty, NSpin, NPopconfirm, NTooltip } from 'naive-ui';
+import {
+  NAvatar,
+  NButton,
+  NCard,
+  NEmpty,
+  NInputNumber,
+  NModal,
+  NPopconfirm,
+  NSelect,
+  NSpace,
+  NSpin,
+  NTag,
+  NTooltip
+} from 'naive-ui';
 import type { SelectOption } from 'naive-ui';
-import { fetchTaskAssignments, assignTaskToMember, unassignTaskFromMember } from '@/service/api/assignment';
+import { assignTaskToMember, fetchTaskAssignments, unassignTaskFromMember } from '@/service/api/assignment';
 import { fetchMemberList } from '@/service/api/member';
 import type { Assignment, AssignmentRole } from '@/typings/api/assignment';
 import type { Member } from '@/typings/api/member';
-import { ASSIGNMENT_ROLE_LABELS, ASSIGNMENT_ROLE_COLORS } from '@/typings/api/assignment';
+import { ASSIGNMENT_ROLE_COLORS, ASSIGNMENT_ROLE_LABELS } from '@/typings/api/assignment';
 
 const props = defineProps<{
   taskId: number;
@@ -141,9 +154,13 @@ async function handleUnassign(assignment: Assignment) {
 }
 
 // 监听 taskId 变化
-watch(() => props.taskId, () => {
-  loadAssignments();
-}, { immediate: true });
+watch(
+  () => props.taskId,
+  () => {
+    loadAssignments();
+  },
+  { immediate: true }
+);
 
 onMounted(() => {
   loadMembers();
@@ -153,9 +170,7 @@ onMounted(() => {
 <template>
   <NCard title="任务分配" size="small">
     <template #header-extra>
-      <NButton type="primary" size="small" @click="openAssignModal">
-        分配成员
-      </NButton>
+      <NButton type="primary" size="small" @click="openAssignModal">分配成员</NButton>
     </template>
 
     <NSpin :show="loading">
@@ -164,18 +179,9 @@ onMounted(() => {
         <div v-if="assignmentsByRole.assignee.length > 0" class="role-group">
           <div class="role-label">负责人</div>
           <NSpace vertical :size="8">
-            <div
-              v-for="assignment in assignmentsByRole.assignee"
-              :key="assignment.id"
-              class="assignment-item"
-            >
+            <div v-for="assignment in assignmentsByRole.assignee" :key="assignment.id" class="assignment-item">
               <NSpace align="center">
-                <NAvatar
-                  round
-                  size="small"
-                  :src="assignment.member?.avatar"
-                  :name="assignment.member?.name"
-                />
+                <NAvatar round size="small" :src="assignment.member?.avatar" :name="assignment.member?.name" />
                 <span>{{ assignment.member?.name || '未知成员' }}</span>
                 <NTag v-if="assignment.estimatedHours" size="small" type="info">
                   预估: {{ assignment.estimatedHours }}h
@@ -183,9 +189,7 @@ onMounted(() => {
               </NSpace>
               <NPopconfirm @positive-click="handleUnassign(assignment)">
                 <template #trigger>
-                  <NButton text type="error" size="small">
-                    移除
-                  </NButton>
+                  <NButton text type="error" size="small">移除</NButton>
                 </template>
                 确认移除此分配？
               </NPopconfirm>
@@ -197,25 +201,14 @@ onMounted(() => {
         <div v-if="assignmentsByRole.reviewer.length > 0" class="role-group">
           <div class="role-label">审核人</div>
           <NSpace vertical :size="8">
-            <div
-              v-for="assignment in assignmentsByRole.reviewer"
-              :key="assignment.id"
-              class="assignment-item"
-            >
+            <div v-for="assignment in assignmentsByRole.reviewer" :key="assignment.id" class="assignment-item">
               <NSpace align="center">
-                <NAvatar
-                  round
-                  size="small"
-                  :src="assignment.member?.avatar"
-                  :name="assignment.member?.name"
-                />
+                <NAvatar round size="small" :src="assignment.member?.avatar" :name="assignment.member?.name" />
                 <span>{{ assignment.member?.name || '未知成员' }}</span>
               </NSpace>
               <NPopconfirm @positive-click="handleUnassign(assignment)">
                 <template #trigger>
-                  <NButton text type="error" size="small">
-                    移除
-                  </NButton>
+                  <NButton text type="error" size="small">移除</NButton>
                 </template>
                 确认移除此分配？
               </NPopconfirm>
@@ -227,25 +220,14 @@ onMounted(() => {
         <div v-if="assignmentsByRole.collaborator.length > 0" class="role-group">
           <div class="role-label">协作者</div>
           <NSpace vertical :size="8">
-            <div
-              v-for="assignment in assignmentsByRole.collaborator"
-              :key="assignment.id"
-              class="assignment-item"
-            >
+            <div v-for="assignment in assignmentsByRole.collaborator" :key="assignment.id" class="assignment-item">
               <NSpace align="center">
-                <NAvatar
-                  round
-                  size="small"
-                  :src="assignment.member?.avatar"
-                  :name="assignment.member?.name"
-                />
+                <NAvatar round size="small" :src="assignment.member?.avatar" :name="assignment.member?.name" />
                 <span>{{ assignment.member?.name || '未知成员' }}</span>
               </NSpace>
               <NPopconfirm @positive-click="handleUnassign(assignment)">
                 <template #trigger>
-                  <NButton text type="error" size="small">
-                    移除
-                  </NButton>
+                  <NButton text type="error" size="small">移除</NButton>
                 </template>
                 确认移除此分配？
               </NPopconfirm>
@@ -269,20 +251,11 @@ onMounted(() => {
       <NSpace vertical :size="16">
         <div>
           <div class="mb-8px">选择成员</div>
-          <NSelect
-            v-model:value="selectedMemberId"
-            :options="memberOptions"
-            placeholder="请选择成员"
-            filterable
-          />
+          <NSelect v-model:value="selectedMemberId" :options="memberOptions" placeholder="请选择成员" filterable />
         </div>
         <div>
           <div class="mb-8px">角色</div>
-          <NSelect
-            v-model:value="selectedRole"
-            :options="roleOptions"
-            placeholder="请选择角色"
-          />
+          <NSelect v-model:value="selectedRole" :options="roleOptions" placeholder="请选择角色" />
         </div>
         <div>
           <div class="mb-8px">预估工时（小时，可选）</div>

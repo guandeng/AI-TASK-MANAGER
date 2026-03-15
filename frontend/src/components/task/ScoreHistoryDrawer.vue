@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { NDrawer, NDrawerContent, NSpin, NCard, NButton, NSpace, NTag, NEmpty, NAlert, NModal } from 'naive-ui';
-import type { TaskQualityScore, EvaluationData, EvalSuggestion } from '@/typings/api/task';
-import { useTaskStore } from '@/store/modules/task';
+import { NAlert, NButton, NCard, NDrawer, NDrawerContent, NEmpty, NModal, NSpace, NSpin, NTag } from 'naive-ui';
 import { MdPreview } from 'md-editor-v3';
+import { useTaskStore } from '@/store/modules/task';
+import type { EvalSuggestion, EvaluationData, TaskQualityScore } from '@/typings/api/task';
 import 'md-editor-v3/lib/style.css';
 
 interface Props {
@@ -20,7 +20,7 @@ const taskStore = useTaskStore();
 
 const localShow = computed({
   get: () => props.show,
-  set: (val) => emit('update:show', val)
+  set: val => emit('update:show', val)
 });
 
 const selectedScore = ref<TaskQualityScore | null>(null);
@@ -29,14 +29,18 @@ const showDeleteModal = ref(false);
 const scoreToDelete = ref<number | null>(null);
 
 // 加载评分历史
-watch(() => props.taskId, async (id) => {
-  if (id) {
-    await taskStore.loadScoreHistory(id);
-    if (taskStore.qualityScores.length > 0) {
-      selectedScore.value = taskStore.qualityScores[0];
+watch(
+  () => props.taskId,
+  async id => {
+    if (id) {
+      await taskStore.loadScoreHistory(id);
+      if (taskStore.qualityScores.length > 0) {
+        selectedScore.value = taskStore.qualityScores[0];
+      }
     }
-  }
-}, { immediate: true });
+  },
+  { immediate: true }
+);
 
 // 选择评分
 function selectScore(score: TaskQualityScore) {
@@ -118,7 +122,7 @@ function closeDrawer() {
       <NSpin :show="taskStore.scoreHistoryLoading">
         <div class="score-history-container">
           <!-- 评分列表 -->
-          <div class="score-list" v-if="taskStore.qualityScores.length > 0">
+          <div v-if="taskStore.qualityScores.length > 0" class="score-list">
             <NCard
               v-for="score in taskStore.qualityScores"
               :key="score.id"
@@ -126,8 +130,8 @@ function closeDrawer() {
               :bordered="false"
               size="small"
               :class="{ selected: selectedScore?.id === score.id }"
-              @click="selectScore(score)"
               class="score-item"
+              @click="selectScore(score)"
             >
               <template #header-extra>
                 <NTag :type="score.totalScore >= 70 ? 'success' : 'warning'">
@@ -156,11 +160,13 @@ function closeDrawer() {
               <template #header-extra>
                 <NSpace>
                   <NButton size="small" quaternary @click.stop="confirmRestore(selectedScore)">
-                    <template #icon><span class="i-mdi:backup-restore-outline" style="font-size: 18px;"></span></template>
+                    <template #icon>
+                      <span class="i-mdi:backup-restore-outline" style="font-size: 18px"></span>
+                    </template>
                     恢复此版本
                   </NButton>
                   <NButton size="small" quaternary @click.stop="confirmDelete(selectedScore.id)">
-                    <template #icon><span class="i-mdi:delete-outline" style="font-size: 18px;"></span></template>
+                    <template #icon><span class="i-mdi:delete-outline" style="font-size: 18px"></span></template>
                     删除
                   </NButton>
                 </NSpace>
@@ -225,14 +231,18 @@ function closeDrawer() {
                   </ul>
                 </NAlert>
                 <NAlert type="info" title="改进建议" class="eval-section">
-                  <div v-for="(item, i) in getEvaluationData(selectedScore)?.suggestions" :key="i" class="suggestion-item">
+                  <div
+                    v-for="(item, i) in getEvaluationData(selectedScore)?.suggestions"
+                    :key="i"
+                    class="suggestion-item"
+                  >
                     <strong>{{ item.issue }}</strong>
                     <p>{{ item.suggestion }}</p>
                   </div>
                 </NAlert>
                 <NDivider>详细分析</NDivider>
                 <div class="analysis">
-                  <MdPreview :modelValue="getEvaluationData(selectedScore)?.analysis || ''" />
+                  <MdPreview :model-value="getEvaluationData(selectedScore)?.analysis || ''" />
                 </div>
               </template>
             </NCard>
@@ -243,10 +253,22 @@ function closeDrawer() {
   </NDrawer>
 
   <!-- 删除确认弹窗 -->
-  <NModal v-model:show="showDeleteModal" preset="dialog" title="确认删除" :content="`确定要删除这个评分记录吗？此操作不可恢复。`" @positive-click="handleDelete" />
+  <NModal
+    v-model:show="showDeleteModal"
+    preset="dialog"
+    title="确认删除"
+    content="确定要删除这个评分记录吗？此操作不可恢复。"
+    @positive-click="handleDelete"
+  />
 
   <!-- 恢复确认弹窗 -->
-  <NModal v-model:show="showRestoreModal" preset="dialog" title="确认恢复" :content="`确定要恢复到版本 ${selectedScore?.version} 吗？当前任务内容将被覆盖。`" @positive-click="handleRestore" />
+  <NModal
+    v-model:show="showRestoreModal"
+    preset="dialog"
+    title="确认恢复"
+    :content="`确定要恢复到版本 ${selectedScore?.version} 吗？当前任务内容将被覆盖。`"
+    @positive-click="handleRestore"
+  />
 </template>
 
 <style scoped lang="scss">

@@ -1,32 +1,41 @@
-import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
+import { defineStore } from 'pinia';
 import {
+  addTaskDependency as addTaskDependencyApi,
   batchDeleteTasks as batchDeleteTasksApi,
   clearTaskSubtasks as clearTaskSubtasksApi,
+  copyTask as copyTaskApi,
   createTask as createTaskApi,
-  deleteTask as deleteTaskApi,
   deleteSubtask as deleteSubtaskApi,
+  deleteTask as deleteTaskApi,
+  deleteTaskScore as deleteTaskScoreApi,
   expandTask as expandTaskApi,
   expandTaskAsync as expandTaskAsyncApi,
   fetchTaskDetail,
   fetchTaskList,
-  regenerateSubtask as regenerateSubtaskApi,
-  reorderSubtasks as reorderSubtasksApi,
-  updateTask,
-  updateSubtask as updateSubtaskApi,
-  copyTask as copyTaskApi,
-  getTaskDependencies as getTaskDependenciesApi,
-  addTaskDependency as addTaskDependencyApi,
-  removeTaskDependency as removeTaskDependencyApi,
-  validateDependencies as validateDependenciesApi,
-  getReadyTasks as getReadyTasksApi,
-  scoreTask as scoreTaskApi,
   fetchTaskScoreHistory as fetchTaskScoreHistoryApi,
+  getReadyTasks as getReadyTasksApi,
+  getTaskDependencies as getTaskDependenciesApi,
+  regenerateSubtask as regenerateSubtaskApi,
+  removeTaskDependency as removeTaskDependencyApi,
+  reorderSubtasks as reorderSubtasksApi,
   restoreTaskScore as restoreTaskScoreApi,
-  deleteTaskScore as deleteTaskScoreApi
+  scoreTask as scoreTaskApi,
+  updateSubtask as updateSubtaskApi,
+  updateTask,
+  validateDependencies as validateDependenciesApi
 } from '@/service/api/task';
-import type { Task, TaskStatus, TaskStatistics, TaskListParams, TaskCreateRequest, TaskDependency, TaskQualityScore } from '@/typings/api/task';
-import { createLoadingService, LoadingService, LOADING_PRESETS } from '@/utils/loading-service';
+import type { LoadingService } from '@/utils/loading-service';
+import { LOADING_PRESETS, createLoadingService } from '@/utils/loading-service';
+import type {
+  Task,
+  TaskCreateRequest,
+  TaskDependency,
+  TaskListParams,
+  TaskQualityScore,
+  TaskStatistics,
+  TaskStatus
+} from '@/typings/api/task';
 
 // 辅助函数：提取后端返回的 data 字段
 // 后端返回格式: { code: 0, message: "success", data: {...} }
@@ -482,7 +491,12 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
-  async function regenerateSubtask(taskId: number, subtaskId: number, prompt?: string, loadingService?: LoadingService) {
+  async function regenerateSubtask(
+    taskId: number,
+    subtaskId: number,
+    prompt?: string,
+    loadingService?: LoadingService
+  ) {
     // 使用传入的 loadingService 或创建新的
     const ls = loadingService || createLoadingService();
     const shouldManageLoading = !loadingService;

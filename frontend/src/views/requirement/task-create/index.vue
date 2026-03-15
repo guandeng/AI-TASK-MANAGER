@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
+  NAlert,
+  NButton,
   NCard,
+  NCascader,
+  NDatePicker,
   NForm,
   NFormItem,
   NInput,
-  NButton,
-  NSpace,
+  NInputNumber,
   NSelect,
-  NTag,
-  NCascader,
+  NSpace,
   NSpin,
-  NAlert,
-  NDatePicker,
-  NInputNumber
+  NTag
 } from 'naive-ui';
 import type { FormInst, FormRules, SelectOption } from 'naive-ui';
 import { useTaskStore } from '@/store/modules/task';
@@ -80,7 +80,7 @@ const dependencyOptions = computed<SelectOption[]>(() => {
     options.push({
       label: task.title,
       value: task.id,
-      disabled: !!(formData.value.requirementId && task.requirementId === formData.value.requirementId)
+      disabled: Boolean(formData.value.requirementId && task.requirementId === formData.value.requirementId)
     });
   });
   return options;
@@ -147,21 +147,9 @@ onMounted(async () => {
   <div class="task-create-page">
     <NCard title="创建新任务">
       <NSpin :show="submitting">
-        <NForm
-          ref="formRef"
-          :model="formData"
-          :rules="rules"
-          label-placement="left"
-          label-width="120px"
-        >
+        <NForm ref="formRef" :model="formData" :rules="rules" label-placement="left" label-width="120px">
           <NFormItem label="任务标题" path="title">
-            <NInput
-              v-model:value="formData.title"
-              placeholder="请输入任务标题"
-              maxlength="200"
-              show-count
-              clearable
-            />
+            <NInput v-model:value="formData.title" placeholder="请输入任务标题" maxlength="200" show-count clearable />
           </NFormItem>
 
           <NFormItem label="关联需求" path="requirementId">
@@ -271,12 +259,8 @@ onMounted(async () => {
 
           <NFormItem>
             <NSpace>
-              <NButton type="primary" @click="handleSubmit" :loading="submitting">
-                创建任务
-              </NButton>
-              <NButton @click="handleCancel">
-                取消
-              </NButton>
+              <NButton type="primary" :loading="submitting" @click="handleSubmit">创建任务</NButton>
+              <NButton @click="handleCancel">取消</NButton>
             </NSpace>
           </NFormItem>
         </NForm>

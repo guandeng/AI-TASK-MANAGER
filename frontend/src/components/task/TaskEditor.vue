@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { NModal, NCard, NForm, NFormItem, NInput, NButton, NSpace, NSelect, NTag } from 'naive-ui';
+import { NButton, NCard, NForm, NFormItem, NInput, NModal, NSelect, NSpace, NTag } from 'naive-ui';
 import { MdEditor } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import type { Task, TaskPriority } from '@/typings/api/task';
@@ -47,7 +47,7 @@ const saving = ref(false);
 // 监听 visible 变化，初始化表单数据
 watch(
   () => props.visible,
-  (newVal) => {
+  newVal => {
     if (newVal && props.task) {
       formData.value = {
         title: props.task.title || '',
@@ -82,30 +82,17 @@ function handleSave() {
     :show="visible"
     preset="card"
     title="编辑任务"
-    style="width: 800px; max-height: 90vh; overflow: auto;"
+    style="width: 800px; max-height: 90vh; overflow: auto"
     :close-on-esc="false"
-    @update:show="(value) => emit('update:visible', value)"
+    @update:show="value => emit('update:visible', value)"
   >
-    <NForm
-      :model="formData"
-      label-placement="left"
-      label-width="100px"
-    >
+    <NForm :model="formData" label-placement="left" label-width="100px">
       <NFormItem label="任务标题">
-        <NInput
-          v-model:value="formData.title"
-          placeholder="请输入任务标题"
-          maxlength="200"
-          show-count
-        />
+        <NInput v-model:value="formData.title" placeholder="请输入任务标题" maxlength="200" show-count />
       </NFormItem>
 
       <NFormItem label="优先级">
-        <NSelect
-          v-model:value="formData.priority"
-          :options="priorityOptions"
-          style="width: 150px"
-        />
+        <NSelect v-model:value="formData.priority" :options="priorityOptions" style="width: 150px" />
       </NFormItem>
 
       <NFormItem label="负责人">
@@ -185,12 +172,8 @@ function handleSave() {
 
     <template #footer>
       <NSpace justify="end">
-        <NButton @click="handleClose">
-          取消
-        </NButton>
-        <NButton type="primary" @click="handleSave" :loading="saving">
-          保存
-        </NButton>
+        <NButton @click="handleClose">取消</NButton>
+        <NButton type="primary" :loading="saving" @click="handleSave">保存</NButton>
       </NSpace>
     </template>
   </NModal>

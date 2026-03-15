@@ -1,5 +1,5 @@
 import { request } from '@/service/request';
-import type { MenuItem, MenuFormData, MenuListResponse, MenuOperationResponse } from '@/typings/api/menu';
+import type { MenuFormData, MenuItem, MenuListResponse, MenuOperationResponse } from '@/typings/api/menu';
 
 const API_BASE = '/api';
 

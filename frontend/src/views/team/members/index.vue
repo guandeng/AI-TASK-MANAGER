@@ -1,11 +1,30 @@
 <script setup lang="ts">
-import { h, computed, onMounted, onActivated, ref } from 'vue';
+import { computed, h, onActivated, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { NCard, NDataTable, NTag, NSpace, NButton, NInput, NSelect, NAvatar, NModal, NForm, NFormItem, NInputNumber, useMessage } from 'naive-ui';
+import {
+  NAvatar,
+  NButton,
+  NCard,
+  NDataTable,
+  NForm,
+  NFormItem,
+  NInput,
+  NInputNumber,
+  NModal,
+  NSelect,
+  NSpace,
+  NTag,
+  useMessage
+} from 'naive-ui';
 import type { DataTableColumns, FormInst } from 'naive-ui';
 import { useMemberStore } from '@/store/modules/member';
 import type { Member, MemberRole, MemberStatus } from '@/typings/api/member';
-import { MEMBER_ROLE_OPTIONS, MEMBER_STATUS_OPTIONS, MEMBER_ROLE_LABELS, MEMBER_STATUS_LABELS } from '@/typings/api/member';
+import {
+  MEMBER_ROLE_LABELS,
+  MEMBER_ROLE_OPTIONS,
+  MEMBER_STATUS_LABELS,
+  MEMBER_STATUS_OPTIONS
+} from '@/typings/api/member';
 
 const router = useRouter();
 const message = useMessage();
@@ -42,8 +61,8 @@ const filteredMembers = computed(() => {
       const keyword = filterKeyword.value.toLowerCase();
       return (
         member.name.toLowerCase().includes(keyword) ||
-        (member.email?.toLowerCase().includes(keyword)) ||
-        (member.department?.toLowerCase().includes(keyword))
+        member.email?.toLowerCase().includes(keyword) ||
+        member.department?.toLowerCase().includes(keyword)
       );
     }
     return true;
@@ -100,10 +119,14 @@ const columns: DataTableColumns<Member> = [
     key: 'status',
     width: 80,
     render(row) {
-      return h(NTag, {
-        type: row.status === 'active' ? 'success' : 'default',
-        size: 'small'
-      }, () => MEMBER_STATUS_LABELS[row.status]);
+      return h(
+        NTag,
+        {
+          type: row.status === 'active' ? 'success' : 'default',
+          size: 'small'
+        },
+        () => MEMBER_STATUS_LABELS[row.status]
+      );
     }
   },
   {
@@ -112,20 +135,32 @@ const columns: DataTableColumns<Member> = [
     width: 180,
     render(row) {
       return h(NSpace, {}, () => [
-        h(NButton, {
-          size: 'small',
-          onClick: () => handleEdit(row)
-        }, () => '编辑'),
-        h(NButton, {
-          size: 'small',
-          type: row.status === 'active' ? 'warning' : 'success',
-          onClick: () => handleToggleStatus(row)
-        }, () => row.status === 'active' ? '停用' : '激活'),
-        h(NButton, {
-          size: 'small',
-          type: 'error',
-          onClick: () => handleDelete(row)
-        }, () => '删除')
+        h(
+          NButton,
+          {
+            size: 'small',
+            onClick: () => handleEdit(row)
+          },
+          () => '编辑'
+        ),
+        h(
+          NButton,
+          {
+            size: 'small',
+            type: row.status === 'active' ? 'warning' : 'success',
+            onClick: () => handleToggleStatus(row)
+          },
+          () => (row.status === 'active' ? '停用' : '激活')
+        ),
+        h(
+          NButton,
+          {
+            size: 'small',
+            type: 'error',
+            onClick: () => handleDelete(row)
+          },
+          () => '删除'
+        )
       ]);
     }
   }
@@ -194,9 +229,10 @@ async function handleSubmit() {
 // 切换状态
 async function handleToggleStatus(member: Member) {
   const action = member.status === 'active' ? '停用' : '激活';
-  const result = member.status === 'active'
-    ? await memberStore.deactivateMemberById(member.id)
-    : await memberStore.activateMemberById(member.id);
+  const result =
+    member.status === 'active'
+      ? await memberStore.deactivateMemberById(member.id)
+      : await memberStore.activateMemberById(member.id);
 
   if (result) {
     message.success(`成员已${action}`);
@@ -240,12 +276,7 @@ onActivated(() => {
 
       <!-- 筛选栏 -->
       <NSpace class="mb-16px">
-        <NInput
-          v-model:value="filterKeyword"
-          placeholder="搜索成员姓名/邮箱/部门"
-          clearable
-          style="width: 200px"
-        />
+        <NInput v-model:value="filterKeyword" placeholder="搜索成员姓名/邮箱/部门" clearable style="width: 200px" />
         <NSelect
           v-model:value="filterStatus"
           :options="[{ label: '全部状态', value: 'all' }, ...MEMBER_STATUS_OPTIONS]"

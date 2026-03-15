@@ -1,22 +1,22 @@
+import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import {
+  createRequirement,
+  deleteDocument,
+  deleteRequirement,
+  fetchRequirementDetail,
+  fetchRequirementList,
+  fetchRequirementStatistics,
+  updateRequirement,
+  uploadDocument
+} from '@/service/api/requirement';
 import type {
   Requirement,
   RequirementDocument,
-  RequirementListParams,
   RequirementFormData,
+  RequirementListParams,
   RequirementStatistics
 } from '@/typings/api/requirement';
-import {
-  fetchRequirementList,
-  fetchRequirementStatistics,
-  fetchRequirementDetail,
-  createRequirement,
-  updateRequirement,
-  deleteRequirement,
-  uploadDocument,
-  deleteDocument
-} from '@/service/api/requirement';
 
 // 辅助函数：提取后端返回的 data 字段
 function extractData(responseData: any): any {
@@ -158,9 +158,7 @@ export const useRequirementStore = defineStore('requirement-store', () => {
   async function deleteRequirementDocument(requirementId: number, documentId: number) {
     const { data, error } = await deleteDocument(requirementId, documentId);
     if (!error && data && currentRequirement.value) {
-      currentRequirement.value.documents = currentRequirement.value.documents?.filter(
-        d => d.id !== documentId
-      );
+      currentRequirement.value.documents = currentRequirement.value.documents?.filter(d => d.id !== documentId);
     }
     return { data, error };
   }

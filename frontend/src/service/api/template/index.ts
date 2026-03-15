@@ -1,10 +1,10 @@
 import { request } from '@/service/request';
 import type {
-  ProjectTemplate,
-  TaskTemplate,
   CreateProjectTemplateRequest,
   CreateTaskTemplateRequest,
-  InstantiateTemplateRequest
+  InstantiateTemplateRequest,
+  ProjectTemplate,
+  TaskTemplate
 } from '@/typings/api/template';
 
 const API_BASE = '/api';

@@ -1,27 +1,27 @@
 <script setup lang="ts">
-import { h, ref, onMounted } from 'vue';
+import { h, onMounted, ref } from 'vue';
 import {
+  NButton,
   NCard,
   NDataTable,
-  NButton,
-  NSpace,
-  NModal,
   NForm,
   NFormItem,
   NInput,
-  NSwitch,
   NInputNumber,
+  NModal,
   NPopconfirm,
+  NSpace,
+  NSwitch,
   useMessage
 } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import {
-  fetchLanguageList,
-  createLanguage,
-  updateLanguage,
-  deleteLanguage,
   type Language,
-  type LanguageCreateRequest
+  type LanguageCreateRequest,
+  createLanguage,
+  deleteLanguage,
+  fetchLanguageList,
+  updateLanguage
 } from '@/service/api/language';
 
 const message = useMessage();
@@ -106,12 +106,7 @@ const columns: DataTableColumns<Language> = [
           NPopconfirm,
           { onPositiveClick: () => handleDelete(row.id) },
           {
-            trigger: () =>
-              h(
-                NButton,
-                { size: 'small', type: 'error', text: true },
-                () => '删除'
-              ),
+            trigger: () => h(NButton, { size: 'small', type: 'error', text: true }, () => '删除'),
             default: () => '确定删除该语言吗？'
           }
         )
@@ -241,20 +236,10 @@ onMounted(() => {
           <NInput v-model:value="formData.framework" placeholder="如: Gin + GORM" />
         </NFormItem>
         <NFormItem label="描述">
-          <NInput
-            v-model:value="formData.description"
-            type="textarea"
-            placeholder="语言/技术栈描述"
-            :rows="2"
-          />
+          <NInput v-model:value="formData.description" type="textarea" placeholder="语言/技术栈描述" :rows="2" />
         </NFormItem>
         <NFormItem label="代码提示">
-          <NInput
-            v-model:value="formData.codeHints"
-            type="textarea"
-            placeholder="代码实现提示模板"
-            :rows="3"
-          />
+          <NInput v-model:value="formData.codeHints" type="textarea" placeholder="代码实现提示模板" :rows="3" />
         </NFormItem>
         <NFormItem label="Claude备注">
           <NInput

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, nextTick } from 'vue';
-import { NCard, NEmpty, NSpin, NTag, NButton, NSpace, NTooltip } from 'naive-ui';
-import type { Task, TaskDependency } from '@/typings/api/task';
+import { computed, nextTick, onMounted, ref } from 'vue';
+import { NButton, NCard, NEmpty, NSpace, NSpin, NTag, NTooltip } from 'naive-ui';
 import { useTaskStore } from '@/store/modules/task';
+import type { Task, TaskDependency } from '@/typings/api/task';
 
 interface Props {
   taskId?: number;
@@ -38,7 +38,7 @@ const nodes = computed<NodePosition[]>(() => {
   tasks.forEach(t => taskMap.set(t.id, t));
 
   // 如果有指定 taskId，只显示相关任务
-  let relevantTaskIds = new Set<number>();
+  const relevantTaskIds = new Set<number>();
   if (props.taskId) {
     relevantTaskIds.add(props.taskId);
     // 找出所有相关联的任务
@@ -117,11 +117,13 @@ const nodes = computed<NodePosition[]>(() => {
 
 // 连线数据
 const links = computed(() => {
-  return dependencies.value.map(dep => {
-    const fromNode = nodes.value.find(n => n.id === dep.dependsOnTaskId);
-    const toNode = nodes.value.find(n => n.id === dep.taskId);
-    return { from: fromNode, to: toNode, dependency: dep };
-  }).filter(l => l.from && l.to);
+  return dependencies.value
+    .map(dep => {
+      const fromNode = nodes.value.find(n => n.id === dep.dependsOnTaskId);
+      const toNode = nodes.value.find(n => n.id === dep.taskId);
+      return { from: fromNode, to: toNode, dependency: dep };
+    })
+    .filter(l => l.from && l.to);
 });
 
 // 生成 SVG 路径（贝塞尔曲线）
@@ -170,11 +172,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <NCard
-    title="依赖关系图"
-    :bordered="false"
-    :style="{ height: `${height}px` }"
-  >
+  <NCard title="依赖关系图" :bordered="false" :style="{ height: `${height}px` }">
     <NSpin :show="loading">
       <div v-if="nodes.length === 0" class="empty-state">
         <NEmpty description="暂无依赖关系" :image-size="60" />
@@ -183,24 +181,10 @@ onMounted(() => {
       <div v-else class="dependency-graph" :style="{ height: `${height - 50}px` }">
         <svg class="links-layer" :style="{ height: `${height - 50}px` }">
           <defs>
-            <marker
-              id="arrowhead"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
               <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
             </marker>
-            <marker
-              id="arrowhead-highlighted"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
+            <marker id="arrowhead-highlighted" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
               <polygon points="0 0, 10 3.5, 0 7" fill="#2080f0" />
             </marker>
           </defs>
@@ -209,9 +193,15 @@ onMounted(() => {
             <path
               :d="getLinkPath(link.from!, link.to!)"
               :stroke="getDependencyColor(link.dependency)"
-              :stroke-width="hoveredNodeId && (hoveredNodeId === link.from!.id || hoveredNodeId === link.to!.id) ? 3 : 2"
+              :stroke-width="
+                hoveredNodeId && (hoveredNodeId === link.from!.id || hoveredNodeId === link.to!.id) ? 3 : 2
+              "
               fill="none"
-              :marker-end="hoveredNodeId && (hoveredNodeId === link.from!.id || hoveredNodeId === link.to!.id) ? 'url(#arrowhead-highlighted)' : 'url(#arrowhead)'"
+              :marker-end="
+                hoveredNodeId && (hoveredNodeId === link.from!.id || hoveredNodeId === link.to!.id)
+                  ? 'url(#arrowhead-highlighted)'
+                  : 'url(#arrowhead)'
+              "
               class="dependency-link"
             />
           </g>
@@ -233,7 +223,9 @@ onMounted(() => {
             <template #trigger>
               <div class="node-content">
                 <NTag
-                  :type="node.task.priority === 'high' ? 'error' : node.task.priority === 'medium' ? 'warning' : 'success'"
+                  :type="
+                    node.task.priority === 'high' ? 'error' : node.task.priority === 'medium' ? 'warning' : 'success'
+                  "
                   size="small"
                   class="priority-tag"
                 >
@@ -241,20 +233,51 @@ onMounted(() => {
                 </NTag>
                 <span class="node-title">{{ node.task.title }}</span>
                 <NTag
-                  :type="node.task.status === 'done' ? 'success' : node.task.status === 'in-progress' ? 'info' : node.task.status === 'deferred' ? 'warning' : 'default'"
+                  :type="
+                    node.task.status === 'done'
+                      ? 'success'
+                      : node.task.status === 'in-progress'
+                        ? 'info'
+                        : node.task.status === 'deferred'
+                          ? 'warning'
+                          : 'default'
+                  "
                   size="small"
                   class="status-tag"
                 >
-                  {{ node.task.status === 'done' ? '已完成' : node.task.status === 'in-progress' ? '进行中' : node.task.status === 'deferred' ? '已延期' : '待处理' }}
+                  {{
+                    node.task.status === 'done'
+                      ? '已完成'
+                      : node.task.status === 'in-progress'
+                        ? '进行中'
+                        : node.task.status === 'deferred'
+                          ? '已延期'
+                          : '待处理'
+                  }}
                 </NTag>
               </div>
             </template>
             <div>
-              <div><strong>ID:</strong> {{ node.task.id }}</div>
-              <div><strong>标题:</strong> {{ node.task.title }}</div>
-              <div><strong>优先级:</strong> {{ node.task.priority }}</div>
-              <div><strong>状态:</strong> {{ node.task.status }}</div>
-              <div v-if="node.task.dueDate"><strong>截止日期:</strong> {{ node.task.dueDate }}</div>
+              <div>
+                <strong>ID:</strong>
+                {{ node.task.id }}
+              </div>
+              <div>
+                <strong>标题:</strong>
+                {{ node.task.title }}
+              </div>
+              <div>
+                <strong>优先级:</strong>
+                {{ node.task.priority }}
+              </div>
+              <div>
+                <strong>状态:</strong>
+                {{ node.task.status }}
+              </div>
+              <div v-if="node.task.dueDate">
+                <strong>截止日期:</strong>
+                {{ node.task.dueDate }}
+              </div>
             </div>
           </NTooltip>
         </div>

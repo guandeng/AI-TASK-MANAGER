@@ -1,22 +1,28 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, nextTick } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import {
-  NCard,
-  NSpace,
-  NButton,
-  NInput,
   NAvatar,
-  NEmpty,
-  NSpin,
-  NPopconfirm,
+  NButton,
+  NCard,
   NDropdown,
-  NTooltip,
-  NEllipsis
+  NEllipsis,
+  NEmpty,
+  NInput,
+  NPopconfirm,
+  NSpace,
+  NSpin,
+  NTooltip
 } from 'naive-ui';
-import { fetchTaskComments, createComment, updateComment, deleteComment, fetchCommentReplies } from '@/service/api/comment';
+import {
+  createComment,
+  deleteComment,
+  fetchCommentReplies,
+  fetchTaskComments,
+  updateComment
+} from '@/service/api/comment';
 import { useMemberStore } from '@/store/modules/member';
-import type { Comment } from '@/typings/api/comment';
 import { formatTimeAgo } from '@/utils/common';
+import type { Comment } from '@/typings/api/comment';
 
 const props = defineProps<{
   taskId: number;
@@ -249,9 +255,13 @@ function getReplies(commentId: number): Comment[] {
 }
 
 // 监听 taskId 变化
-watch(() => props.taskId, () => {
-  loadComments();
-}, { immediate: true });
+watch(
+  () => props.taskId,
+  () => {
+    loadComments();
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -285,20 +295,11 @@ watch(() => props.taskId, () => {
 
         <!-- 评论列表 -->
         <div v-if="rootComments.length > 0" class="comment-list">
-          <div
-            v-for="comment in rootComments"
-            :key="comment.id"
-            class="comment-item"
-          >
+          <div v-for="comment in rootComments" :key="comment.id" class="comment-item">
             <!-- 评论内容 -->
             <div class="comment-header">
               <NSpace align="center">
-                <NAvatar
-                  round
-                  size="small"
-                  :src="comment.member?.avatar"
-                  :name="comment.member?.name"
-                />
+                <NAvatar round size="small" :src="comment.member?.avatar" :name="comment.member?.name" />
                 <span class="author-name">{{ comment.member?.name || '未知成员' }}</span>
                 <span class="comment-time">{{ formatTime(comment.createdAt) }}</span>
               </NSpace>
@@ -306,11 +307,7 @@ watch(() => props.taskId, () => {
 
             <!-- 编辑模式 -->
             <div v-if="editingComment?.id === comment.id" class="comment-content edit-mode">
-              <NInput
-                v-model:value="editContent"
-                type="textarea"
-                :autosize="{ minRows: 2 }"
-              />
+              <NInput v-model:value="editContent" type="textarea" :autosize="{ minRows: 2 }" />
               <NSpace class="edit-actions">
                 <NButton size="small" @click="cancelEdit">取消</NButton>
                 <NButton type="primary" size="small" @click="handleSaveEdit(comment)">保存</NButton>
@@ -367,23 +364,11 @@ watch(() => props.taskId, () => {
             </div>
 
             <!-- 回复列表 -->
-            <div
-              v-if="expandedComments.has(comment.id) && getReplies(comment.id).length > 0"
-              class="replies-list"
-            >
-              <div
-                v-for="reply in getReplies(comment.id)"
-                :key="reply.id"
-                class="reply-item"
-              >
+            <div v-if="expandedComments.has(comment.id) && getReplies(comment.id).length > 0" class="replies-list">
+              <div v-for="reply in getReplies(comment.id)" :key="reply.id" class="reply-item">
                 <div class="reply-header">
                   <NSpace align="center">
-                    <NAvatar
-                      round
-                      :size="20"
-                      :src="reply.member?.avatar"
-                      :name="reply.member?.name"
-                    />
+                    <NAvatar round :size="20" :src="reply.member?.avatar" :name="reply.member?.name" />
                     <span class="author-name">{{ reply.member?.name || '未知成员' }}</span>
                     <span class="comment-time">{{ formatTime(reply.createdAt) }}</span>
                   </NSpace>

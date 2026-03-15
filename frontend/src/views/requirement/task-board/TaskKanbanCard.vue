@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import {
-  NCard,
-  NSpace,
-  NTag,
-  NText,
-  NPopover,
-  NButton,
-  NAvatar
-} from 'naive-ui';
+import { NAvatar, NButton, NCard, NPopover, NSpace, NTag, NText } from 'naive-ui';
 import type { Task } from '@/typings/api/task';
 
 interface Props {
@@ -100,7 +92,16 @@ function viewDetail() {
 
       <!-- 描述预览 -->
       <div v-if="task.description" class="description">
-        <NText depth="3" style="font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+        <NText
+          depth="3"
+          style="
+            font-size: 12px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          "
+        >
           {{ task.description }}
         </NText>
       </div>
@@ -130,11 +131,7 @@ function viewDetail() {
         <NSpace align="center" justify="space-between">
           <!-- 负责人 -->
           <div v-if="task.assignee" class="assignee">
-            <NAvatar
-              :size="20"
-              :label="task.assignee.slice(0, 1)"
-              color="blue"
-            />
+            <NAvatar :size="20" :label="task.assignee.slice(0, 1)" color="blue" />
             <NText depth="3" style="font-size: 12px; margin-left: 4px">
               {{ task.assignee }}
             </NText>
@@ -147,9 +144,7 @@ function viewDetail() {
           </div>
 
           <!-- 操作按钮 -->
-          <NButton size="tiny" text type="primary" @click.stop="viewDetail">
-            详情
-          </NButton>
+          <NButton size="tiny" text type="primary" @click.stop="viewDetail">详情</NButton>
         </NSpace>
       </div>
     </template>

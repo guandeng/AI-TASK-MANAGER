@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { NCard, NDescriptions, NDescriptionsItem, NTag, NButton, NSpace, NInputNumber, NPopover } from 'naive-ui';
+import { NButton, NCard, NDescriptions, NDescriptionsItem, NInputNumber, NPopover, NSpace, NTag } from 'naive-ui';
 import type { Task } from '@/typings/api/task';
 
 interface Props {
@@ -70,11 +70,7 @@ const hoursStatus = computed(() => {
 </script>
 
 <template>
-  <NCard
-    title="时间信息"
-    :bordered="false"
-    size="small"
-  >
+  <NCard title="时间信息" :bordered="false" size="small">
     <template #header-extra>
       <NSpace v-if="editable">
         <NButton size="small" text type="primary">编辑</NButton>
@@ -96,20 +92,8 @@ const hoursStatus = computed(() => {
         <span :class="{ 'text-red': isOverdue }">
           {{ formatDate(task?.dueDate) }}
         </span>
-        <NTag
-          v-if="isOverdue"
-          type="error"
-          size="small"
-          style="margin-left: 8px"
-        >
-          已逾期
-        </NTag>
-        <NTag
-          v-else-if="remainingDays && remainingDays <= 3"
-          type="warning"
-          size="small"
-          style="margin-left: 8px"
-        >
+        <NTag v-if="isOverdue" type="error" size="small" style="margin-left: 8px">已逾期</NTag>
+        <NTag v-else-if="remainingDays && remainingDays <= 3" type="warning" size="small" style="margin-left: 8px">
           剩余 {{ remainingDays }} 天
         </NTag>
       </NDescriptionsItem>
@@ -122,7 +106,7 @@ const hoursStatus = computed(() => {
           :step="0.5"
           placeholder="小时"
           style="width: 120px"
-          @update:value="(val) => emit('update:task', { estimatedHours: val || undefined })"
+          @update:value="val => emit('update:task', { estimatedHours: val || undefined })"
         />
         <span v-else>{{ task?.estimatedHours ? `${task.estimatedHours} 小时` : '-' }}</span>
       </NDescriptionsItem>
@@ -135,7 +119,7 @@ const hoursStatus = computed(() => {
           :step="0.5"
           placeholder="小时"
           style="width: 120px"
-          @update:value="(val) => emit('update:task', { actualHours: val || undefined })"
+          @update:value="val => emit('update:task', { actualHours: val || undefined })"
         />
         <span v-else>
           {{ task?.actualHours ? `${task.actualHours} 小时` : '-' }}
@@ -154,7 +138,7 @@ const hoursStatus = computed(() => {
         {{ formatDate(task?.completedAt) }}
       </NDescriptionsItem>
 
-      <NDescriptionsItem label="工时进度" :span="2" v-if="task?.estimatedHours">
+      <NDescriptionsItem v-if="task?.estimatedHours" label="工时进度" :span="2">
         <div class="hours-progress-bar">
           <div
             class="hours-progress-fill"

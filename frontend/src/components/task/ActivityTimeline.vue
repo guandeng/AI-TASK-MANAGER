@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import {
-  NCard,
-  NSpace,
-  NTimeline,
-  NTimelineItem,
-  NTag,
-  NEmpty,
-  NSpin,
   NButton,
-  NSelect,
+  NCard,
+  NEllipsis,
+  NEmpty,
   NPopover,
-  NEllipsis
+  NSelect,
+  NSpace,
+  NSpin,
+  NTag,
+  NTimeline,
+  NTimelineItem
 } from 'naive-ui';
 import type { SelectOption } from 'naive-ui';
-import { fetchTaskActivities, fetchGlobalActivities } from '@/service/api/activity';
+import { fetchGlobalActivities, fetchTaskActivities } from '@/service/api/activity';
 import type { Activity, ActivityAction } from '@/typings/api/activity';
 import { ACTIVITY_TYPE_LABELS } from '@/typings/api/activity';
 
@@ -169,21 +169,20 @@ function getActivityDescription(activity: Activity): string {
 }
 
 // 监听 taskId 变化
-watch(() => props.taskId, () => {
-  loadActivities();
-}, { immediate: true });
+watch(
+  () => props.taskId,
+  () => {
+    loadActivities();
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
   <NCard :title="taskId ? '活动记录' : '全局活动'" size="small">
     <template #header-extra>
       <NSpace align="center">
-        <NSelect
-          v-model:value="filterAction"
-          :options="actionOptions"
-          size="small"
-          style="width: 120px"
-        />
+        <NSelect v-model:value="filterAction" :options="actionOptions" size="small" style="width: 120px" />
         <NButton size="small" @click="loadActivities">刷新</NButton>
       </NSpace>
     </template>
@@ -212,11 +211,7 @@ watch(() => props.taskId, () => {
               </div>
 
               <!-- 显示详细变更 -->
-              <NPopover
-                v-if="activity.oldValue || activity.newValue"
-                trigger="hover"
-                placement="right"
-              >
+              <NPopover v-if="activity.oldValue || activity.newValue" trigger="hover" placement="right">
                 <template #trigger>
                   <NButton text size="tiny" type="info">查看详情</NButton>
                 </template>

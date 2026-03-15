@@ -1,5 +1,5 @@
 import { request } from '@/service/request';
-import type { TaskListParams, TaskCreateRequest } from '@/typings/api/task';
+import type { TaskCreateRequest, TaskListParams } from '@/typings/api/task';
 
 const API_BASE = '/api';
 

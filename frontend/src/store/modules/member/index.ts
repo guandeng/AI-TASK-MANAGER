@@ -1,23 +1,23 @@
-import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
+import { defineStore } from 'pinia';
+import {
+  activateMember,
+  createMember,
+  deactivateMember,
+  deleteMember,
+  fetchMemberDetail,
+  fetchMemberList,
+  fetchMemberStatistics,
+  searchMembers,
+  updateMember
+} from '@/service/api/member';
 import type {
   Member,
   MemberCreateRequest,
-  MemberUpdateRequest,
   MemberListParams,
-  MemberStatistics
+  MemberStatistics,
+  MemberUpdateRequest
 } from '@/typings/api/member';
-import {
-  fetchMemberList,
-  fetchMemberDetail,
-  createMember,
-  updateMember,
-  deleteMember,
-  fetchMemberStatistics,
-  searchMembers,
-  activateMember,
-  deactivateMember
-} from '@/service/api/member';
 
 // 辅助函数：提取后端返回的 data 字段
 // 后端返回格式: { code: 0, message: "success", data: {...} }

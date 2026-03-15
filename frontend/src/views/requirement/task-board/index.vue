@@ -1,16 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import {
-  NCard,
-  NSpace,
-  NButton,
-  NTag,
-  NPopover,
-  NScrollbar,
-  NEmpty,
-  NSpin
-} from 'naive-ui';
+import { NButton, NCard, NEmpty, NPopover, NScrollbar, NSpace, NSpin, NTag } from 'naive-ui';
 import { VueDraggable } from 'vue-draggable-plus';
 import { useTaskStore } from '@/store/modules/task';
 import type { Task, TaskStatus } from '@/typings/api/task';
@@ -56,32 +47,17 @@ onMounted(async () => {
 
 <template>
   <div class="task-board-page">
-    <NCard
-      title="任务看板"
-      :bordered="false"
-    >
+    <NCard title="任务看板" :bordered="false">
       <template #header-extra>
         <NSpace>
-          <NButton size="small" @click="refresh">
-            刷新
-          </NButton>
-          <NButton
-            size="small"
-            type="primary"
-            @click="router.push('/requirement/task-create')"
-          >
-            新建任务
-          </NButton>
+          <NButton size="small" @click="refresh">刷新</NButton>
+          <NButton size="small" type="primary" @click="router.push('/requirement/task-create')">新建任务</NButton>
         </NSpace>
       </template>
 
       <NSpin :show="taskStore.loading">
         <div class="kanban-board">
-          <div
-            v-for="column in kanbanColumns"
-            :key="column.key"
-            class="kanban-column"
-          >
+          <div v-for="column in kanbanColumns" :key="column.key" class="kanban-column">
             <div class="column-header" :style="{ borderTopColor: column.color }">
               <div class="column-title">
                 <span class="column-dot" :style="{ backgroundColor: column.color }"></span>
@@ -96,17 +72,19 @@ onMounted(async () => {
               <NScrollbar style="max-height: calc(100vh - 250px)">
                 <VueDraggable
                   :list="tasksByStatus[column.key as keyof typeof tasksByStatus]"
-                  :group="'kanban'"
+                  group="kanban"
                   :animation="150"
-                  :ghost-class="'ghost-card'"
-                  :drag-class="'dragging-card'"
+                  ghost-class="ghost-card"
+                  drag-class="dragging-card"
                   item-key="id"
-                  @end="(evt: any) => {
-                    const task = tasksByStatus[column.key as keyof typeof tasksByStatus][evt.newIndex];
-                    if (task && task.status !== column.key) {
-                      taskStore.setTaskStatus(task.id, column.key as TaskStatus);
+                  @end="
+                    (evt: any) => {
+                      const task = tasksByStatus[column.key as keyof typeof tasksByStatus][evt.newIndex];
+                      if (task && task.status !== column.key) {
+                        taskStore.setTaskStatus(task.id, column.key as TaskStatus);
+                      }
                     }
-                  }"
+                  "
                 >
                   <template #item="{ element }">
                     <TaskKanbanCard :task="element" />

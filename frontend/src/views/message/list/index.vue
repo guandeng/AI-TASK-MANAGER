@@ -1,36 +1,36 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue'
-import { NCard, NList, NListItem, NEmpty, NSpin, NButton, NTag, NSpace, NPopconfirm, NProgress } from 'naive-ui'
-import { useMessageStore } from '@/store/modules/message'
-import { useRouter } from 'vue-router'
-import type { Message } from '@/typings/api/message'
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { NButton, NCard, NEmpty, NList, NListItem, NPopconfirm, NProgress, NSpace, NSpin, NTag } from 'naive-ui';
+import { useMessageStore } from '@/store/modules/message';
+import type { Message } from '@/typings/api/message';
 
 defineOptions({
-  name: 'message_list'
-})
+  name: 'MessageList'
+});
 
-const messageStore = useMessageStore()
-const router = useRouter()
+const messageStore = useMessageStore();
+const router = useRouter();
 
-const loading = ref(false)
-const pollingTimer = ref<NodeJS.Timeout | null>(null)
-const pollingInterval = 5000 // 5秒轮询一次
+const loading = ref(false);
+const pollingTimer = ref<NodeJS.Timeout | null>(null);
+const pollingInterval = 5000; // 5秒轮询一次
 
 // 获取处理中的消息
 const processingMessages = computed(() => {
-  return messageStore.messages.filter(m => m.status === 'pending' || m.status === 'processing')
-})
+  return messageStore.messages.filter(m => m.status === 'pending' || m.status === 'processing');
+});
 
 // 是否有处理中的消息
-const hasProcessingMessages = computed(() => processingMessages.value.length > 0)
+const hasProcessingMessages = computed(() => processingMessages.value.length > 0);
 
 // 加载消息列表
 async function loadMessages() {
-  loading.value = true
+  loading.value = true;
   try {
-    await messageStore.loadMessages()
+    await messageStore.loadMessages();
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
@@ -38,17 +38,17 @@ async function loadMessages() {
 async function viewMessage(message: Message) {
   // 如果消息还在处理中，不跳转
   if (message.status === 'pending' || message.status === 'processing') {
-    window.$message?.info('消息正在处理中，请稍后')
-    return
+    window.$message?.info('消息正在处理中，请稍后');
+    return;
   }
 
-  await messageStore.markAsRead(message.id)
-  router.push(`/requirement/task-detail/${message.taskId}`)
+  await messageStore.markAsRead(message.id);
+  router.push(`/requirement/task-detail/${message.taskId}`);
 }
 
 // 删除消息
 async function handleDelete(messageId: number) {
-  await messageStore.deleteMessageById(messageId)
+  await messageStore.deleteMessageById(messageId);
 }
 
 // 获取消息类型文本
@@ -56,8 +56,8 @@ function getMessageTypeText(type: string): string {
   const typeMap: Record<string, string> = {
     expand_task: '任务拆分',
     regenerate_subtask: '重写子任务'
-  }
-  return typeMap[type] || type
+  };
+  return typeMap[type] || type;
 }
 
 // 获取消息状态文本
@@ -67,8 +67,8 @@ function getMessageStatusText(status: string): string {
     processing: '处理中',
     success: '已完成',
     failed: '失败'
-  }
-  return statusMap[status] || status
+  };
+  return statusMap[status] || status;
 }
 
 // 获取消息状态类型
@@ -78,64 +78,64 @@ function getMessageStatusType(status: string): 'default' | 'warning' | 'info' | 
     processing: 'info',
     success: 'success',
     failed: 'error'
-  }
-  return typeMap[status] || 'default'
+  };
+  return typeMap[status] || 'default';
 }
 
 // 记录已通知的消息ID，避免重复通知
-const notifiedMessageIds = ref<Set<number>>(new Set())
+const notifiedMessageIds = ref<Set<number>>(new Set());
 
 // 轮询检查消息状态
 function startPolling() {
-  if (pollingTimer.value) return
+  if (pollingTimer.value) return;
 
   const poll = async () => {
-    await messageStore.loadMessages()
+    await messageStore.loadMessages();
 
     // 检查是否有状态变化
     for (const message of messageStore.messages) {
       // 只处理未通知过的消息
-      if (notifiedMessageIds.value.has(message.id)) continue
+      if (notifiedMessageIds.value.has(message.id)) continue;
 
       if (message.status === 'success') {
-        notifiedMessageIds.value.add(message.id)
-        window.$message?.success(message.resultSummary || '任务处理完成', { duration: 5000 })
+        notifiedMessageIds.value.add(message.id);
+        window.$message?.success(message.resultSummary || '任务处理完成', { duration: 5000 });
       } else if (message.status === 'failed') {
-        notifiedMessageIds.value.add(message.id)
-        window.$message?.error(`任务处理失败: ${message.errorMessage || '未知错误'}`, { duration: 5000 })
+        notifiedMessageIds.value.add(message.id);
+        window.$message?.error(`任务处理失败: ${message.errorMessage || '未知错误'}`, { duration: 5000 });
       }
     }
 
     // 如果没有处理中的消息，停止轮询
     if (!hasProcessingMessages.value) {
-      stopPolling()
+      stopPolling();
     }
-  }
+  };
 
   // 启动定时轮询
-  pollingTimer.value = setInterval(poll, pollingInterval)
+  pollingTimer.value = setInterval(poll, pollingInterval);
 }
 
 // 停止轮询
 function stopPolling() {
   if (pollingTimer.value) {
-    clearInterval(pollingTimer.value)
-    pollingTimer.value = null
+    clearInterval(pollingTimer.value);
+    pollingTimer.value = null;
   }
 }
 
 onMounted(async () => {
-  await loadMessages()
+  await loadMessages();
 
   // 如果有处理中的消息，启动轮询
   if (hasProcessingMessages.value) {
-    startPolling()
+    startPolling();
   }
-})
+});
 
 onUnmounted(() => {
-  stopPolling()
-})
+  stopPolling();
+});
 </script>
 
 <template>
@@ -174,7 +174,10 @@ onUnmounted(() => {
                     <NTag :type="getMessageStatusType(message.status)" size="small">
                       {{ getMessageStatusText(message.status) }}
                     </NTag>
-                    <span v-if="!message.isRead && message.status !== 'processing' && message.status !== 'pending'" class="unread-dot"></span>
+                    <span
+                      v-if="!message.isRead && message.status !== 'processing' && message.status !== 'pending'"
+                      class="unread-dot"
+                    ></span>
                   </NSpace>
                 </div>
                 <div class="message-title">{{ message.title }}</div>

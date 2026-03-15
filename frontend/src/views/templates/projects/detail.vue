@@ -1,31 +1,37 @@
 <script setup lang="ts">
-import { h, computed, onMounted, ref } from 'vue';
+import { computed, h, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
-  NCard, NTag, NSpace, NButton, NDescriptions, NDescriptionsItem,
-  NDivider, NEmpty, NSpin, NAlert, NDrawer, NDrawerContent,
-  NProgress, NAvatar, useMessage, NBreadcrumb, NBreadcrumbItem
+  NAlert,
+  NAvatar,
+  NBreadcrumb,
+  NBreadcrumbItem,
+  NButton,
+  NCard,
+  NDescriptions,
+  NDescriptionsItem,
+  NDivider,
+  NDrawer,
+  NDrawerContent,
+  NEmpty,
+  NProgress,
+  NSpace,
+  NSpin,
+  NTag,
+  useMessage
 } from 'naive-ui';
 import { MdPreview } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
-import {
-  fetchProjectTemplate,
-  scoreProjectTemplate,
-  instantiateProjectTemplate
-} from '@/service/api/template';
+import { fetchProjectTemplate, instantiateProjectTemplate, scoreProjectTemplate } from '@/service/api/template';
 import type { ProjectTemplate, TemplateScoreResult } from '@/typings/api/template';
-import {
-  TEMPLATE_CATEGORY_OPTIONS,
-  TEMPLATE_PRIORITY_LABELS,
-  TEMPLATE_PRIORITY_COLORS
-} from '@/typings/api/template';
+import { TEMPLATE_CATEGORY_OPTIONS, TEMPLATE_PRIORITY_COLORS, TEMPLATE_PRIORITY_LABELS } from '@/typings/api/template';
 import SvgIcon from '@/components/custom/svg-icon.vue';
 
 const router = useRouter();
 const message = useMessage();
 
 const props = defineProps<{
-  id: string
+  id: string;
 }>();
 
 const loading = ref(false);
@@ -44,7 +50,7 @@ const templateId = computed(() => {
 async function loadTemplate() {
   loading.value = true;
   try {
-    const { data, error } = await fetchProjectTemplate(parseInt(templateId.value));
+    const { data, error } = await fetchProjectTemplate(Number.parseInt(templateId.value));
     if (!error && data) {
       template.value = data.data || data;
       // 如果有评分，解析并显示
@@ -67,7 +73,7 @@ async function loadTemplate() {
 async function handleScore() {
   scoreLoading.value = true;
   try {
-    const { data, error } = await scoreProjectTemplate({ id: parseInt(templateId.value) });
+    const { data, error } = await scoreProjectTemplate({ id: Number.parseInt(templateId.value) });
     if (!error && data) {
       const result = data.data || data;
       scoreResult.value = result.score;
@@ -163,19 +169,15 @@ onMounted(() => {
                 <NTag :type="template.isPublic ? 'success' : 'default'" :bordered="false">
                   {{ template.isPublic ? '公开' : '私有' }}
                 </NTag>
-                <NTag :bordered="false">
-                  使用 {{ template.usageCount }} 次
-                </NTag>
+                <NTag :bordered="false">使用 {{ template.usageCount }} 次</NTag>
               </NSpace>
             </div>
             <NSpace class="template-actions">
-              <NButton @click="handleScore" :loading="scoreLoading">
+              <NButton :loading="scoreLoading" @click="handleScore">
                 <SvgIcon icon="heroicons:star" class="mr-4" />
                 {{ scoreResult ? '重新评分' : '评分' }}
               </NButton>
-              <NButton v-if="scoreResult" @click="openScoreDrawer">
-                查看评分结果
-              </NButton>
+              <NButton v-if="scoreResult" @click="openScoreDrawer">查看评分结果</NButton>
               <NButton type="primary" @click="handleInstantiate">
                 <SvgIcon icon="heroicons:folder-plus" class="mr-4" />
                 使用此模板
@@ -258,7 +260,7 @@ onMounted(() => {
 
           <NDescriptions label-placement="left" :column="2">
             <NDescriptionsItem label="描述" :span="2">
-              <MdPreview v-if="template.description" :modelValue="template.description" />
+              <MdPreview v-if="template.description" :model-value="template.description" />
               <span v-else class="text-gray-400">-</span>
             </NDescriptionsItem>
             <NDescriptionsItem label="创建时间">{{ template.createdAt }}</NDescriptionsItem>
@@ -276,9 +278,7 @@ onMounted(() => {
                   <NTag :type="TEMPLATE_PRIORITY_COLORS[task.priority]" size="small">
                     {{ TEMPLATE_PRIORITY_LABELS[task.priority] }}
                   </NTag>
-                  <NTag v-if="task.estimatedHours" type="info" size="small">
-                    {{ task.estimatedHours }}h
-                  </NTag>
+                  <NTag v-if="task.estimatedHours" type="info" size="small">{{ task.estimatedHours }}h</NTag>
                 </NSpace>
               </div>
               <div v-if="task.description" class="task-desc">{{ task.description }}</div>
@@ -314,7 +314,7 @@ onMounted(() => {
             </div>
 
             <!-- 维度评分 -->
-            <div class="dimensions" v-if="scoreResult.scores">
+            <div v-if="scoreResult.scores" class="dimensions">
               <div class="dimension-item">
                 <span class="dimension-name">清晰度</span>
                 <NTag :type="scoreResult.scores.clarity >= 7 ? 'success' : 'warning'">
@@ -350,17 +350,17 @@ onMounted(() => {
             <!-- 评价内容 -->
             <template v-if="scoreResult.strengths || scoreResult.weaknesses || scoreResult.suggestions">
               <NDivider>评价内容</NDivider>
-              <NAlert type="success" title="优点" class="eval-section" v-if="scoreResult.strengths">
+              <NAlert v-if="scoreResult.strengths" type="success" title="优点" class="eval-section">
                 <ul>
                   <li v-for="(item, i) in scoreResult.strengths" :key="i">{{ item }}</li>
                 </ul>
               </NAlert>
-              <NAlert type="warning" title="待改进" class="eval-section" v-if="scoreResult.weaknesses">
+              <NAlert v-if="scoreResult.weaknesses" type="warning" title="待改进" class="eval-section">
                 <ul>
                   <li v-for="(item, i) in scoreResult.weaknesses" :key="i">{{ item }}</li>
                 </ul>
               </NAlert>
-              <NAlert type="info" title="改进建议" class="eval-section" v-if="scoreResult.suggestions">
+              <NAlert v-if="scoreResult.suggestions" type="info" title="改进建议" class="eval-section">
                 <div v-for="(item, i) in scoreResult.suggestions" :key="i" class="suggestion-item">
                   <strong>{{ item.issue }}</strong>
                   <p>{{ item.suggestion }}</p>
@@ -372,7 +372,7 @@ onMounted(() => {
             <template v-if="scoreResult.analysis">
               <NDivider>详细分析</NDivider>
               <div class="analysis">
-                <MdPreview :modelValue="scoreResult.analysis" />
+                <MdPreview :model-value="scoreResult.analysis" />
               </div>
             </template>
           </div>

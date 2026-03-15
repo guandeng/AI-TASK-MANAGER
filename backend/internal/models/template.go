@@ -21,7 +21,7 @@ type ProjectTemplate struct {
 	DeletedAt   *time.Time `gorm:"index:idx_deleted_at" json:"deletedAt,omitempty"`
 
 	// 关联
-	Tasks []ProjectTemplateTask `gorm:"foreignKey:TemplateID;constraint:OnDelete:CASCADE" json:"tasks,omitempty"`
+	Tasks []ProjectTemplateTask `gorm:"foreignKey:TemplateID" json:"tasks,omitempty"`
 }
 
 // TableName 指定表名
@@ -42,7 +42,7 @@ type ProjectTemplateTask struct {
 	CreatedAt      time.Time `gorm:"autoCreateTime" json:"createdAt"`
 
 	// 关联
-	Subtasks []ProjectTemplateSubtask `gorm:"foreignKey:TemplateTaskID;constraint:OnDelete:CASCADE" json:"subtasks,omitempty"`
+	Subtasks []ProjectTemplateSubtask `gorm:"foreignKey:TemplateTaskID" json:"subtasks,omitempty"`
 }
 
 // TableName 指定表名

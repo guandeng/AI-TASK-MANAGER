@@ -21,7 +21,7 @@ type TaskQualityScore struct {
 	CreatedAt         time.Time `gorm:"autoCreateTime" json:"createdAt"`
 
 	// 关联
-	Task Task `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"-"`
+	Task Task `gorm:"foreignKey:TaskID" json:"-"`
 }
 
 // TableName 指定表名

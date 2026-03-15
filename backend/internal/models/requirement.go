@@ -18,7 +18,7 @@ type Requirement struct {
 	DeletedAt   *time.Time `gorm:"index:idx_deleted_at" json:"deletedAt,omitempty"`
 
 	// 关联
-	Documents  []RequirementDocument `gorm:"foreignKey:RequirementID;constraint:OnDelete:CASCADE" json:"documents,omitempty"`
+	Documents  []RequirementDocument `gorm:"foreignKey:RequirementID" json:"documents,omitempty"`
 	Tasks      []Task                `gorm:"foreignKey:RequirementID" json:"tasks,omitempty"`
 }
 
@@ -40,7 +40,7 @@ type RequirementDocument struct {
 	CreatedAt      time.Time `gorm:"autoCreateTime" json:"createdAt"`
 
 	// 关联
-	Requirement Requirement `gorm:"foreignKey:RequirementID;constraint:OnDelete:CASCADE" json:"-"`
+	Requirement Requirement `gorm:"foreignKey:RequirementID" json:"-"`
 }
 
 // TableName 指定表名

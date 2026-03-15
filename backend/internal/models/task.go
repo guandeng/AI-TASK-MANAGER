@@ -46,9 +46,9 @@ type Task struct {
 	SubtaskDoneCount int `gorm:"-" json:"subtaskDoneCount"`
 
 	// 关联
-	Subtasks     []Subtask       `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"subtasks,omitempty"`
-	Dependencies []TaskDependency `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"dependencies,omitempty"`
-	Assignments  []Assignment    `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"assignments,omitempty"`
+	Subtasks     []Subtask       `gorm:"foreignKey:TaskID" json:"subtasks,omitempty"`
+	Dependencies []TaskDependency `gorm:"foreignKey:TaskID" json:"dependencies,omitempty"`
+	Assignments  []Assignment    `gorm:"foreignKey:TaskID" json:"assignments,omitempty"`
 	Activities   []ActivityLog   `gorm:"foreignKey:TaskID" json:"activities,omitempty"`
 }
 
@@ -82,8 +82,8 @@ type Subtask struct {
 
 	// 关联
 	Task          Task                  `gorm:"foreignKey:TaskID" json:"-"`
-	Dependencies  []SubtaskDependency   `gorm:"foreignKey:SubtaskID;constraint:OnDelete:CASCADE" json:"dependencies,omitempty"`
-	Assignments   []SubtaskAssignment   `gorm:"foreignKey:SubtaskID;constraint:OnDelete:CASCADE" json:"assignments,omitempty"`
+	Dependencies  []SubtaskDependency   `gorm:"foreignKey:SubtaskID" json:"dependencies,omitempty"`
+	Assignments   []SubtaskAssignment   `gorm:"foreignKey:SubtaskID" json:"assignments,omitempty"`
 }
 
 // TableName 指定表名
@@ -96,11 +96,11 @@ type TaskDependency struct {
 	ID              uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
 	TaskID          uint64    `gorm:"not null;uniqueIndex:uk_task_dependency;index:idx_depends_on" json:"taskId"`
 	DependsOnTaskID uint64    `gorm:"not null;uniqueIndex:uk_task_dependency" json:"dependsOnTaskId"`
-	DependsOnTask   *Task     `gorm:"foreignKey:DependsOnTaskID;constraint:OnDelete:CASCADE" json:"dependsOnTask,omitempty"`
+	DependsOnTask   *Task     `gorm:"foreignKey:DependsOnTaskID" json:"dependsOnTask,omitempty"`
 	CreatedAt       time.Time `gorm:"autoCreateTime" json:"createdAt"`
 
 	// 关联（Task 字段保留用于其他场景）
-	Task Task `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"-"`
+	Task Task `gorm:"foreignKey:TaskID" json:"-"`
 }
 
 // TableName 指定表名
@@ -116,8 +116,8 @@ type SubtaskDependency struct {
 	CreatedAt           time.Time `gorm:"autoCreateTime" json:"createdAt"`
 
 	// 关联
-	Subtask         Subtask `gorm:"foreignKey:SubtaskID;constraint:OnDelete:CASCADE" json:"-"`
-	DependsOnSubtask Subtask `gorm:"foreignKey:DependsOnSubtaskID;constraint:OnDelete:CASCADE" json:"-"`
+	Subtask         Subtask `gorm:"foreignKey:SubtaskID" json:"-"`
+	DependsOnSubtask Subtask `gorm:"foreignKey:DependsOnSubtaskID" json:"-"`
 }
 
 // TableName 指定表名

@@ -17,7 +17,7 @@ type Assignment struct {
 	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	// 关联
-	Task   Task   `gorm:"foreignKey:TaskID;constraint:OnDelete:CASCADE" json:"-"`
+	Task   Task   `gorm:"foreignKey:TaskID" json:"-"`
 	Member Member `gorm:"foreignKey:MemberID" json:"member,omitempty"`
 }
 
@@ -39,7 +39,7 @@ type SubtaskAssignment struct {
 	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 
 	// 关联
-	Subtask Subtask `gorm:"foreignKey:SubtaskID;constraint:OnDelete:CASCADE" json:"-"`
+	Subtask Subtask `gorm:"foreignKey:SubtaskID" json:"-"`
 	Member  Member  `gorm:"foreignKey:MemberID" json:"member,omitempty"`
 }
 

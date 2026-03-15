@@ -30,6 +30,7 @@ func Init(cfg *config.DatabaseConfig, log *zap.Logger) error {
 	dsn := cfg.GetDSN()
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger: gormLogger,
+		DisableForeignKeyConstraintWhenMigrating: true, // 禁用外键约束
 	})
 	if err != nil {
 		return fmt.Errorf("连接数据库失败: %w", err)

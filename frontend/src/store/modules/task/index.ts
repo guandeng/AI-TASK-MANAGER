@@ -165,13 +165,13 @@ export const useTaskStore = defineStore('task-store', () => {
         // 更新列表中的任务
         const index = tasks.value.findIndex(t => t.id === id);
         if (index !== -1) {
-          // 保留原有的子任务统计字段，不被覆盖
+          // 合并任务数据，优先使用后端返回的子任务统计字段
           const existingTask = tasks.value[index];
           tasks.value[index] = {
             ...existingTask,
             ...updatedTask,
-            subtaskCount: existingTask.subtaskCount,
-            subtaskDoneCount: existingTask.subtaskDoneCount
+            subtaskCount: updatedTask.subtaskCount ?? existingTask.subtaskCount,
+            subtaskDoneCount: updatedTask.subtaskDoneCount ?? existingTask.subtaskDoneCount
           };
         }
         // 如果是当前任务，也更新

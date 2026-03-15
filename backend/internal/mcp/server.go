@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/ai-task-manager/backend/internal/config"
@@ -51,7 +52,10 @@ func (s *Server) Start(ctx context.Context) error {
 func (s *Server) registerTools() {
 	// list_tasks 工具
 	s.server.AddTool(mcp.NewTool("list_tasks",
-		mcp.WithDescription("列出所有任务"),
+		mcp.WithDescription("列出任务，支持按需求过滤"),
+		mcp.WithNumber("requirement_id", mcp.Description("需求ID（可选）")),
+		mcp.WithString("requirement_name", mcp.Description("需求名称/关键字（可选）")),
+		mcp.WithString("status", mcp.Description("任务状态过滤 (pending/in_progress/done/cancelled)")),
 	), s.handleListTasks)
 
 	// show_task 工具
@@ -113,27 +117,92 @@ func (s *Server) registerTools() {
 	s.server.AddTool(mcp.NewTool("get_ready_tasks",
 		mcp.WithDescription("获取所有依赖已满足的可执行任务"),
 	), s.handleGetReadyTasks)
+
+	// search_requirements 工具
+	s.server.AddTool(mcp.NewTool("search_requirements",
+		mcp.WithDescription("按关键字搜索需求，返回匹配的需求列表供用户选择"),
+		mcp.WithString("keyword", mcp.Required(), mcp.Description("搜索关键字（需求标题）")),
+	), s.handleSearchRequirements)
+
+	// get_requirement_tasks 工具
+	s.server.AddTool(mcp.NewTool("get_requirement_tasks",
+		mcp.WithDescription("获取指定需求下的所有任务，如果提供ID则直接查询，如果提供名称则搜索匹配的需求"),
+		mcp.WithNumber("requirement_id", mcp.Description("需求ID（可选）")),
+		mcp.WithString("requirement_name", mcp.Description("需求名称/关键字（可选）")),
+	), s.handleGetRequirementTasks)
 }
 
 // 处理函数
 func (s *Server) handleListTasks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	requirementID := request.GetInt("requirement_id", 0)
+	requirementName := request.GetString("requirement_name", "")
+	statusFilter := request.GetString("status", "")
+
+	// 如果提供了需求名称但没有ID，先搜索需求
+	if requirementID == 0 && requirementName != "" {
+		var requirements []models.Requirement
+		if err := s.db.Where("title LIKE ? AND deleted_at IS NULL", "%"+requirementName+"%").
+			Order("created_at DESC").
+			Find(&requirements).Error; err != nil {
+			return nil, err
+		}
+
+		if len(requirements) == 0 {
+			return mcp.NewToolResultText(fmt.Sprintf("未找到包含 \"%s\" 的需求", requirementName)), nil
+		}
+
+		if len(requirements) > 1 {
+			// 多个匹配，返回列表让用户确认
+			result := fmt.Sprintf("找到 %d 个匹配的需求，请确认选择哪个：\n", len(requirements))
+			for _, req := range requirements {
+				result += fmt.Sprintf("  - [ID: %d] %s (状态: %s)\n", req.ID, req.Title, req.Status)
+			}
+			return mcp.NewToolResultText(result), nil
+		}
+
+		// 只有一个匹配，直接使用
+		requirementID = int(requirements[0].ID)
+	}
+
+	// 构建查询
+	query := s.db.Model(&models.Task{}).Where("status != ?", "paused")
+
+	if requirementID > 0 {
+		query = query.Where("requirement_id = ?", requirementID)
+	}
+	if statusFilter != "" {
+		query = query.Where("status = ?", statusFilter)
+	}
+
 	var tasks []models.Task
-	// 排除暂停状态的任务
-	if err := s.db.Where("status != ?", "paused").Order("created_at DESC").Find(&tasks).Error; err != nil {
+	if err := query.Order("created_at DESC").Find(&tasks).Error; err != nil {
 		return nil, err
 	}
 
+	// 构建结构化结果
 	result := make([]map[string]interface{}, len(tasks))
 	for i, task := range tasks {
-		result[i] = map[string]interface{}{
-			"id":       task.ID,
-			"title":    task.Title,
-			"status":   task.Status,
-			"priority": task.Priority,
+		item := map[string]interface{}{
+			"id":          task.ID,
+			"title":       task.Title,
+			"status":      task.Status,
+			"priority":    task.Priority,
+			"description": task.Description,
 		}
+		if task.RequirementID != nil {
+			item["requirementId"] = *task.RequirementID
+		} else {
+			item["requirementId"] = nil
+		}
+		result[i] = item
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("%v", result)), nil
+	// 返回 JSON 格式
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	return mcp.NewToolResultText(string(jsonData)), nil
 }
 
 func (s *Server) handleShowTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -387,6 +456,97 @@ func (s *Server) handleGetReadyTasks(ctx context.Context, request mcp.CallToolRe
 	result := fmt.Sprintf("Ready tasks (%d):\n", len(readyTasks))
 	for _, task := range readyTasks {
 		result += fmt.Sprintf("  - [%d] %s (Priority: %s)\n", task.ID, task.Title, task.Priority)
+	}
+
+	return mcp.NewToolResultText(result), nil
+}
+
+func (s *Server) handleSearchRequirements(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	keyword, err := request.RequireString("keyword")
+	if err != nil {
+		return nil, err
+	}
+
+	var requirements []models.Requirement
+	// 搜索标题包含关键字的未删除需求
+	if err := s.db.Where("title LIKE ? AND deleted_at IS NULL", "%"+keyword+"%").
+		Order("created_at DESC").
+		Find(&requirements).Error; err != nil {
+		return nil, err
+	}
+
+	if len(requirements) == 0 {
+		return mcp.NewToolResultText(fmt.Sprintf("未找到包含 \"%s\" 的需求", keyword)), nil
+	}
+
+	result := fmt.Sprintf("找到 %d 个匹配的需求，请选择一个：\n", len(requirements))
+	for _, req := range requirements {
+		status := req.Status
+		if status == "" {
+			status = "draft"
+		}
+		result += fmt.Sprintf("  - [ID: %d] %s (状态: %s, 优先级: %s)\n", req.ID, req.Title, status, req.Priority)
+	}
+
+	return mcp.NewToolResultText(result), nil
+}
+
+func (s *Server) handleGetRequirementTasks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	requirementID := request.GetInt("requirement_id", 0)
+	requirementName := request.GetString("requirement_name", "")
+
+	// 如果没有提供任何参数
+	if requirementID == 0 && requirementName == "" {
+		return nil, fmt.Errorf("请提供 requirement_id 或 requirement_name")
+	}
+
+	// 如果提供的是名称，先搜索需求
+	if requirementID == 0 && requirementName != "" {
+		var requirements []models.Requirement
+		if err := s.db.Where("title LIKE ? AND deleted_at IS NULL", "%"+requirementName+"%").
+			Order("created_at DESC").
+			Find(&requirements).Error; err != nil {
+			return nil, err
+		}
+
+		if len(requirements) == 0 {
+			return mcp.NewToolResultText(fmt.Sprintf("未找到包含 \"%s\" 的需求", requirementName)), nil
+		}
+
+		if len(requirements) > 1 {
+			result := fmt.Sprintf("找到 %d 个匹配的需求，请确认选择哪个：\n", len(requirements))
+			for _, req := range requirements {
+				result += fmt.Sprintf("  - [ID: %d] %s (状态: %s)\n", req.ID, req.Title, req.Status)
+			}
+			return mcp.NewToolResultText(result), nil
+		}
+
+		// 只有一个匹配，直接使用
+		requirementID = int(requirements[0].ID)
+	}
+
+	// 获取需求信息
+	var requirement models.Requirement
+	if err := s.db.Where("id = ? AND deleted_at IS NULL", requirementID).First(&requirement).Error; err != nil {
+		return mcp.NewToolResultText(fmt.Sprintf("需求 [ID: %d] 不存在或已删除", requirementID)), nil
+	}
+
+	// 获取该需求下的所有任务
+	var tasks []models.Task
+	if err := s.db.Where("requirement_id = ?", requirementID).Order("created_at DESC").Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+
+	result := fmt.Sprintf("需求: %s [ID: %d]\n状态: %s\n任务列表 (%d):\n",
+		requirement.Title, requirement.ID, requirement.Status, len(tasks))
+
+	if len(tasks) == 0 {
+		result += "  暂无任务\n"
+	} else {
+		for _, task := range tasks {
+			result += fmt.Sprintf("  - [ID: %d] %s (状态: %s, 优先级: %s)\n",
+				task.ID, task.Title, task.Status, task.Priority)
+		}
 	}
 
 	return mcp.NewToolResultText(result), nil

@@ -18,7 +18,7 @@ type Comment struct {
 
 	// 关联
 	Member   Member    `gorm:"foreignKey:MemberID" json:"member,omitempty"`
-	Replies  []Comment `gorm:"foreignKey:ParentID;constraint:OnDelete:CASCADE" json:"replies,omitempty"`
+	Replies  []Comment `gorm:"foreignKey:ParentID" json:"replies,omitempty"`
 }
 
 // TableName 指定表名

@@ -83,6 +83,7 @@ export interface Task {
   // AI 扩展状态
   isExpanding?: boolean;
   expandMessageId?: number;
+  expandStartedAt?: string; // 拆分开始时间
   // 扩展字段
   tags?: string[];
   createdAt?: string;

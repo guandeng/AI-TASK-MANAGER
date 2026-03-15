@@ -25,6 +25,7 @@ type Task struct {
 	Assignee         *string    `gorm:"size:100" json:"assignee,omitempty"`
 	IsExpanding      bool       `gorm:"default:false" json:"isExpanding"`
 	ExpandMessageID  *uint64    `json:"expandMessageId,omitempty"`
+	ExpandStartedAt  *time.Time `json:"expandStartedAt,omitempty"` // 拆分开始时间
 	StartDate        *time.Time `gorm:"type:date" json:"startDate,omitempty"`
 	DueDate          *time.Time `gorm:"type:date" json:"dueDate,omitempty"`
 	CompletedAt      *time.Time `json:"completedAt,omitempty"`

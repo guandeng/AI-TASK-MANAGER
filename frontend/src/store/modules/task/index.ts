@@ -247,10 +247,12 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
-  // 通用子任务更新方法
+  // 通用子任务更新���法
   async function updateSubtask(taskId: number, subtaskId: number, updateData: Record<string, any>) {
+    console.log('[store.updateSubtask] 开始调用 API', { taskId, subtaskId, updateData });
     try {
       const { data: responseData, error } = await updateSubtaskApi(taskId, subtaskId, updateData);
+      console.log('[store.updateSubtask] API 返回', { responseData, error });
       if (!error && responseData) {
         const updatedTask = extractData(responseData);
         // 后端返回的是整个 task 对象（包含更新后的 subtasks）
@@ -260,9 +262,13 @@ export const useTaskStore = defineStore('task-store', () => {
           if (taskIndex !== -1) {
             tasks.value[taskIndex] = { ...tasks.value[taskIndex], ...updatedTask };
           }
-          // 如果是当前任务，直接替换
+          // 如果是当前任务，创建新对象确保响应式更新
           if (currentTask.value?.id === taskId) {
-            currentTask.value = { ...currentTask.value, ...updatedTask };
+            currentTask.value = {
+              ...currentTask.value,
+              ...updatedTask,
+              subtasks: [...updatedTask.subtasks] // 确保是新的数组引用
+            };
           }
         }
         return true;

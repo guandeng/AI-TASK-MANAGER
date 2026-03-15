@@ -79,8 +79,20 @@ const expandStartTime = ref<number | null>(null);
 
 // 判断是否超时（超过5分钟）
 const isExpandTimeout = computed(() => {
-  if (!task.value?.isExpanding || !expandStartTime.value) return false;
-  return Date.now() - expandStartTime.value > EXPAND_TIMEOUT_MS;
+  if (!task.value?.isExpanding) return false;
+
+  // 优先使用本地记录的开始时间
+  if (expandStartTime.value) {
+    return Date.now() - expandStartTime.value > EXPAND_TIMEOUT_MS;
+  }
+
+  // 使用后端返回的拆分开始时间
+  if (task.value?.expandStartedAt) {
+    const startedTime = new Date(task.value.expandStartedAt).getTime();
+    return Date.now() - startedTime > EXPAND_TIMEOUT_MS;
+  }
+
+  return false;
 });
 
 // 实际的loading状态（考虑超时）
@@ -249,6 +261,7 @@ async function saveEdit() {
     } else if (editingType.value === 'subtask' && editingSubtaskId.value !== null) {
       // 更新子任务
       const field = editingField.value as EditableSubtaskField;
+      console.log('[saveEdit] 更新子任务', { subtaskId: editingSubtaskId.value, field, value: editingValue.value });
       let updateData: Record<string, unknown>;
       if (field === 'title') {
         updateData = { title: editingValue.value };
@@ -282,7 +295,9 @@ async function saveEdit() {
       } else {
         return;
       }
+      console.log('[saveEdit] 调用 updateSubtask API', { taskId: taskId.value, subtaskId: editingSubtaskId.value, updateData });
       const success = await taskStore.updateSubtask(taskId.value, editingSubtaskId.value, updateData);
+      console.log('[saveEdit] updateSubtask 结果', success);
       if (success) {
         // 先取消编辑状态，再切换预览模式
         cancelEdit();
@@ -475,7 +490,7 @@ async function handleConfirmRegenerate() {
 // 子任务列表 - 使用 ref 配合智能同步
 const localSubtasks = ref<Subtask[]>([]);
 
-// 监听 task.subtasks 变化，但只在必要时更新
+// 监听 task.subtasks 变化
 watch(
   () => task.value?.subtasks,
   (newSubtasks) => {
@@ -483,37 +498,10 @@ watch(
       localSubtasks.value = [];
       return;
     }
-
-    // 检查是否是真正的数据变化（通过比较完整 JSON）
-    const newJson = JSON.stringify(newSubtasks.map((s: Subtask) => ({
-      id: s.id, status: s.status, title: s.title, description: s.description,
-      details: s.details, codeInterface: s.codeInterface,
-      acceptanceCriteria: s.acceptanceCriteria, relatedFiles: s.relatedFiles,
-      codeHints: s.codeHints
-    })));
-    const currentJson = JSON.stringify(localSubtasks.value.map((s: Subtask) => ({
-      id: s.id, status: s.status, title: s.title, description: s.description,
-      details: s.details, codeInterface: s.codeInterface,
-      acceptanceCriteria: s.acceptanceCriteria, relatedFiles: s.relatedFiles,
-      codeHints: s.codeHints
-    })));
-
-    if (newJson !== currentJson) {
-      // 数据确实变了，更新本地列表
-      // 但尽量保持相同 ID 的对象引用
-      const currentMap = new Map(localSubtasks.value.map(s => [s.id, s]));
-      localSubtasks.value = newSubtasks.map((newSubtask: Subtask) => {
-        const existing = currentMap.get(newSubtask.id);
-        if (existing) {
-          // 合并更新，保持引用
-          Object.assign(existing, newSubtask);
-          return existing;
-        }
-        return newSubtask;
-      });
-    }
+    // 直接替换整个数组，确保响应式更新
+    localSubtasks.value = [...newSubtasks];
   },
-  { immediate: true }
+  { immediate: true, deep: true }
 );
 
 async function handleDragEnd() {
@@ -549,11 +537,11 @@ onUnmounted(() => {
         <!-- 拆分子任务按钮 - 根据状态显示不同文案 -->
         <NButton
           type="primary"
-          :loading="task?.isExpanding || expandLoading"
-          :disabled="task?.isExpanding"
+          :loading="actualExpandLoading"
+          :disabled="actualExpandDisabled"
           @click="handleExpandTask"
         >
-          {{ task?.isExpanding ? '拆分中...' : '拆分子任务' }}
+          {{ isExpandTimeout ? '重新拆分' : (task?.isExpanding ? '拆分中...' : '拆分子任务') }}
         </NButton>
         <NButton
           type="error"

@@ -220,6 +220,12 @@ func (h *TaskHandler) UpdateSubtask(c *gin.Context) {
 		return
 	}
 
+	h.logger.Info("UpdateSubtask 收到请求",
+		zap.Uint64("taskID", taskID),
+		zap.Uint64("subtaskID", subtaskID),
+		zap.Any("updates", updates),
+	)
+
 	if err := h.service.UpdateSubtask(taskID, subtaskID, updates); err != nil {
 		h.logger.Error("更新子任务失败", zap.Error(err))
 		response.Error(c, 500, "更新子任务失败")
@@ -382,14 +388,21 @@ func (h *TaskHandler) ExpandTaskAsync(c *gin.Context) {
 		return
 	}
 
-	// 标记任务正在拆分
-	db.Model(&models.Task{}).Where("id = ?", taskID).Update("is_expanding", true)
+	// 标记任务正在拆分，并记录开始时间
+	now := time.Now()
+	db.Model(&models.Task{}).Where("id = ?", taskID).Updates(map[string]interface{}{
+		"is_expanding":     true,
+		"expand_started_at": &now,
+	})
 
 	// 异步执行拆分
 	go func() {
 		defer func() {
-			// 完成后标记任务不在拆分中
-			db.Model(&models.Task{}).Where("id = ?", taskID).Update("is_expanding", false)
+			// 完成后标记任务不在拆分中，清空开始时间
+			db.Model(&models.Task{}).Where("id = ?", taskID).Updates(map[string]interface{}{
+				"is_expanding":      false,
+				"expand_started_at": nil,
+			})
 		}()
 
 		if err := h.service.ExpandTask(taskID, false); err != nil {

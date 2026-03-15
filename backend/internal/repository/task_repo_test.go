@@ -301,3 +301,60 @@ func TestTaskRepository_GetDependencies(t *testing.T) {
 		t.Errorf("期望 2 个依赖关系, 实际 %d", len(deps))
 	}
 }
+
+func TestTaskRepository_List(t *testing.T) {
+	repo, mock := setupTaskRepoTest(t)
+
+	// Mock count query
+	mock.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+
+	// Mock select query
+	rows := sqlmock.NewRows([]string{
+		"id", "requirement_id", "requirement_title", "title", "description",
+		"status", "priority", "assignee", "subtask_count", "subtask_done_count",
+	}).AddRow(1, 1, "需求1", "任务1", "描述1", "pending", "high", "user1", 2, 1).
+		AddRow(2, 1, "需求1", "任务2", "描述2", "done", "low", "user2", 1, 1)
+
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	tasks, total, err := repo.List(map[string]interface{}{}, 1, 10)
+	if err != nil {
+		t.Errorf("获取任务列表失败: %v", err)
+	}
+	if total != 2 {
+		t.Errorf("期望总数 2, 实际 %d", total)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("期望 2 条记录, 实际 %d", len(tasks))
+	}
+}
+
+func TestTaskRepository_List_WithFilters(t *testing.T) {
+	repo, mock := setupTaskRepoTest(t)
+
+	// Mock count query
+	mock.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	// Mock select query
+	rows := sqlmock.NewRows([]string{
+		"id", "requirement_id", "requirement_title", "title", "description",
+		"status", "priority", "assignee", "subtask_count", "subtask_done_count",
+	}).AddRow(1, 1, "需求1", "任务1", "描述1", "pending", "high", "user1", 2, 1)
+
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	filters := map[string]interface{}{
+		"status":  "pending",
+		"keyword": "任务",
+	}
+	tasks, total, err := repo.List(filters, 1, 10)
+	if err != nil {
+		t.Errorf("获取任务列表失败: %v", err)
+	}
+	if total != 1 {
+		t.Errorf("期望总数 1, 实际 %d", total)
+	}
+	if len(tasks) != 1 {
+		t.Errorf("期望 1 条记录, 实际 %d", len(tasks))
+	}
+}

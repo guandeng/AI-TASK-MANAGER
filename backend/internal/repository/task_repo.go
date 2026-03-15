@@ -261,6 +261,7 @@ func (r *taskRepository) UpdateSubtaskWithMap(taskID, subtaskID uint64, updates 
 	dbUpdates := make(map[string]interface{})
 	for key, value := range updates {
 		dbKey := camelToSnake(key)
+		println("DEBUG: key=", key, " -> dbKey=", dbKey)
 
 		// 对于 JSON 字段，需要序列化为字符串
 		if jsonFields[key] && value != nil {
@@ -274,7 +275,9 @@ func (r *taskRepository) UpdateSubtaskWithMap(taskID, subtaskID uint64, updates 
 		}
 	}
 
-	return r.db.Model(&models.Subtask{}).Where("id = ? AND task_id = ?", subtaskID, taskID).Updates(dbUpdates).Error
+	result := r.db.Model(&models.Subtask{}).Where("id = ? AND task_id = ?", subtaskID, taskID).Updates(dbUpdates)
+	println("DEBUG: Updates map=", len(dbUpdates), " RowsAffected=", result.RowsAffected, " Error=", result.Error)
+	return result.Error
 }
 
 // camelToSnake 将驼峰命名转换为蛇形命名

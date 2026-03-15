@@ -76,6 +76,7 @@ type Subtask struct {
 	AcceptanceCriteria *string `gorm:"type:text" json:"acceptanceCriteria,omitempty"`
 	RelatedFiles     *string   `gorm:"type:text" json:"relatedFiles,omitempty"`
 	CodeHints        *string   `gorm:"type:text" json:"codeHints,omitempty"`
+	Risk             *string   `gorm:"type:text" json:"risk,omitempty"` // 风险点
 	CustomFields     *string   `gorm:"type:longtext" json:"customFields,omitempty"` // 自定义字段值 JSON
 	CreatedAt        time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt        time.Time `gorm:"autoUpdateTime" json:"updatedAt"`

@@ -93,6 +93,18 @@ func (s *taskService) Update(id uint64, updates map[string]interface{}) error {
 	if assignee, ok := updates["assignee"].(string); ok {
 		task.Assignee = &assignee
 	}
+	if risk, ok := updates["risk"].(string); ok {
+		task.Risk = &risk
+	}
+	if acceptanceCriteria, ok := updates["acceptanceCriteria"].(string); ok {
+		task.AcceptanceCriteria = &acceptanceCriteria
+	}
+	if input, ok := updates["input"].(string); ok {
+		task.Input = &input
+	}
+	if output, ok := updates["output"].(string); ok {
+		task.Output = &output
+	}
 
 	return s.repo.Update(task)
 }

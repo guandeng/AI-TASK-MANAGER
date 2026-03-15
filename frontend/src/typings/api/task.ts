@@ -44,6 +44,8 @@ export interface Subtask {
   /** 关联文件 - 后端返回 JSON 字符串 */
   relatedFiles?: string;
   codeHints?: string;
+  /** 风险点 */
+  risk?: string;
   createdAt?: string;
   updatedAt?: string;
   dependencies?: number[];
@@ -154,6 +156,8 @@ export interface TaskUpdateRequest {
   actualHours?: number;
   completedAt?: string;
   tags?: string[];
+  risk?: string;
+  acceptanceCriteria?: string;
 }
 
 /** 子任务更新请求 */
@@ -169,6 +173,7 @@ export interface SubtaskUpdateRequest {
   acceptanceCriteria?: AcceptanceCriteria[];
   relatedFiles?: string[];
   codeHints?: string;
+  risk?: string;
 }
 
 /** 任务统计 */

@@ -9,6 +9,7 @@ import {
   NGi,
   NGrid,
   NInput,
+  NPagination,
   NProgress,
   NSelect,
   NSpace,
@@ -41,7 +42,6 @@ const checkedRowKeys = ref<DataTableRowKey[]>([]);
 // 分页
 const currentPage = ref(1);
 const pageSize = ref(20);
-const total = ref(0);
 
 // 语言选项
 const languageOptions = ref<SelectOption[]>([{ label: '全部语言', value: 'all' }]);
@@ -330,7 +330,6 @@ async function loadTaskListData() {
   }
 
   await taskStore.loadTasks(params);
-  total.value = taskStore.total;
 }
 
 async function handleBatchDelete() {
@@ -393,30 +392,11 @@ async function handleAssigneeChange(id: number, assignee: string) {
   await taskStore.setTaskAssignee(id, assignee);
 }
 
-// 分页配置
-const paginationConfig = computed(() => ({
-  page: currentPage.value,
-  pageSize: pageSize.value,
-  itemCount: total.value,
-  showSizePicker: true,
-  showQuickJumper: true,
-  pageSizes: [10, 20, 50, 100],
-  onChange: (page: number, size?: number) => {
-    currentPage.value = page;
-    if (size && size !== pageSize.value) {
-      pageSize.value = size;
-    }
-  },
-  onUpdatePageSize: (size: number) => {
-    pageSize.value = size;
-    currentPage.value = 1;
-  }
-}));
-
-// 监听分页变化
+// 监听分页变化 - 使用 flush: 'post' 确保在 DOM 更新后执行
 watch([currentPage, pageSize], () => {
   loadTaskListData();
-});
+}, { flush: 'post' });
+
 // 完成率
 const completionRate = computed(() => {
   if (taskStore.statistics.total === 0) return 0;
@@ -446,8 +426,14 @@ watch(
 watch(
   () => [filterRequirementId.value, filterStatus.value, filterCategory.value, searchText.value],
   () => {
-    currentPage.value = 1;
-    loadTaskListData();
+    // 只重置页码，不调用 loadTaskListData
+    // 分页 watch 会自动触发数据加载
+    if (currentPage.value !== 1) {
+      currentPage.value = 1;
+    } else {
+      // 如果已经是第一页，需要手动加载
+      loadTaskListData();
+    }
   }
 );
 </script>
@@ -524,12 +510,24 @@ watch(
           :data="taskStore.tasks"
           :row-key="(row: Task) => row.id"
           :bordered="false"
-          :pagination="paginationConfig"
+          :pagination="false"
         />
-        <div class="mt-16px flex justify-start">
+        <div class="mt-16px flex justify-between items-center">
           <NButton type="error" ghost :disabled="checkedRowKeys.length === 0" @click="handleBatchDelete">
             批量删除
           </NButton>
+          <NPagination
+            v-model:page="currentPage"
+            v-model:page-size="pageSize"
+            :item-count="taskStore.total"
+            :page-sizes="[10, 20, 50]"
+            show-size-picker
+            show-quick-jumper
+          >
+            <template #prefix="{ itemCount }">
+              共 {{ itemCount }} 条
+            </template>
+          </NPagination>
         </div>
         <NEmpty v-if="taskStore.tasks.length === 0 && !taskStore.loading" description="暂无任务数据" />
       </NSpin>

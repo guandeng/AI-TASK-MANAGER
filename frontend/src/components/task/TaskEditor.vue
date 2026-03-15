@@ -34,6 +34,8 @@ const formData = ref<Partial<Task>>({
   description: '',
   details: '',
   testStrategy: '',
+  risk: '',
+  acceptanceCriteria: '',
   priority: 'medium',
   assignee: undefined,
   startDate: undefined,
@@ -54,6 +56,8 @@ watch(
         description: props.task.description || '',
         details: props.task.details || '',
         testStrategy: props.task.testStrategy || '',
+        risk: props.task.risk || '',
+        acceptanceCriteria: props.task.acceptanceCriteria || '',
         priority: props.task.priority || 'medium',
         assignee: props.task.assignee,
         startDate: props.task.startDate,
@@ -166,6 +170,28 @@ function handleSave() {
           :toolbars-exclude="['save', 'catalog', 'pageFullscreen']"
           :preview="false"
           style="height: 200px"
+        />
+      </NFormItem>
+
+      <NFormItem label="风险点">
+        <NInput
+          v-model:value="formData.risk"
+          type="textarea"
+          placeholder="请输入风险点"
+          :rows="3"
+          maxlength="2000"
+          show-count
+        />
+      </NFormItem>
+
+      <NFormItem label="验收标准">
+        <NInput
+          v-model:value="formData.acceptanceCriteria"
+          type="textarea"
+          placeholder="请输入验收标准（JSON 格式）"
+          :rows="5"
+          maxlength="5000"
+          show-count
         />
       </NFormItem>
     </NForm>

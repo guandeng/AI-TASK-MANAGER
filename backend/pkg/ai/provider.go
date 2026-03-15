@@ -533,7 +533,7 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
 - priority: 优先级（high/medium/low）
 - estimatedHours: 预估工时（小时数）
 - details: 实现细节（具体的实现步骤、关键技术点、注意事项）
-- description: 任务描述（简要说明任务目的和内容）
+- description: 任务描述（**必填，不能为空字符串**，简要说明任务目的和核心内容，20-50 字）
 
 **可选字段：**
 - testStrategy: 测试策略
@@ -544,7 +544,7 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
 2. 优先级设置：基础架构和高优先级功能设为 high，核心功能设为 medium，辅助功能设为 low
 3. 合理设置依赖关系，确保任务可以按顺序执行
 4. 每个任务应该足够独立，可以单独开发和测试
-5. details、testStrategy、risk、acceptanceCriteria、description 是必填字段，必须为每个任务填写完整
+5. details、testStrategy、risk、acceptanceCriteria、description 是必填字段，必须为每个任务填写完整，**不能为空字符串**
 6. 预估工时应基于实现复杂度合理评估
 
 示例格式：
@@ -720,7 +720,7 @@ func (s *Service) buildSplitRequirementPromptWithTemplate(requirement *models.Re
 - priority: 优先级（high/medium/low）
 - estimatedHours: 预估工时（小时数）
 - details: 实现细节（具体的实现步骤、关键技术点、注意事项，必填）
-- description: 任务描述（简要说明任务目的和内容，必填）`
+- description: 任务描述（**必填，不能为空字符串**，简要说明任务目的和核心内容，20-50 字）`
 	}
 
 	return fmt.Sprintf(`你是一个 AI 助手，帮助将产品需求文档（PRD）拆分为开发任务。
@@ -745,7 +745,7 @@ func (s *Service) buildSplitRequirementPromptWithTemplate(requirement *models.Re
 2. 优先级设置：基础架构和高优先级功能设为 high，核心功能设为 medium，辅助功能设为 low
 3. 合理设置依赖关系，确保任务可以按顺序执行
 4. 每个任务应该足够独立，可以单独开发和测试
-5. details、risk、acceptanceCriteria、description 是必填字段，必须为每个任务填写完整
+5. details、risk、acceptanceCriteria、description 是必填字段，必须为每个任务填写完整，**不能为空字符串**
 6. 预估工时应基于实现复杂度合理评估
 
 示例格式：
@@ -858,7 +858,7 @@ func (s *Service) buildSplitRequirementPromptWithLanguage(requirement *models.Re
 - priority: 优先级（high/medium/low）
 - estimatedHours: 预估工时（小时数）
 - details: 实现细节（具体的实现步骤、关键技术点、注意事项）
-- description: 任务描述（简要说明任务目的和内容）
+- description: 任务描述（**必填，不能为空字符串**，简要说明任务目的和核心内容，20-50 字）
 
 **可选字段：**
 - testStrategy: 测试策略
@@ -869,7 +869,7 @@ func (s *Service) buildSplitRequirementPromptWithLanguage(requirement *models.Re
 2. 优先级设置：基础架构和高优先级功能设为 high，核心功能设为 medium，辅助功能设为 low
 3. 合理设置依赖关系，确保任务可以按顺序执行
 4. 每个任务应该足够独立，可以单独开发和测试
-5. details、testStrategy、risk、acceptanceCriteria、description 是必填字段，必须为每个任务填写完整
+5. details、testStrategy、risk、acceptanceCriteria、description 是必填字段，必须为每个任务填写完整，**不能为空字符串**
 6. 预估工时应基于实现复杂度合理评估
 
 示例格式：

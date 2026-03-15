@@ -167,7 +167,7 @@ const actualExpandDisabled = computed(() => {
 });
 
 // 编辑模式状态
-type EditableTaskField = 'title' | 'details' | 'testStrategy';
+type EditableTaskField = 'title' | 'description' | 'details' | 'testStrategy' | 'risk' | 'acceptanceCriteria' | 'input' | 'output';
 type EditableSubtaskField =
   | 'title'
   | 'description'
@@ -175,7 +175,8 @@ type EditableSubtaskField =
   | 'codeInterface'
   | 'acceptanceCriteria'
   | 'relatedFiles'
-  | 'codeHints';
+  | 'codeHints'
+  | 'risk';
 const editingType = ref<'task' | 'subtask' | null>(null);
 const editingField = ref<EditableTaskField | EditableSubtaskField | null>(null);
 const editingSubtaskId = ref<number | null>(null);
@@ -246,10 +247,20 @@ function startEditTask(field: EditableTaskField) {
   editingSubtaskId.value = null;
   if (field === 'title') {
     editingValue.value = task.value.titleTrans || task.value.title || '';
+  } else if (field === 'description') {
+    editingValue.value = task.value.descriptionTrans || task.value.description || '';
   } else if (field === 'details') {
     editingValue.value = task.value.detailsTrans || task.value.details || '';
-  } else {
+  } else if (field === 'testStrategy') {
     editingValue.value = task.value.testStrategyTrans || task.value.testStrategy || '';
+  } else if (field === 'risk') {
+    editingValue.value = task.value.risk || '';
+  } else if (field === 'acceptanceCriteria') {
+    editingValue.value = task.value.acceptanceCriteria || '';
+  } else if (field === 'input') {
+    editingValue.value = task.value.input || '';
+  } else if (field === 'output') {
+    editingValue.value = task.value.output || '';
   }
   // 切换到编辑模式
   if (field !== 'title') {
@@ -280,6 +291,8 @@ function startEditSubtask(subtaskId: number, field: EditableSubtaskField) {
     editingValue.value = subtask.relatedFiles || '';
   } else if (field === 'codeHints') {
     editingValue.value = subtask.codeHints || '';
+  } else if (field === 'risk') {
+    editingValue.value = subtask.risk || '';
   }
   // 切换到编辑模式
   if (field === 'description' || field === 'details') {
@@ -289,13 +302,15 @@ function startEditSubtask(subtaskId: number, field: EditableSubtaskField) {
 
 // 取消编辑
 function cancelEdit() {
-  // 如果是 Markdown 字段，切回预览模式
+  // 切回预览模式（所有非 title 字段都需要切换）
   if (editingType.value && editingField.value) {
     const field = editingField.value;
-    if (field === 'details' || field === 'testStrategy') {
+    if (editingType.value === 'task' && field !== 'title') {
       togglePreview('task', field);
-    } else if ((field === 'description' || field === 'details') && editingSubtaskId.value !== null) {
-      togglePreview('subtask', field as 'description' | 'details', editingSubtaskId.value);
+    } else if (editingType.value === 'subtask' && editingSubtaskId.value !== null) {
+      if (field === 'description' || field === 'details') {
+        togglePreview('subtask', field as 'description' | 'details', editingSubtaskId.value);
+      }
     }
   }
   editingType.value = null;
@@ -316,22 +331,27 @@ async function saveEdit() {
       let updateData: Record<string, string>;
       if (field === 'title') {
         updateData = { title: editingValue.value };
+      } else if (field === 'description') {
+        updateData = { description: editingValue.value };
       } else if (field === 'details') {
         updateData = { details: editingValue.value };
       } else if (field === 'testStrategy') {
         updateData = { testStrategy: editingValue.value };
+      } else if (field === 'risk') {
+        updateData = { risk: editingValue.value };
+      } else if (field === 'acceptanceCriteria') {
+        updateData = { acceptanceCriteria: editingValue.value };
+      } else if (field === 'input') {
+        updateData = { input: editingValue.value };
+      } else if (field === 'output') {
+        updateData = { output: editingValue.value };
       } else {
         // 不应该到达这里
         return;
       }
       const success = await taskStore.updateTask(taskId.value, updateData);
       if (success) {
-        // 先取消编辑状态，再切换预览模式
         cancelEdit();
-        // 切回预览模式
-        if (field === 'details' || field === 'testStrategy') {
-          togglePreview('task', field);
-        }
         window.$message?.success('保存成功');
       } else {
         window.$message?.error('保存失败');
@@ -370,6 +390,8 @@ async function saveEdit() {
         }
       } else if (field === 'codeHints') {
         updateData = { codeHints: editingValue.value };
+      } else if (field === 'risk') {
+        updateData = { risk: editingValue.value };
       } else {
         return;
       }
@@ -381,12 +403,7 @@ async function saveEdit() {
       const success = await taskStore.updateSubtask(taskId.value, editingSubtaskId.value, updateData);
       console.log('[saveEdit] updateSubtask 结果', success);
       if (success) {
-        // 先取消编辑状态，再切换预览模式
         cancelEdit();
-        // 切回预览模式
-        if (field === 'description' || field === 'details') {
-          togglePreview('subtask', field, editingSubtaskId.value);
-        }
         window.$message?.success('保存成功');
       } else {
         window.$message?.error('保存失败');
@@ -598,8 +615,22 @@ watch(
       localSubtasks.value = [];
       return;
     }
-    // 直接替换整个数组，确保响应式更新
-    localSubtasks.value = [...newSubtasks];
+    // 序列化比较，确保内容变化时触发更新
+    const newJson = JSON.stringify(newSubtasks.map(s => ({
+      id: s.id, status: s.status, title: s.title, description: s.description,
+      details: s.details, codeInterface: s.codeInterface,
+      acceptanceCriteria: s.acceptanceCriteria, relatedFiles: s.relatedFiles,
+      codeHints: s.codeHints, risk: s.risk
+    })));
+    const oldJson = JSON.stringify(localSubtasks.value.map(s => ({
+      id: s.id, status: s.status, title: s.title, description: s.description,
+      details: s.details, codeInterface: s.codeInterface,
+      acceptanceCriteria: s.acceptanceCriteria, relatedFiles: s.relatedFiles,
+      codeHints: s.codeHints, risk: s.risk
+    })));
+    if (newJson !== oldJson) {
+      localSubtasks.value = [...newSubtasks];
+    }
   },
   { immediate: true, deep: true }
 );
@@ -755,7 +786,28 @@ onUnmounted(() => {
                 <NDescriptions bordered :column="1" label-placement="left" :label-style="{ width: '15%' }">
                   <NDescriptionsItem label="ID">{{ task.id }}</NDescriptionsItem>
                   <NDescriptionsItem label="描述">
-                    {{ task.descriptionTrans || task.description || '-' }}
+                    <div class="editable-field">
+                      <!-- 编辑模式 -->
+                      <div v-if="!isPreviewMode('task', 'description')" class="editor-wrapper">
+                        <NInput
+                          v-model:value="editingValue"
+                          type="textarea"
+                          placeholder="请输入任务描述"
+                          :rows="3"
+                          maxlength="500"
+                          show-count
+                        />
+                        <NSpace class="mt-8px">
+                          <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                          <NButton size="small" @click="cancelEdit">取消</NButton>
+                        </NSpace>
+                      </div>
+                      <!-- 预览模式 -->
+                      <div v-else class="preview-container" @click="startEditTask('description')">
+                        {{ task.descriptionTrans || task.description || '-' }}
+                        <NButton text type="primary" size="small" class="edit-btn">编辑</NButton>
+                      </div>
+                    </div>
                   </NDescriptionsItem>
                   <NDescriptionsItem label="依赖">
                     <template v-if="task.dependencies?.length">
@@ -780,31 +832,107 @@ onUnmounted(() => {
                     <span v-else class="text-gray-400">-</span>
                   </NDescriptionsItem>
                   <NDescriptionsItem label="输入依赖">
-                    {{ task.input || '-' }}
+                    <div class="editable-field">
+                      <div v-if="!isPreviewMode('task', 'input')" class="editor-wrapper">
+                        <NInput
+                          v-model:value="editingValue"
+                          type="textarea"
+                          placeholder="请输入输入依赖"
+                          :rows="2"
+                        />
+                        <NSpace class="mt-8px">
+                          <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                          <NButton size="small" @click="cancelEdit">取消</NButton>
+                        </NSpace>
+                      </div>
+                      <div v-else class="preview-container" @click="startEditTask('input')">
+                        {{ task.input || '-' }}
+                        <NButton text type="primary" size="small" class="edit-btn">编辑</NButton>
+                      </div>
+                    </div>
                   </NDescriptionsItem>
                   <NDescriptionsItem label="输出交付物">
-                    {{ task.output || '-' }}
+                    <div class="editable-field">
+                      <div v-if="!isPreviewMode('task', 'output')" class="editor-wrapper">
+                        <NInput
+                          v-model:value="editingValue"
+                          type="textarea"
+                          placeholder="请输入输出交付物"
+                          :rows="2"
+                        />
+                        <NSpace class="mt-8px">
+                          <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                          <NButton size="small" @click="cancelEdit">取消</NButton>
+                        </NSpace>
+                      </div>
+                      <div v-else class="preview-container" @click="startEditTask('output')">
+                        {{ task.output || '-' }}
+                        <NButton text type="primary" size="small" class="edit-btn">编辑</NButton>
+                      </div>
+                    </div>
                   </NDescriptionsItem>
                   <NDescriptionsItem label="风险点">
-                    <NAlert v-if="task.risk" type="warning" style="margin-top: 8px">
-                      {{ task.risk }}
-                    </NAlert>
-                    <span v-else class="text-gray-400">-</span>
+                    <div class="editable-field">
+                      <!-- 编辑模式 -->
+                      <div v-if="!isPreviewMode('task', 'risk')" class="editor-wrapper">
+                        <NInput
+                          v-model:value="editingValue"
+                          type="textarea"
+                          placeholder="请输入风险点"
+                          :rows="3"
+                          maxlength="2000"
+                          show-count
+                        />
+                        <NSpace class="mt-8px">
+                          <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                          <NButton size="small" @click="cancelEdit">取消</NButton>
+                        </NSpace>
+                      </div>
+                      <!-- 预览模式 -->
+                      <div v-else class="preview-container" @click="startEditTask('risk')">
+                        <NAlert v-if="task.risk" type="warning" style="margin-top: 8px">
+                          {{ task.risk }}
+                        </NAlert>
+                        <span v-else class="text-gray-400">-</span>
+                        <NButton text type="primary" size="small" class="edit-btn">编辑</NButton>
+                      </div>
+                    </div>
                   </NDescriptionsItem>
                   <NDescriptionsItem label="验收标准">
-                    <div v-if="task.acceptanceCriteria">
-                      <NCollapse>
-                        <NCollapseItem
-                          v-for="(item, index) in parseJsonField(task.acceptanceCriteria)"
-                          :key="index"
-                          :title="`验收点 ${index + 1}: ${item?.description || item || '-'}`"
-                          :name="index"
-                        >
-                          {{ item?.description || item || '-' }}
-                        </NCollapseItem>
-                      </NCollapse>
+                    <div class="editable-field">
+                      <!-- 编辑模式 -->
+                      <div v-if="!isPreviewMode('task', 'acceptanceCriteria')" class="editor-wrapper">
+                        <NInput
+                          v-model:value="editingValue"
+                          type="textarea"
+                          placeholder="请输入验收标准（JSON 格式或纯文本）"
+                          :rows="5"
+                          maxlength="5000"
+                          show-count
+                        />
+                        <NSpace class="mt-8px">
+                          <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">保存</NButton>
+                          <NButton size="small" @click="cancelEdit">取消</NButton>
+                        </NSpace>
+                      </div>
+                      <!-- 预览模式 -->
+                      <div v-else class="preview-container" @click="startEditTask('acceptanceCriteria')">
+                        <div v-if="task.acceptanceCriteria" class="acceptance-criteria">
+                          <NCollapse>
+                            <NCollapseItem
+                              v-for="(item, index) in parseJsonField(task.acceptanceCriteria)"
+                              :key="index"
+                              :title="`验收点 ${index + 1}: ${item?.description || item || '-'}`"
+                              :name="index"
+                            >
+                              {{ item?.description || item || '-' }}
+                            </NCollapseItem>
+                          </NCollapse>
+                        </div>
+                        <span v-else class="text-gray-400">-</span>
+                        <NButton text type="primary" size="small" class="edit-btn">编辑</NButton>
+                      </div>
                     </div>
-                    <span v-else class="text-gray-400">-</span>
                   </NDescriptionsItem>
                   <NDescriptionsItem label="预估工时">
                     {{ task.estimatedHours ? `${task.estimatedHours} 小时` : '-' }}
@@ -1305,6 +1433,55 @@ onUnmounted(() => {
                             {{ subtask.codeHints }}
                           </div>
                           <div v-else class="detail-content text-gray-400">点击编辑代码提示</div>
+                        </div>
+
+                        <!-- 风险点 -->
+                        <div class="detail-section">
+                          <div class="detail-header">
+                            <div class="detail-label">风险点</div>
+                            <NButton
+                              v-if="
+                                !(
+                                  editingType === 'subtask' &&
+                                  editingSubtaskId === subtask.id &&
+                                  editingField === 'risk'
+                                )
+                              "
+                              text
+                              type="primary"
+                              size="tiny"
+                              @click="startEditSubtask(subtask.id, 'risk')"
+                            >
+                              编辑
+                            </NButton>
+                          </div>
+                          <div
+                            v-if="
+                              editingType === 'subtask' &&
+                              editingSubtaskId === subtask.id &&
+                              editingField === 'risk'
+                            "
+                            class="detail-content"
+                          >
+                            <NInput
+                              v-model:value="editingValue"
+                              type="textarea"
+                              placeholder="请输入风险点"
+                              :rows="3"
+                              maxlength="2000"
+                              show-count
+                            />
+                            <NSpace class="mt-8px">
+                              <NButton type="primary" size="small" :loading="saveLoading" @click="saveEdit">
+                                保存
+                              </NButton>
+                              <NButton size="small" @click="cancelEdit">取消</NButton>
+                            </NSpace>
+                          </div>
+                          <div v-else-if="subtask.risk" class="detail-content">
+                            <NAlert type="warning">{{ subtask.risk }}</NAlert>
+                          </div>
+                          <div v-else class="detail-content text-gray-400">点击编辑风险点</div>
                         </div>
 
                         <!-- 自定义字段（来自项目模板） -->

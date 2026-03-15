@@ -47,6 +47,8 @@ export interface Subtask {
   createdAt?: string;
   updatedAt?: string;
   dependencies?: number[];
+  /** 自定义字段值 - JSON 字符串 */
+  customFields?: string;
 }
 
 /** 任务 */
@@ -68,6 +70,18 @@ export interface Task {
   detailsTrans?: string;
   testStrategy?: string;
   testStrategyTrans?: string;
+  /** 模块归属 */
+  module?: string;
+  /** 输入依赖 */
+  input?: string;
+  /** 输出交付物 */
+  output?: string;
+  /** 风险点 */
+  risk?: string;
+  /** 验收标准 - 后端返回 JSON 字符串 */
+  acceptanceCriteria?: string;
+  /** 自定义字段值 - JSON 字符串 */
+  customFields?: string;
   subtasks?: Subtask[];
   /** 子任务总数（列表 API 返回） */
   subtaskCount?: number;
@@ -175,4 +189,35 @@ export interface TaskDependency {
   taskId: number;
   dependsOnTaskId: number;
   createdAt?: string;
+}
+
+/** 任务质量评分 */
+export interface TaskQualityScore {
+  id: number;
+  taskId: number;
+  version: number;
+  totalScore: number;
+  clarityScore: number;
+  completenessScore: number;
+  structureScore: number;
+  actionabilityScore: number;
+  consistencyScore: number;
+  evaluation: string; // JSON 字符串
+  taskSnapshot: string; // JSON 字符串
+  aiProvider: string;
+  createdAt: string;
+}
+
+/** 评分评价数据 */
+export interface EvaluationData {
+  strengths: string[];
+  weaknesses: string[];
+  suggestions: EvalSuggestion[];
+  analysis: string;
+}
+
+/** 评分建议 */
+export interface EvalSuggestion {
+  issue: string;
+  suggestion: string;
 }

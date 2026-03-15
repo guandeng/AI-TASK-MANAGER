@@ -43,6 +43,12 @@ func main() {
 	}
 	defer database.Close()
 
+	// 初始化默认项目模板
+	templateService := services.NewTemplateService(logger)
+	if err := templateService.InitDefaultTemplates(); err != nil {
+		logger.Warn("初始化默认项目模板失败", zap.Error(err))
+	}
+
 	// 创建 Gin 引擎
 	r := gin.New()
 
@@ -103,6 +109,7 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 		{
 			// 静态路由 - 必须放在参数路由之前
 			tasks.GET("", taskHandler.List)
+			tasks.POST("", taskHandler.Create)
 			tasks.POST("/batch-delete", taskHandler.BatchDelete)
 			tasks.GET("/dependencies", taskHandler.GetAllDependencies)
 			tasks.GET("/dependencies/validate", taskHandler.ValidateDependencies)
@@ -138,6 +145,14 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			tasks.POST("/:taskId/subtasks/:subtaskId/assignments", taskHandler.CreateSubtaskAssignment)
 			tasks.POST("/:taskId/subtasks/:subtaskId/assignments/:assignmentId/delete", taskHandler.DeleteSubtaskAssignment)
 
+			// 任务质量评分
+			taskQualityHandler := handlers.NewTaskQualityHandler(logger, cfg)
+			tasks.POST("/:taskId/score", taskQualityHandler.Score)
+			tasks.GET("/:taskId/scores", taskQualityHandler.ListScores)
+			tasks.GET("/:taskId/scores/:scoreId", taskQualityHandler.GetScore)
+			tasks.DELETE("/:taskId/scores/:scoreId", taskQualityHandler.DeleteScore)
+			tasks.POST("/:taskId/scores/:scoreId/restore", taskQualityHandler.RestoreScore)
+
 			// 评论管理
 			commentHandler := handlers.NewCommentHandler(logger)
 			tasks.GET("/:taskId/comments", commentHandler.List)
@@ -165,6 +180,8 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			requirements.GET("/:id/documents/:docId/download", requirementHandler.DownloadDocument)
 			requirements.POST("/:id/split-tasks", requirementHandler.SplitTasks)
 			requirements.POST("/:id/split-tasks-async", requirementHandler.SplitTasksAsync)
+			// 获取需求结构化数据（需求 + 任务 + 子任务）
+			requirements.GET("/:id/structure", requirementHandler.GetRequirementStructure)
 		}
 
 		// 成员管理
@@ -230,7 +247,7 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 		}
 
 		// 模板管理
-		templateHandler := handlers.NewTemplateHandler(logger)
+		templateHandler := handlers.NewTemplateHandler(logger, cfg)
 
 		// 项目模板
 		projectTemplates := api.Group("/templates/projects")
@@ -241,6 +258,9 @@ func registerRoutes(r *gin.Engine, logger *zap.Logger, cfg *config.Config) {
 			projectTemplates.POST("/:id/update", templateHandler.UpdateProjectTemplate)
 			projectTemplates.POST("/:id/delete", templateHandler.DeleteProjectTemplate)
 			projectTemplates.POST("/:id/instantiate", templateHandler.InstantiateProjectTemplate)
+			// 项目模板打分
+			projectTemplates.POST("/:id/score", templateHandler.ScoreProjectTemplate)
+			projectTemplates.POST("/:id/score-async", templateHandler.ScoreProjectTemplateAsync)
 		}
 
 		// 任务模板

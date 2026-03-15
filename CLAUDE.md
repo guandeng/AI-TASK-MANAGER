@@ -1,8 +1,14 @@
 # AI Task Manager - 项目协作规范
 
 ## 技术栈
-- 后端: Go + Gin + GORM
-- 前端: Vue 3 + TypeScript + Element Plus
+- 后端：Go + Gin + GORM (Go 1.22+)
+- 前端：Vue 3 + TypeScript + Element Plus
+
+## Go 语法规范
+- 使用现代 Go 语法 (Go 1.22+)
+- 使用 `any` 代替 `interface{}`
+- 使用 `:=` 短变量声明
+- 使用泛型时优先类型推断
 
 ## API 设计规范
 - 只使用 GET 和 POST 请求
@@ -14,4 +20,4 @@
 - 直接修改代码，无需详细解释
 - 输出简洁，避免冗余
 - 完成后简短回复"完成"或"已修改"
-- 不要输出代��片段预览，直接编辑文件
+- 不要输出代码片段预览，直接编辑文件

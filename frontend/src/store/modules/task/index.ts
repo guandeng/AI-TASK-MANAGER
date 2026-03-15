@@ -19,9 +19,13 @@ import {
   addTaskDependency as addTaskDependencyApi,
   removeTaskDependency as removeTaskDependencyApi,
   validateDependencies as validateDependenciesApi,
-  getReadyTasks as getReadyTasksApi
+  getReadyTasks as getReadyTasksApi,
+  scoreTask as scoreTaskApi,
+  fetchTaskScoreHistory as fetchTaskScoreHistoryApi,
+  restoreTaskScore as restoreTaskScoreApi,
+  deleteTaskScore as deleteTaskScoreApi
 } from '@/service/api/task';
-import type { Task, Subtask, TaskStatus, TaskStatistics, TaskListParams, TaskCreateRequest, TaskDependency } from '@/typings/api/task';
+import type { Task, TaskStatus, TaskStatistics, TaskListParams, TaskCreateRequest, TaskDependency, TaskQualityScore } from '@/typings/api/task';
 import { createLoadingService, LoadingService, LOADING_PRESETS } from '@/utils/loading-service';
 
 // 辅助函数：提取后端返回的 data 字段
@@ -47,6 +51,12 @@ export const useTaskStore = defineStore('task-store', () => {
   const page = ref(1);
   const pageSize = ref(20);
   const taskDependencies = ref<TaskDependency[]>([]);
+
+  // 评分相关状态
+  const qualityScores = ref<TaskQualityScore[]>([]);
+  const currentScore = ref<TaskQualityScore | null>(null);
+  const scoreLoading = ref(false);
+  const scoreHistoryLoading = ref(false);
 
   // 计算属性：任务统计
   const statistics = computed<TaskStatistics>(() => {
@@ -207,8 +217,7 @@ export const useTaskStore = defineStore('task-store', () => {
         }
         // 如果是当前任务，完全替换对象以触发响应式更新
         if (currentTask.value?.id === id) {
-          currentTask.value = null;
-          currentTask.value = updatedTask;
+          currentTask.value = JSON.parse(JSON.stringify(updatedTask));
         }
         return true;
       }
@@ -262,13 +271,9 @@ export const useTaskStore = defineStore('task-store', () => {
           if (taskIndex !== -1) {
             tasks.value[taskIndex] = { ...tasks.value[taskIndex], ...updatedTask };
           }
-          // 如果是当前任务，创建新对象确保响应式更新
+          // 如果是当前任务，完全替换对象以触发响应式更新
           if (currentTask.value?.id === taskId) {
-            currentTask.value = {
-              ...currentTask.value,
-              ...updatedTask,
-              subtasks: [...updatedTask.subtasks] // 确保是新的数组引用
-            };
+            currentTask.value = JSON.parse(JSON.stringify(updatedTask));
           }
         }
         return true;
@@ -340,9 +345,9 @@ export const useTaskStore = defineStore('task-store', () => {
       if (!error && data) {
         // data 已经是后端返回的完整响应体 { code, message, data }
         const innerData = extractData(data);
-        // 异步展开成功，返回 true 表示已开始
-        if (innerData?.message || (data as any).code === 0) {
-          return true;
+        // 异步展开成功，返回 messageId
+        if (innerData?.messageId) {
+          return innerData.messageId;
         }
       }
       return null;
@@ -694,6 +699,73 @@ export const useTaskStore = defineStore('task-store', () => {
     }
   }
 
+  // 任务质量评分相关 Actions
+  async function scoreTask(taskId: number) {
+    scoreLoading.value = true;
+    try {
+      const { data, error } = await scoreTaskApi(taskId);
+      if (!error && data) {
+        const score = extractData(data) as TaskQualityScore;
+        currentScore.value = score;
+        return score;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to score task:', error);
+      return null;
+    } finally {
+      scoreLoading.value = false;
+    }
+  }
+
+  async function loadScoreHistory(taskId: number, page = 1, pageSize = 20) {
+    scoreHistoryLoading.value = true;
+    try {
+      const { data, error } = await fetchTaskScoreHistoryApi(taskId, page, pageSize);
+      if (!error && data) {
+        const result = extractData(data);
+        qualityScores.value = result.list || [];
+        return result;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to load score history:', error);
+      return null;
+    } finally {
+      scoreHistoryLoading.value = false;
+    }
+  }
+
+  async function restoreScore(taskId: number, scoreId: number) {
+    try {
+      const { data, error } = await restoreTaskScoreApi(taskId, scoreId);
+      if (!error && data) {
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to restore score:', error);
+      return false;
+    }
+  }
+
+  async function deleteScore(taskId: number, scoreId: number) {
+    try {
+      const { error } = await deleteTaskScoreApi(taskId, scoreId);
+      if (!error) {
+        qualityScores.value = qualityScores.value.filter(s => s.id !== scoreId);
+        if (currentScore.value?.id === scoreId) {
+          currentScore.value = null;
+        }
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to delete score:', error);
+      return false;
+    }
+  }
+
   function clearCurrentTask() {
     currentTask.value = null;
   }
@@ -709,6 +781,11 @@ export const useTaskStore = defineStore('task-store', () => {
     page,
     pageSize,
     taskDependencies,
+    // 评分相关状态
+    qualityScores,
+    currentScore,
+    scoreLoading,
+    scoreHistoryLoading,
     // 计算属性
     statistics,
     tasksByStatus,
@@ -735,6 +812,11 @@ export const useTaskStore = defineStore('task-store', () => {
     addTaskDependency,
     removeTaskDependency,
     validateDependencies,
-    loadReadyTasks
+    loadReadyTasks,
+    // 评分相关 Actions
+    scoreTask,
+    loadScoreHistory,
+    restoreScore,
+    deleteScore
   };
 });

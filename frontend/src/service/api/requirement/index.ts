@@ -114,13 +114,21 @@ export function splitRequirementToTasks(requirementId: number, taskType: TaskTyp
 }
 
 /** 将需求拆分为任务（异步） */
-export function splitRequirementToTasksAsync(requirementId: number, taskType: TaskType = 'backend', languageId?: number) {
+export function splitRequirementToTasksAsync(requirementId: number, taskType: TaskType = 'backend', languageId?: number, projectTemplateId?: number) {
   return request<{
     messageId: number;
     message: string;
   }>({
     url: `/api/requirements/${requirementId}/split-tasks-async`,
     method: 'post',
-    data: { taskType, languageId }
+    data: { taskType, languageId, projectTemplateId }
+  });
+}
+
+/** 获取需求结构化数据（需求 + 任务 + 子任务） */
+export function fetchRequirementStructure(id: number) {
+  return request<import('@/typings/api/requirement').RequirementTree>({
+    url: `/api/requirements/${id}/structure`,
+    method: 'get'
   });
 }

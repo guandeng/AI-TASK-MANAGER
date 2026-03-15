@@ -106,3 +106,28 @@ export function validateDependencies() {
 export function getReadyTasks() {
   return request({ url: `${API_BASE}/tasks/ready`, method: 'GET' });
 }
+
+// 任务质量评分相关 API
+export function scoreTask(id: number) {
+  return request({ url: `${API_BASE}/tasks/${id}/score`, method: 'POST' });
+}
+
+export function fetchTaskScoreHistory(id: number, page = 1, pageSize = 20) {
+  return request({
+    url: `${API_BASE}/tasks/${id}/scores`,
+    method: 'GET',
+    params: { page, pageSize }
+  });
+}
+
+export function fetchTaskScoreDetail(id: number, scoreId: number) {
+  return request({ url: `${API_BASE}/tasks/${id}/scores/${scoreId}`, method: 'GET' });
+}
+
+export function restoreTaskScore(id: number, scoreId: number) {
+  return request({ url: `${API_BASE}/tasks/${id}/scores/${scoreId}/restore`, method: 'POST' });
+}
+
+export function deleteTaskScore(id: number, scoreId: number) {
+  return request({ url: `${API_BASE}/tasks/${id}/scores/${scoreId}`, method: 'DELETE' });
+}

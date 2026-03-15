@@ -14,8 +14,10 @@ type ProjectTemplate struct {
 	CreatedBy   *uint64   `json:"createdBy,omitempty"`
 	UsageCount  int       `gorm:"default:0" json:"usageCount"`
 	Tags        *string   `gorm:"size:500" json:"tags,omitempty"`
+	FieldSchema *string   `gorm:"type:longtext" json:"fieldSchema,omitempty"` // 字段定义 JSON
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	DeletedAt   *time.Time `gorm:"index:idx_deleted_at" json:"deletedAt,omitempty"`
 
 	// 关联
 	Tasks []ProjectTemplateTask `gorm:"foreignKey:TemplateID;constraint:OnDelete:CASCADE" json:"tasks,omitempty"`
@@ -79,6 +81,7 @@ type TaskTemplate struct {
 	UsageCount     int       `gorm:"default:0" json:"usageCount"`
 	CreatedAt      time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
+	DeletedAt      *time.Time `gorm:"index:idx_deleted_at" json:"deletedAt,omitempty"`
 }
 
 // TableName 指定表名

@@ -12,6 +12,7 @@ import (
 	"github.com/ai-task-manager/backend/internal/config"
 	"github.com/ai-task-manager/backend/internal/database"
 	"github.com/ai-task-manager/backend/internal/models"
+	"github.com/ai-task-manager/backend/internal/repository"
 	"github.com/ai-task-manager/backend/pkg/ai"
 	"github.com/ai-task-manager/backend/pkg/response"
 	"github.com/gin-gonic/gin"
@@ -397,8 +398,9 @@ func getMimeType(ext string) string {
 
 // SplitTasksRequest 拆分任务请求
 type SplitTasksRequest struct {
-	TaskType   string `json:"taskType"`   // frontend, backend, fullstack
-	LanguageID uint64 `json:"languageId"` // 语言 ID
+	TaskType         string  `json:"taskType"`            // frontend, backend, fullstack
+	LanguageID       uint64  `json:"languageId"`          // 语言 ID
+	ProjectTemplateID *uint64 `json:"projectTemplateId"`  // 项目模板 ID（可选）
 }
 
 // SplitTasks 需求拆分为任务（AI）- 同步版本
@@ -517,6 +519,15 @@ func (h *RequirementHandler) SplitTasksAsync(c *gin.Context) {
 		}
 	}
 
+	// 获取项目模板的字段定义（如果指定了模板）
+	var fieldSchema *string
+	if req.ProjectTemplateID != nil && *req.ProjectTemplateID > 0 {
+		var template models.ProjectTemplate
+		if err := db.Select("field_schema").First(&template, *req.ProjectTemplateID).Error; err == nil {
+			fieldSchema = template.FieldSchema
+		}
+	}
+
 	// 获取需求详情
 	var requirement models.Requirement
 	if err := db.First(&requirement, id).Error; err != nil {
@@ -549,8 +560,8 @@ func (h *RequirementHandler) SplitTasksAsync(c *gin.Context) {
 
 	// 异步执行拆分
 	go func() {
-		// 调用 AI 服务拆分需求（传入语言信息）
-		tasksWithDeps, err := h.aiService.SplitRequirementWithLanguage(&requirement, req.TaskType, language)
+		// 调用 AI 服务拆分需求（传入语言信息和模板字段定义）
+		tasksWithDeps, err := h.aiService.SplitRequirementWithTemplate(&requirement, req.TaskType, language, fieldSchema)
 		if err != nil {
 			h.logger.Error("AI 拆分需求失败", zap.Error(err))
 			// 更新消息状态为失败
@@ -613,4 +624,25 @@ func (h *RequirementHandler) SplitTasksAsync(c *gin.Context) {
 		"messageId": message.ID,
 		"message":   "需求拆分已开始，完成后会通知您",
 	})
+}
+
+// GetRequirementStructure 获取需求及其任务和子任务的结构化数据
+// GET /api/requirements/:id/structure
+func (h *RequirementHandler) GetRequirementStructure(c *gin.Context) {
+	requirementID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的需求 ID")
+		return
+	}
+
+	// 使用 taskService 获取结构化数据
+	taskRepo := repository.NewTaskRepository()
+	tree, err := taskRepo.GetRequirementWithTasksAndSubtasks(requirementID)
+	if err != nil {
+		h.logger.Error("获取需求结构化数据失败", zap.Uint64("requirementID", requirementID), zap.Error(err))
+		response.NotFound(c, "需求不存在")
+		return
+	}
+
+	response.Success(c, tree)
 }

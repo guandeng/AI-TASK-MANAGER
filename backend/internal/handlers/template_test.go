@@ -36,7 +36,7 @@ func setupTemplateTestWithDB(t *testing.T) (*TemplateHandler, *gin.Engine, sqlmo
 
 	database.DB = gormDB
 
-	handler := NewTemplateHandler(logger)
+	handler := NewTemplateHandler(logger, nil)
 	router := gin.New()
 
 	return handler, router, mock
@@ -540,5 +540,47 @@ func TestTemplateHandler_CreateProjectTemplate_InvalidJSON(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("期望状态码 %d, 实际 %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+func TestTemplateHandler_ScoreProjectTemplate(t *testing.T) {
+	tests := []struct {
+		name       string
+		id         string
+		expectCode int
+		setupMock  func(mock sqlmock.Sqlmock)
+	}{
+		{
+			name:       "无效的 ID",
+			id:         "abc",
+			expectCode: http.StatusBadRequest,
+			setupMock:  func(mock sqlmock.Sqlmock) {},
+		},
+		{
+			name:       "模板不存在",
+			id:         "999",
+			expectCode: http.StatusNotFound,
+			setupMock: func(mock sqlmock.Sqlmock) {
+				mock.ExpectQuery("SELECT").
+					WillReturnRows(sqlmock.NewRows([]string{"id"}))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler, router, mock := setupTemplateTestWithDB(t)
+			router.POST("/project-templates/:id/score", handler.ScoreProjectTemplate)
+
+			tt.setupMock(mock)
+
+			req := httptest.NewRequest(http.MethodPost, "/project-templates/"+tt.id+"/score", nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			if w.Code != tt.expectCode {
+				t.Errorf("期望状态码 %d, 实际 %d", tt.expectCode, w.Code)
+			}
+		})
 	}
 }

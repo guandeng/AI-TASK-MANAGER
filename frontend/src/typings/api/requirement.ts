@@ -60,3 +60,82 @@ export interface RequirementFormData {
   tags?: string[];
   assignee?: string;
 }
+
+/** 子任务 */
+export interface Subtask {
+  id: number;
+  taskId: number;
+  title: string;
+  titleTrans?: string;
+  description?: string;
+  descriptionTrans?: string;
+  details?: string;
+  detailsTrans?: string;
+  status: string;
+  priority: string;
+  sortOrder: number;
+  estimatedHours?: number;
+  actualHours?: number;
+  codeInterface?: string;
+  acceptanceCriteria?: string;
+  relatedFiles?: string;
+  codeHints?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** 任务依赖 */
+export interface TaskDependency {
+  id: number;
+  taskId: number;
+  dependsOnTaskId: number;
+  createdAt?: string;
+}
+
+/** 任务带子任务（结构化数据） */
+export interface TaskWithSubtasks {
+  id: number;
+  title: string;
+  titleTrans?: string;
+  description: string;
+  descriptionTrans?: string;
+  status: string;
+  priority: string;
+  category: string;
+  details: string;
+  detailsTrans?: string;
+  testStrategy: string;
+  testStrategyTrans?: string;
+  module?: string;
+  input?: string;
+  output?: string;
+  risk?: string;
+  acceptanceCriteria?: string;
+  assignee?: string;
+  customFields?: string;
+  isExpanding: boolean;
+  startDate?: string;
+  dueDate?: string;
+  completedAt?: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  createdAt: string;
+  updatedAt: string;
+  subtasks: Subtask[];
+  dependencies: TaskDependency[];
+}
+
+/** 需求树形结构（需求 + 任务 + 子任务） */
+export interface RequirementTree {
+  id: number;
+  title: string;
+  content: string;
+  status: string;
+  priority: string;
+  tags?: string;
+  assignee?: string;
+  createdAt: string;
+  updatedAt: string;
+  documents: RequirementDocument[];
+  tasks: TaskWithSubtasks[];
+}

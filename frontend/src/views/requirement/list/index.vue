@@ -7,6 +7,8 @@ import { useRequirementStore } from '@/store/modules/requirement';
 import type { Requirement, RequirementStatus, RequirementPriority } from '@/typings/api/requirement';
 import { splitRequirementToTasksAsync, type TaskType } from '@/service/api/requirement';
 import { fetchLanguageList, createLanguage, updateLanguage, deleteLanguage, type Language, type LanguageCategory } from '@/service/api/language';
+import { fetchProjectTemplates } from '@/service/api/template';
+import type { ProjectTemplate } from '@/typings/api/template';
 
 defineOptions({
   name: 'RequirementList'
@@ -24,7 +26,11 @@ const filterPriority = ref<RequirementPriority | null>(null);
 const showTaskTypeModal = ref(false);
 const selectedTaskType = ref<TaskType>('backend');
 const selectedLanguageId = ref<number | null>(null);
+const selectedProjectTemplateId = ref<number | null>(null);
 const currentSplittingRequirement = ref<Requirement | null>(null);
+
+// 项目模板列表
+const projectTemplates = ref<ProjectTemplate[]>([]);
 
 // 语言列表
 const languages = ref<Language[]>([]);
@@ -51,6 +57,17 @@ const taskTypeOptions: SelectOption[] = [
   { label: '前端', value: 'frontend' as TaskType },
   { label: '前后端', value: 'fullstack' as TaskType }
 ];
+
+// 项目模板选项
+const projectTemplateOptions = computed<SelectOption[]>(() => {
+  return [
+    { label: '不使用模板', value: null as unknown as number },
+    ...projectTemplates.value.map(t => ({
+      label: t.name,
+      value: t.id
+    }))
+  ];
+});
 
 // 语言分类选项
 const categoryOptions: SelectOption[] = [
@@ -378,12 +395,22 @@ async function handleDelete(id: number) {
   }
 }
 
+// 加载项目模板列表
+async function loadProjectTemplates() {
+  const { data } = await fetchProjectTemplates();
+  if (data) {
+    projectTemplates.value = Array.isArray(data) ? data : ((data as any).data || []);
+  }
+}
+
 // 打开任务类型选择弹框
 function openTaskTypeModal(row: Requirement) {
   currentSplittingRequirement.value = row;
   selectedTaskType.value = 'backend';
   selectedLanguageId.value = null;
+  selectedProjectTemplateId.value = null;
   showTaskTypeModal.value = true;
+  loadProjectTemplates();
 }
 
 // 监听任务类型变化，重置语言选择
@@ -399,6 +426,7 @@ async function confirmSplitTasks() {
   const row = currentSplittingRequirement.value;
   const taskType = selectedTaskType.value;
   const languageId = selectedLanguageId.value;
+  const projectTemplateId = selectedProjectTemplateId.value;
 
   showTaskTypeModal.value = false;
 
@@ -410,7 +438,7 @@ async function confirmSplitTasks() {
   splittingTaskIds.value.add(row.id);
 
   try {
-    const { data, error } = await splitRequirementToTasksAsync(row.id, taskType, languageId || undefined);
+    const { data, error } = await splitRequirementToTasksAsync(row.id, taskType, languageId || undefined, projectTemplateId || undefined);
 
     if (!error && data) {
       const responseData = (data as any)?.data || data;
@@ -571,15 +599,21 @@ onActivated(() => {
       </NGi>
       <NGi>
         <NCard>
-          <div class="flex flex-col">
-            <span class="text-gray-500 text-sm mb-2">完成进度</span>
-            <NProgress
-              type="line"
-              :percentage="completionProgress"
-              :indicator-placement="'inside'"
-              :processing="requirementStore.loading"
-            />
-          </div>
+          <NStatistic label="完成进度" :value="completionProgress + '%'">
+            <template #prefix>
+              <span class="i-mdi:progress-check text-lg"></span>
+            </template>
+            <template #footer>
+              <NProgress
+                type="line"
+                :percentage="completionProgress"
+                :show-indicator="false"
+                :height="20"
+                :border-radius="4"
+                style="margin-top: 8px;"
+              />
+            </template>
+          </NStatistic>
         </NCard>
       </NGi>
     </NGrid>
@@ -680,6 +714,17 @@ onActivated(() => {
           placeholder="请选择语言"
           style="width: 100%;"
         />
+
+        <NDivider style="margin: 16px 0;" />
+
+        <p class="mb-4 text-gray-600">选择项目模板（可选）：</p>
+        <NSelect
+          v-model:value="selectedProjectTemplateId"
+          :options="projectTemplateOptions"
+          placeholder="选择项目模板，将按模板定义的字段格式生成任务"
+          clearable
+          style="width: 100%;"
+        />
       </div>
     </NModal>
 
@@ -728,6 +773,22 @@ onActivated(() => {
 <style scoped>
 .requirement-list-page {
   padding: 16px;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+
+.mb-8px {
+  margin-bottom: 8px;
+}
+
+.text-gray-500 {
+  color: #6b7280;
+}
+
+.text-sm {
+  font-size: 14px;
 }
 
 :deep(.n-grid .n-card) {

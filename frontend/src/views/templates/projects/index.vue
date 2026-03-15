@@ -19,16 +19,24 @@ import {
   NEmpty,
   NSpin,
   NPopconfirm,
+  NAlert,
+  NDrawer,
+  NDrawerContent,
+  NCard as NCardComp,
   useMessage
 } from 'naive-ui';
 import type { DataTableColumns, FormInst, FormRules } from 'naive-ui';
+import { MdEditor, MdPreview } from 'md-editor-v3';
+import 'md-editor-v3/lib/style.css';
 import {
   fetchProjectTemplates,
   fetchProjectTemplate,
   createProjectTemplate,
   updateProjectTemplate,
   deleteProjectTemplate,
-  instantiateProjectTemplate
+  instantiateProjectTemplate,
+  scoreProjectTemplate,
+  scoreProjectTemplateAsync
 } from '@/service/api/template';
 import type { ProjectTemplate, CreateProjectTemplateRequest, TemplateTask } from '@/typings/api/template';
 import {
@@ -69,6 +77,15 @@ const instantiateForm = ref({
   dueDate: null as string | null
 });
 const instantiateLoading = ref(false);
+
+// 评分相关
+const scoreLoading = ref(false);
+const showScoreDrawer = ref(false);
+const scoreResult = ref<any>(null);
+
+// 编辑模式
+const editingDescription = ref(false);
+const tempDescription = ref('');
 
 // 过滤后的模板列表
 const filteredTemplates = computed(() => {
@@ -135,7 +152,7 @@ const columns: DataTableColumns<ProjectTemplate> = [
   {
     title: '操作',
     key: 'actions',
-    width: 250,
+    width: 320,
     render(row) {
       return h(NSpace, {}, () => [
         h(NButton, {
@@ -146,6 +163,11 @@ const columns: DataTableColumns<ProjectTemplate> = [
           size: 'small',
           onClick: () => handleEdit(row)
         }, () => '编辑'),
+        h(NButton, {
+          size: 'small',
+          type: 'info',
+          onClick: () => openScoreDrawer(row)
+        }, () => '评分'),
         h(NButton, {
           size: 'small',
           type: 'primary',
@@ -287,6 +309,80 @@ async function handleDelete(template: ProjectTemplate) {
   }
 }
 
+// 评分模板（异步）
+async function handleScore(template: ProjectTemplate) {
+  scoreLoading.value = true;
+  try {
+    const { data, error } = await scoreProjectTemplateAsync(template.id);
+    if (!error && data) {
+      const result = data.data || data;
+      message.info(result.message || '评分已开始，完成后会通知您');
+      showScoreDrawer.value = false;
+    }
+  } catch (e) {
+    message.error('启动评分失败');
+  } finally {
+    scoreLoading.value = false;
+  }
+}
+
+// 打开评分抽屉
+function openScoreDrawer(template: ProjectTemplate) {
+  handleScore(template);
+}
+
+// 编辑描述
+function startEditDescription(template: ProjectTemplate) {
+  editingTemplate.value = template;
+  tempDescription.value = template.description || '';
+  editingDescription.value = true;
+}
+
+// 保存描述
+async function saveDescription() {
+  if (!editingTemplate.value) return;
+
+  const { error } = await updateProjectTemplate(editingTemplate.value.id, {
+    name: editingTemplate.value.name,
+    description: tempDescription.value,
+    category: editingTemplate.value.category,
+    isPublic: editingTemplate.value.isPublic,
+    tasks: editingTemplate.value.tasks || []
+  });
+
+  if (!error) {
+    message.success('更新成功');
+    editingDescription.value = false;
+    editingTemplate.value.description = tempDescription.value;
+    await loadTemplates();
+  } else {
+    message.error('更新失败');
+  }
+}
+
+// 取消编辑
+function cancelEditDescription() {
+  editingDescription.value = false;
+  editingTemplate.value = null;
+}
+
+// 获取评分等级
+function getScoreLevel(score: number): string {
+  if (score >= 90) return '优秀';
+  if (score >= 70) return '良好';
+  if (score >= 50) return '一般';
+  if (score >= 30) return '较差';
+  return '很差';
+}
+
+// 获取评分等级颜色
+function getScoreLevelColor(score: number): string {
+  if (score >= 90) return '#18a058';
+  if (score >= 70) return '#2080f0';
+  if (score >= 50) return '#f0a020';
+  return '#d03050';
+}
+
 // 打开实例化模态框
 function handleOpenInstantiate(template: ProjectTemplate) {
   instantiatingTemplate.value = template;
@@ -391,7 +487,22 @@ onActivated(() => {
             </NTag>
           </NDescriptionsItem>
           <NDescriptionsItem label="使用次数">{{ editingTemplate.usageCount }}</NDescriptionsItem>
-          <NDescriptionsItem label="描述" :span="2">{{ editingTemplate.description || '-' }}</NDescriptionsItem>
+          <NDescriptionsItem label="描述" :span="2">
+            <div v-if="!editingDescription" class="description-view">
+              <MdPreview v-if="editingTemplate.description" :modelValue="editingTemplate.description" />
+              <span v-else>-</span>
+              <NButton size="small" text type="primary" @click="startEditDescription(editingTemplate)" class="edit-desc-btn">
+                编辑
+              </NButton>
+            </div>
+            <MdEditor v-else v-model="tempDescription" :language="zh_CN" :toolbars="['previewOnly', 'fullscreen']" />
+          </NDescriptionsItem>
+          <NDescriptionsItem v-if="editingDescription" :span="2">
+            <NSpace>
+              <NButton size="small" type="primary" @click="saveDescription">保存</NButton>
+              <NButton size="small" @click="cancelEditDescription">取消</NButton>
+            </NSpace>
+          </NDescriptionsItem>
         </NDescriptions>
 
         <NDivider>任务列表</NDivider>
@@ -483,6 +594,90 @@ onActivated(() => {
         </NSpace>
       </template>
     </NModal>
+
+    <!-- 评分结果抽屉 -->
+    <NDrawer v-model:show="showScoreDrawer" :width="600">
+      <NDrawerContent title="项目模板评分结果" :native-scrollbar="false" closable>
+        <NSpin :show="scoreLoading">
+          <div v-if="scoreResult" class="score-result">
+            <!-- 总分 -->
+            <div class="total-score">
+              <div class="score-number" :style="{ color: getScoreLevelColor(scoreResult.totalScore || 0) }">
+                {{ (scoreResult.totalScore || 0).toFixed(1) }}
+              </div>
+              <div class="score-label">总分 / 100</div>
+              <div class="score-level" :style="{ color: getScoreLevelColor(scoreResult.totalScore || 0) }">
+                {{ scoreResult.level || getScoreLevel(scoreResult.totalScore || 0) }}
+              </div>
+            </div>
+
+            <!-- 维度评分 -->
+            <div class="dimensions" v-if="scoreResult.scores">
+              <div class="dimension-item">
+                <span class="dimension-name">清晰度</span>
+                <NTag :type="scoreResult.scores.clarity >= 7 ? 'success' : 'warning'">
+                  {{ scoreResult.scores.clarity }} / 10
+                </NTag>
+              </div>
+              <div class="dimension-item">
+                <span class="dimension-name">完整性</span>
+                <NTag :type="scoreResult.scores.completeness >= 7 ? 'success' : 'warning'">
+                  {{ scoreResult.scores.completeness }} / 10
+                </NTag>
+              </div>
+              <div class="dimension-item">
+                <span class="dimension-name">结构化</span>
+                <NTag :type="scoreResult.scores.structure >= 7 ? 'success' : 'warning'">
+                  {{ scoreResult.scores.structure }} / 10
+                </NTag>
+              </div>
+              <div class="dimension-item">
+                <span class="dimension-name">可执行性</span>
+                <NTag :type="scoreResult.scores.actionability >= 7 ? 'success' : 'warning'">
+                  {{ scoreResult.scores.actionability }} / 10
+                </NTag>
+              </div>
+              <div class="dimension-item">
+                <span class="dimension-name">一致性</span>
+                <NTag :type="scoreResult.scores.consistency >= 7 ? 'success' : 'warning'">
+                  {{ scoreResult.scores.consistency }} / 10
+                </NTag>
+              </div>
+            </div>
+
+            <!-- 评价内容 -->
+            <template v-if="scoreResult.strengths || scoreResult.weaknesses || scoreResult.suggestions">
+              <NDivider>评价内容</NDivider>
+              <NAlert type="success" title="优点" class="eval-section" v-if="scoreResult.strengths">
+                <ul>
+                  <li v-for="(item, i) in scoreResult.strengths" :key="i">{{ item }}</li>
+                </ul>
+              </NAlert>
+              <NAlert type="warning" title="待改进" class="eval-section" v-if="scoreResult.weaknesses">
+                <ul>
+                  <li v-for="(item, i) in scoreResult.weaknesses" :key="i">{{ item }}</li>
+                </ul>
+              </NAlert>
+              <NAlert type="info" title="改进建议" class="eval-section" v-if="scoreResult.suggestions">
+                <div v-for="(item, i) in scoreResult.suggestions" :key="i" class="suggestion-item">
+                  <strong>{{ item.issue }}</strong>
+                  <p>{{ item.suggestion }}</p>
+                </div>
+              </NAlert>
+            </template>
+
+            <!-- 详细分析 -->
+            <template v-if="scoreResult.analysis">
+              <NDivider>详细分析</NDivider>
+              <div class="analysis">
+                <MdPreview :modelValue="scoreResult.analysis" />
+              </div>
+            </template>
+          </div>
+          <NEmpty v-else description="暂无评分结果" />
+        </NSpin>
+      </NDrawerContent>
+    </NDrawer>
   </div>
 </template>
 
@@ -549,5 +744,105 @@ onActivated(() => {
   padding: 16px;
   background: #fafafa;
   border-radius: 6px;
+}
+
+.description-view {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+
+  :deep(.md-editor-preview-wrapper) {
+    flex: 1;
+  }
+
+  .edit-desc-btn {
+    flex-shrink: 0;
+  }
+}
+
+.score-result {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .total-score {
+    text-align: center;
+    padding: 20px 0;
+    background: var(--n-border-color-popover);
+    border-radius: 8px;
+
+    .score-number {
+      font-size: 48px;
+      font-weight: bold;
+      line-height: 1;
+    }
+
+    .score-label {
+      font-size: 12px;
+      color: var(--n-text-color-3);
+      margin-top: 4px;
+    }
+
+    .score-level {
+      font-size: 18px;
+      font-weight: 500;
+      margin-top: 8px;
+    }
+  }
+
+  .dimensions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    .dimension-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--n-border-color-popover);
+      border-radius: 6px;
+
+      .dimension-name {
+        font-size: 14px;
+        color: var(--n-text-color-2);
+      }
+    }
+  }
+
+  .eval-section {
+    margin-bottom: 12px;
+
+    ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+  }
+
+  .suggestion-item {
+    margin-bottom: 12px;
+
+    strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--n-text-color-2);
+    }
+
+    p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--n-text-color-3);
+    }
+  }
+
+  .analysis {
+    font-size: 14px;
+    line-height: 1.8;
+  }
 }
 </style>

@@ -22,7 +22,13 @@ type Task struct {
 	DetailsTrans     *string    `gorm:"type:text" json:"detailsTrans,omitempty"`
 	TestStrategy     string     `gorm:"type:text" json:"testStrategy"`
 	TestStrategyTrans *string   `gorm:"type:text" json:"testStrategyTrans,omitempty"`
+	Module           *string    `gorm:"size:100" json:"module,omitempty"` // 模块归属
+	Input            *string    `gorm:"type:text" json:"input,omitempty"` // 输入依赖
+	Output           *string    `gorm:"type:text" json:"output,omitempty"` // 输出交付物
+	Risk             *string    `gorm:"type:text" json:"risk,omitempty"` // 风险点
+	AcceptanceCriteria *string  `gorm:"type:text" json:"acceptanceCriteria,omitempty"` // 验收标准
 	Assignee         *string    `gorm:"size:100" json:"assignee,omitempty"`
+	CustomFields     *string    `gorm:"type:longtext" json:"customFields,omitempty"` // 自定义字段值 JSON
 	IsExpanding      bool       `gorm:"default:false" json:"isExpanding"`
 	ExpandMessageID  *uint64    `json:"expandMessageId,omitempty"`
 	ExpandStartedAt  *time.Time `json:"expandStartedAt,omitempty"` // 拆分开始时间
@@ -70,6 +76,7 @@ type Subtask struct {
 	AcceptanceCriteria *string `gorm:"type:text" json:"acceptanceCriteria,omitempty"`
 	RelatedFiles     *string   `gorm:"type:text" json:"relatedFiles,omitempty"`
 	CodeHints        *string   `gorm:"type:text" json:"codeHints,omitempty"`
+	CustomFields     *string   `gorm:"type:longtext" json:"customFields,omitempty"` // 自定义字段值 JSON
 	CreatedAt        time.Time `gorm:"autoCreateTime" json:"createdAt"`
 	UpdatedAt        time.Time `gorm:"autoUpdateTime" json:"updatedAt"`
 

@@ -74,6 +74,23 @@ func (h *TaskHandler) List(c *gin.Context) {
 	response.SuccessPage(c, tasks, total, page, pageSize)
 }
 
+// Create 创建任务
+func (h *TaskHandler) Create(c *gin.Context) {
+	var task models.Task
+	if err := c.ShouldBindJSON(&task); err != nil {
+		response.BadRequest(c, "请求参数格式错误")
+		return
+	}
+
+	if err := h.service.Create(&task); err != nil {
+		h.logger.Error("创建任务失败", zap.Error(err))
+		response.Error(c, 500, "创建任务失败")
+		return
+	}
+
+	response.Success(c, task)
+}
+
 // Get 获取任务详情
 func (h *TaskHandler) Get(c *gin.Context) {
 	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)

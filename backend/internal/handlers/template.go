@@ -2,10 +2,16 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
+	"strings"
+	"time"
 
+	"github.com/ai-task-manager/backend/internal/config"
 	"github.com/ai-task-manager/backend/internal/database"
 	"github.com/ai-task-manager/backend/internal/models"
+	"github.com/ai-task-manager/backend/internal/services"
+	"github.com/ai-task-manager/backend/pkg/ai"
 	"github.com/ai-task-manager/backend/pkg/response"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -13,13 +19,19 @@ import (
 
 // TemplateHandler 模板处理器
 type TemplateHandler struct {
-	logger *zap.Logger
+	logger  *zap.Logger
+	aiSvc   services.AIService
 }
 
 // NewTemplateHandler 创建模板处理器
-func NewTemplateHandler(logger *zap.Logger) *TemplateHandler {
+func NewTemplateHandler(logger *zap.Logger, cfg *config.Config) *TemplateHandler {
+	var aiSvc services.AIService
+	if cfg != nil && cfg.AI.Provider != "" {
+		aiSvc = ai.NewService(&cfg.AI)
+	}
 	return &TemplateHandler{
 		logger: logger,
+		aiSvc:  aiSvc,
 	}
 }
 
@@ -30,7 +42,7 @@ func (h *TemplateHandler) ListProjectTemplates(c *gin.Context) {
 	db := database.GetDB()
 
 	var templates []models.ProjectTemplate
-	query := db.Model(&models.ProjectTemplate{})
+	query := db.Model(&models.ProjectTemplate{}).Where("deleted_at IS NULL")
 
 	// 筛选条件
 	if category := c.Query("category"); category != "" {
@@ -59,7 +71,7 @@ func (h *TemplateHandler) GetProjectTemplate(c *gin.Context) {
 
 	db := database.GetDB()
 	var template models.ProjectTemplate
-	if err := db.Preload("Tasks.Subtasks").First(&template, id).Error; err != nil {
+	if err := db.Where("deleted_at IS NULL").Preload("Tasks.Subtasks").First(&template, id).Error; err != nil {
 		response.NotFound(c, "模板不存在")
 		return
 	}
@@ -74,6 +86,7 @@ type CreateProjectTemplateRequest struct {
 	Category    string                              `json:"category"`
 	IsPublic    bool                                `json:"isPublic"`
 	Tags        []string                            `json:"tags"`
+	FieldSchema json.RawMessage                     `json:"fieldSchema"`
 	Tasks       []CreateTemplateTaskRequest         `json:"tasks"`
 }
 
@@ -114,6 +127,13 @@ func (h *TemplateHandler) CreateProjectTemplate(c *gin.Context) {
 		tagsStr = &s
 	}
 
+	// 处理字段定义
+	var fieldSchemaStr *string
+	if len(req.FieldSchema) > 0 {
+		s := string(req.FieldSchema)
+		fieldSchemaStr = &s
+	}
+
 	// 创建模板
 	template := models.ProjectTemplate{
 		Name:        req.Name,
@@ -121,6 +141,7 @@ func (h *TemplateHandler) CreateProjectTemplate(c *gin.Context) {
 		Category:    req.Category,
 		IsPublic:    req.IsPublic,
 		Tags:        tagsStr,
+		FieldSchema: fieldSchemaStr,
 		UsageCount:  0,
 	}
 
@@ -177,6 +198,17 @@ func (h *TemplateHandler) CreateProjectTemplate(c *gin.Context) {
 	response.Success(c, template)
 }
 
+// UpdateProjectTemplateRequest 更新项目模板请求
+type UpdateProjectTemplateRequest struct {
+	Name        string                              `json:"name" binding:"required"`
+	Description string                              `json:"description"`
+	Category    string                              `json:"category"`
+	IsPublic    bool                                `json:"isPublic"`
+	Tags        []string                            `json:"tags"`
+	FieldSchema json.RawMessage                     `json:"fieldSchema"`
+	Tasks       []CreateTemplateTaskRequest         `json:"tasks"`
+}
+
 // UpdateProjectTemplate 更新项目模板
 func (h *TemplateHandler) UpdateProjectTemplate(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -185,7 +217,7 @@ func (h *TemplateHandler) UpdateProjectTemplate(c *gin.Context) {
 		return
 	}
 
-	var req CreateProjectTemplateRequest
+	var req UpdateProjectTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "请求参数格式错误")
 		return
@@ -194,7 +226,7 @@ func (h *TemplateHandler) UpdateProjectTemplate(c *gin.Context) {
 	db := database.GetDB()
 
 	var template models.ProjectTemplate
-	if err := db.First(&template, id).Error; err != nil {
+	if err := db.Where("deleted_at IS NULL").First(&template, id).Error; err != nil {
 		response.NotFound(c, "模板不存在")
 		return
 	}
@@ -207,13 +239,21 @@ func (h *TemplateHandler) UpdateProjectTemplate(c *gin.Context) {
 		tagsStr = &s
 	}
 
+	// 处理字段定义
+	var fieldSchemaStr *string
+	if len(req.FieldSchema) > 0 {
+		s := string(req.FieldSchema)
+		fieldSchemaStr = &s
+	}
+
 	// 更新基本信息
 	updates := map[string]interface{}{
-		"name":        req.Name,
-		"description": req.Description,
-		"category":    req.Category,
-		"is_public":   req.IsPublic,
-		"tags":        tagsStr,
+		"name":         req.Name,
+		"description":  req.Description,
+		"category":     req.Category,
+		"is_public":    req.IsPublic,
+		"tags":         tagsStr,
+		"field_schema": fieldSchemaStr,
 	}
 
 	if err := db.Model(&template).Updates(updates).Error; err != nil {
@@ -271,7 +311,7 @@ func (h *TemplateHandler) UpdateProjectTemplate(c *gin.Context) {
 	response.Success(c, template)
 }
 
-// DeleteProjectTemplate 删除项目模板
+// DeleteProjectTemplate 删除项目模板（软删除）
 func (h *TemplateHandler) DeleteProjectTemplate(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -281,7 +321,9 @@ func (h *TemplateHandler) DeleteProjectTemplate(c *gin.Context) {
 
 	db := database.GetDB()
 
-	if err := db.Delete(&models.ProjectTemplate{}, id).Error; err != nil {
+	// 软删除：设置 deleted_at
+	now := time.Now()
+	if err := db.Model(&models.ProjectTemplate{}).Where("id = ? AND deleted_at IS NULL", id).Update("deleted_at", &now).Error; err != nil {
 		h.logger.Error("删除项目模板失败", zap.Error(err))
 		response.Error(c, 500, "删除项目模板失败")
 		return
@@ -380,7 +422,7 @@ func (h *TemplateHandler) ListTaskTemplates(c *gin.Context) {
 	db := database.GetDB()
 
 	var templates []models.TaskTemplate
-	query := db.Model(&models.TaskTemplate{})
+	query := db.Model(&models.TaskTemplate{}).Where("deleted_at IS NULL")
 
 	if keyword := c.Query("keyword"); keyword != "" {
 		query = query.Where("name LIKE ? OR title LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
@@ -405,7 +447,7 @@ func (h *TemplateHandler) GetTaskTemplate(c *gin.Context) {
 
 	db := database.GetDB()
 	var template models.TaskTemplate
-	if err := db.First(&template, id).Error; err != nil {
+	if err := db.Where("deleted_at IS NULL").First(&template, id).Error; err != nil {
 		response.NotFound(c, "模板不存在")
 		return
 	}
@@ -496,7 +538,7 @@ func (h *TemplateHandler) UpdateTaskTemplate(c *gin.Context) {
 	db := database.GetDB()
 
 	var template models.TaskTemplate
-	if err := db.First(&template, id).Error; err != nil {
+	if err := db.Where("deleted_at IS NULL").First(&template, id).Error; err != nil {
 		response.NotFound(c, "模板不存在")
 		return
 	}
@@ -545,7 +587,7 @@ func (h *TemplateHandler) UpdateTaskTemplate(c *gin.Context) {
 	response.Success(c, template)
 }
 
-// DeleteTaskTemplate 删除任务模板
+// DeleteTaskTemplate 删除任务模板（软删除）
 func (h *TemplateHandler) DeleteTaskTemplate(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -555,7 +597,9 @@ func (h *TemplateHandler) DeleteTaskTemplate(c *gin.Context) {
 
 	db := database.GetDB()
 
-	if err := db.Delete(&models.TaskTemplate{}, id).Error; err != nil {
+	// 软删除：设置 deleted_at
+	now := time.Now()
+	if err := db.Model(&models.TaskTemplate{}).Where("id = ? AND deleted_at IS NULL", id).Update("deleted_at", &now).Error; err != nil {
 		h.logger.Error("删除任务模板失败", zap.Error(err))
 		response.Error(c, 500, "删除任务模板失败")
 		return
@@ -633,4 +677,247 @@ func (h *TemplateHandler) InstantiateTaskTemplate(c *gin.Context) {
 	response.Success(c, gin.H{
 		"taskId": task.ID,
 	})
+}
+
+// ============ 项目模板打分 ============
+
+// ScoreProjectTemplate 对项目模板进行打分（同步版本）
+func (h *TemplateHandler) ScoreProjectTemplate(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的模板 ID")
+		return
+	}
+
+	db := database.GetDB()
+	var template models.ProjectTemplate
+	if err := db.Preload("Tasks.Subtasks").First(&template, id).Error; err != nil {
+		response.NotFound(c, "模板不存在")
+		return
+	}
+
+	// 构建评分 Prompt
+	prompt := h.buildScorePrompt(&template)
+
+	// 调用 AI 进行评分
+	aiResponse, err := h.aiSvc.Chat(prompt)
+	if err != nil {
+		h.logger.Error("AI 评分失败", zap.Uint64("templateID", id), zap.Error(err))
+		response.Error(c, 500, "AI 评分失败："+err.Error())
+		return
+	}
+
+	// 解析评分结果
+	scoreResult, totalScore, err := h.parseScoreResponse(aiResponse)
+	if err != nil {
+		h.logger.Error("解析评分结果失败", zap.Uint64("templateID", id), zap.Error(err))
+		response.Error(c, 500, "解析评分结果失败："+err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"score":       scoreResult,
+		"totalScore":  totalScore,
+		"evaluation":  aiResponse,
+	})
+}
+
+// ScoreProjectTemplateAsync 异步对项目模板进行打分
+func (h *TemplateHandler) ScoreProjectTemplateAsync(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "无效的模板 ID")
+		return
+	}
+
+	db := database.GetDB()
+	var template models.ProjectTemplate
+	if err := db.Preload("Tasks.Subtasks").First(&template, id).Error; err != nil {
+		response.NotFound(c, "模板不存在")
+		return
+	}
+
+	// 创建消息记录
+	title := "项目模板评分"
+	content := template.Name
+	message := models.Message{
+		TaskID:  nil,
+		Type:    "score_template",
+		Status:  "processing",
+		Title:   title,
+		Content: &content,
+	}
+	if err := db.Create(&message).Error; err != nil {
+		h.logger.Error("创建消息记录失败", zap.Error(err))
+		response.Error(c, 500, "创建消息记录失败")
+		return
+	}
+
+	// 异步执行评分
+	go func() {
+		defer func() {
+			// 完成后清理
+		}()
+
+		// 构建评分提示词
+		prompt := h.buildScorePrompt(&template)
+
+		// 调用 AI 进行评分
+		aiResponse, err := h.aiSvc.Chat(prompt)
+		if err != nil {
+			h.logger.Error("异步评分失败", zap.Uint64("templateID", id), zap.Error(err))
+			// 更新消息状态为失败
+			errMsg := err.Error()
+			db.Model(&message).Updates(map[string]interface{}{
+				"status":        "failed",
+				"error_message": &errMsg,
+			})
+		} else {
+			// 解析评分结果
+			_, totalScore, _ := h.parseScoreResponse(aiResponse)
+			resultSummary := fmt.Sprintf("评分完成，总分：%.1f", totalScore)
+			// 更新消息状态为成功
+			db.Model(&message).Updates(map[string]interface{}{
+				"status":         "success",
+				"result_summary": &resultSummary,
+			})
+		}
+	}()
+
+	response.Success(c, gin.H{
+		"messageId": message.ID,
+		"message":   "评分已开始，完成后会通知您",
+	})
+}
+
+// ScoreResult 模板评分结果
+type ScoreResult struct {
+	Scores      struct {
+		Clarity       int `json:"clarity"`
+		Completeness  int `json:"completeness"`
+		Structure     int `json:"structure"`
+		Actionability int `json:"actionability"`
+		Consistency   int `json:"consistency"`
+	} `json:"scores"`
+	TotalScore  float64 `json:"totalScore"`
+	Strengths   []string `json:"strengths"`
+	Weaknesses  []string `json:"weaknesses"`
+	Suggestions []struct {
+		Issue      string `json:"issue"`
+		Suggestion string `json:"suggestion"`
+	} `json:"suggestions"`
+	Analysis    string   `json:"analysis"`
+}
+
+// buildScorePrompt 构建评分 Prompt
+func (h *TemplateHandler) buildScorePrompt(template *models.ProjectTemplate) string {
+	tasksInfo := ""
+	for i, task := range template.Tasks {
+		tasksInfo += strconv.Itoa(i+1) + ". " + task.Title + "\n"
+		if task.Description != "" {
+			tasksInfo += "   描述：" + task.Description + "\n"
+		}
+		tasksInfo += "   优先级：" + task.Priority + "\n"
+		if task.EstimatedHours != nil {
+			tasksInfo += "   预估工时：" + strconv.FormatFloat(*task.EstimatedHours, 'f', 1, 64) + "h\n"
+		}
+		if len(task.Subtasks) > 0 {
+			tasksInfo += "   子任务:\n"
+			for _, st := range task.Subtasks {
+				tasksInfo += "     - " + st.Title + "\n"
+			}
+		}
+	}
+
+	return `你是一位资深提示词工程师和项目管理专家，请对以下项目模板进行质量评分。
+
+【模板信息】
+- 名称：` + template.Name + `
+- 描述：` + template.Description + `
+- 分类：` + template.Category + `
+- 任务数量：` + strconv.Itoa(len(template.Tasks)) + `
+
+【任务列表】
+` + tasksInfo + `
+
+【评分维度】
+请从以下 5 个维度进行评分（每项 1-10 分）：
+
+1. 清晰度 (Clarity)：模板描述是否清晰明确，无歧义
+   - 模板名称是否能准确反映模板用途
+   - 描述是否清晰
+   - 任务划分是否容易理解
+
+2. 完整性 (Completeness)：是否包含了必要的上下文和信息
+   - 是否有完整的任务列表
+   - 是否有明确的优先级
+   - 是否有合理的工时预估
+
+3. 结构化 (Structure)：模板结构是否清晰、层次分明
+   - 任务划分是否有条理
+   - 子任务划分是否合理
+   - 依赖关系是否清晰
+
+4. 可执行性 (Actionability)：用户是否能基于模板直接创建项目
+   - 任务是否有具体的描述
+   - 是否有明确的验收标准
+   - 是否有可参考的实现细节
+
+5. 一致性 (Consistency)：与项目规范的兼容性
+   - 任务优先级设置是否合理
+   - 工时预估是否准确
+   - 整体风格是否一致
+
+【评分标准】
+- 9-10 分：优秀，几乎完美
+- 7-8 分：良好，有小幅改进空间
+- 5-6 分：一般，需要明显改进
+- 3-4 分：较差，存在严重问题
+- 1-2 分：很差，几乎无法使用
+
+请以 JSON 格式返回评分结果：
+{
+  "scores": {
+    "clarity": 1-10,
+    "completeness": 1-10,
+    "structure": 1-10,
+    "actionability": 1-10,
+    "consistency": 1-10
+  },
+  "totalScore": 总分 (5 项平均分*10，保留 1 位小数),
+  "strengths": ["优点 1", "优点 2", ...],
+  "weaknesses": ["缺点 1", "缺点 2", ...],
+  "suggestions": [
+    {"issue": "问题描述", "suggestion": "改进建议"}
+  ],
+  "analysis": "详细分析报告（200-500 字）"
+}
+
+请只返回 JSON，不要包含其他内容。`
+}
+
+// parseScoreResponse 解析评分响应
+func (h *TemplateHandler) parseScoreResponse(responseText string) (*ScoreResult, float64, error) {
+	cleanedResponse := responseText
+	for _, marker := range []string{"```json", "```"} {
+		cleanedResponse = replaceAllStr(cleanedResponse, marker, "")
+	}
+	cleanedResponse = trimWhitespaceStr(cleanedResponse)
+
+	var result ScoreResult
+	if err := json.Unmarshal([]byte(cleanedResponse), &result); err != nil {
+		return nil, 0, err
+	}
+
+	return &result, result.TotalScore, nil
+}
+
+// replaceAllStr 替换所有匹配
+func replaceAllStr(s, old, new string) string {
+	return strings.ReplaceAll(s, old, new)
+}
+
+// trimWhitespaceStr 修剪空白
+func trimWhitespaceStr(s string) string {
+	return strings.TrimSpace(s)
 }

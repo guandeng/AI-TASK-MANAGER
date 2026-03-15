@@ -1,3 +1,17 @@
+/** 字段定义 */
+export interface FieldDefinition {
+  name: string;
+  label: string;
+  type: 'text' | 'textarea' | 'number' | 'select' | 'array' | 'boolean';
+  options?: string[];
+  required?: boolean;
+}
+
+/** 字段模式 */
+export interface FieldSchema {
+  fields: FieldDefinition[];
+}
+
 /** 项目模板 */
 export interface ProjectTemplate {
   id: number;
@@ -12,6 +26,7 @@ export interface ProjectTemplate {
   };
   usageCount: number;
   tags?: string[];
+  fieldSchema?: FieldSchema;
   createdAt: string;
   updatedAt: string;
   tasks?: TemplateTask[];
@@ -71,6 +86,7 @@ export interface CreateProjectTemplateRequest {
   category?: string;
   isPublic?: boolean;
   tags?: string[];
+  fieldSchema?: FieldSchema;
   tasks?: CreateTemplateTaskRequest[];
 }
 
@@ -112,6 +128,25 @@ export interface InstantiateTemplateRequest {
   description?: string;
   startDate?: string;
   dueDate?: string;
+}
+
+/** 模板评分结果 */
+export interface TemplateScoreResult {
+  scores: {
+    clarity: number;
+    completeness: number;
+    structure: number;
+    actionability: number;
+    consistency: number;
+  };
+  totalScore: number;
+  strengths: string[];
+  weaknesses: string[];
+  suggestions: Array<{
+    issue: string;
+    suggestion: string;
+  }>;
+  analysis: string;
 }
 
 /** 模板分类选项 */

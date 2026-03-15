@@ -16,6 +16,7 @@ type TaskRepository interface {
 	GetByID(id uint64) (*models.Task, error)
 	Create(task *models.Task) error
 	Update(task *models.Task) error
+	UpdateWithMap(id uint64, updates map[string]interface{}) error
 	Delete(id uint64) error
 	BatchDelete(ids []uint64) error
 
@@ -30,6 +31,57 @@ type TaskRepository interface {
 
 	// 依赖关系
 	GetDependencies(taskID uint64) ([]models.TaskDependency, error)
+
+	// 需求结构化数据
+	GetRequirementWithTasksAndSubtasks(requirementID uint64) (*RequirementTree, error)
+}
+
+// RequirementTree 需求树形结构
+type RequirementTree struct {
+	ID           uint64             `json:"id"`
+	Title        string             `json:"title"`
+	Content      string             `json:"content"`
+	Status       string             `json:"status"`
+	Priority     string             `json:"priority"`
+	Tags         *string            `json:"tags,omitempty"`
+	Assignee     *string            `json:"assignee,omitempty"`
+	CreatedAt    time.Time          `json:"createdAt"`
+	UpdatedAt    time.Time          `json:"updatedAt"`
+	Documents    []models.RequirementDocument `json:"documents,omitempty"`
+	Tasks        []TaskWithSubtasks `json:"tasks"`
+}
+
+// TaskWithSubtasks 任务带子任务
+type TaskWithSubtasks struct {
+	ID               uint64             `json:"id"`
+	Title            string             `json:"title"`
+	TitleTrans       *string            `json:"titleTrans,omitempty"`
+	Description      string             `json:"description"`
+	DescriptionTrans *string            `json:"descriptionTrans,omitempty"`
+	Status           string             `json:"status"`
+	Priority         string             `json:"priority"`
+	Category         string             `json:"category"`
+	Details          string             `json:"details"`
+	DetailsTrans     *string            `json:"detailsTrans,omitempty"`
+	TestStrategy     string             `json:"testStrategy"`
+	TestStrategyTrans *string           `json:"testStrategyTrans,omitempty"`
+	Module           *string            `json:"module,omitempty"`
+	Input            *string            `json:"input,omitempty"`
+	Output           *string            `json:"output,omitempty"`
+	Risk             *string            `json:"risk,omitempty"`
+	AcceptanceCriteria *string          `json:"acceptanceCriteria,omitempty"`
+	Assignee         *string            `json:"assignee,omitempty"`
+	CustomFields     *string            `json:"customFields,omitempty"`
+	IsExpanding      bool               `json:"isExpanding"`
+	StartDate        *time.Time         `json:"startDate,omitempty"`
+	DueDate          *time.Time         `json:"dueDate,omitempty"`
+	CompletedAt      *time.Time         `json:"completedAt,omitempty"`
+	EstimatedHours   *float64           `json:"estimatedHours,omitempty"`
+	ActualHours      *float64           `json:"actualHours,omitempty"`
+	CreatedAt        time.Time          `json:"createdAt"`
+	UpdatedAt        time.Time          `json:"updatedAt"`
+	Subtasks         []models.Subtask   `json:"subtasks"`
+	Dependencies     []models.TaskDependency `json:"dependencies"`
 }
 
 // taskRepository 任务仓储实现
@@ -214,6 +266,21 @@ func (r *taskRepository) Update(task *models.Task) error {
 	return r.db.Save(task).Error
 }
 
+// UpdateWithMap 使用 map 更新任务（只更新传入的字段）
+func (r *taskRepository) UpdateWithMap(id uint64, updates map[string]interface{}) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	// 将前端驼峰命名转换为数据库蛇形命名
+	snakeUpdates := make(map[string]interface{})
+	for k, v := range updates {
+		snakeUpdates[camelToSnake(k)] = v
+	}
+
+	return r.db.Model(&models.Task{}).Where("id = ?", id).Updates(snakeUpdates).Error
+}
+
 // Delete 软删除任务
 func (r *taskRepository) Delete(id uint64) error {
 	now := time.Now()
@@ -326,4 +393,89 @@ func (r *taskRepository) GetDependencies(taskID uint64) ([]models.TaskDependency
 		return nil, err
 	}
 	return dependencies, nil
+}
+
+// GetRequirementWithTasksAndSubtasks 获取需求及其下的所有任务和子任务
+func (r *taskRepository) GetRequirementWithTasksAndSubtasks(requirementID uint64) (*RequirementTree, error) {
+	// 获取需求详情
+	var requirement models.Requirement
+	if err := r.db.First(&requirement, requirementID).Error; err != nil {
+		return nil, err
+	}
+
+	// 获取需求文档
+	var documents []models.RequirementDocument
+	if err := r.db.Where("requirement_id = ?", requirementID).Find(&documents).Error; err != nil {
+		return nil, err
+	}
+	requirement.Documents = documents
+
+	// 获取该需求下的所有任务（排除已删除的）
+	var tasks []models.Task
+	if err := r.db.Where("requirement_id = ? AND deleted_at IS NULL", requirementID).
+		Order("created_at ASC").Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+
+	// 为每个任务加载子任务和依赖关系
+	taskWithSubtasks := make([]TaskWithSubtasks, 0, len(tasks))
+	for _, task := range tasks {
+		// 获取子任务
+		var subtasks []models.Subtask
+		if err := r.db.Where("task_id = ?", task.ID).Order("sort_order, id").Find(&subtasks).Error; err != nil {
+			return nil, err
+		}
+
+		// 获取依赖关系
+		var dependencies []models.TaskDependency
+		if err := r.db.Where("task_id = ?", task.ID).Find(&dependencies).Error; err != nil {
+			return nil, err
+		}
+
+		taskWithSubtasks = append(taskWithSubtasks, TaskWithSubtasks{
+			ID:                 task.ID,
+			Title:              task.Title,
+			TitleTrans:         task.TitleTrans,
+			Description:        task.Description,
+			DescriptionTrans:   task.DescriptionTrans,
+			Status:             task.Status,
+			Priority:           task.Priority,
+			Category:           task.Category,
+			Details:            task.Details,
+			DetailsTrans:       task.DetailsTrans,
+			TestStrategy:       task.TestStrategy,
+			TestStrategyTrans:  task.TestStrategyTrans,
+			Module:             task.Module,
+			Input:              task.Input,
+			Output:             task.Output,
+			Risk:               task.Risk,
+			AcceptanceCriteria: task.AcceptanceCriteria,
+			Assignee:           task.Assignee,
+			CustomFields:       task.CustomFields,
+			IsExpanding:        task.IsExpanding,
+			StartDate:          task.StartDate,
+			DueDate:            task.DueDate,
+			CompletedAt:        task.CompletedAt,
+			EstimatedHours:     task.EstimatedHours,
+			ActualHours:        task.ActualHours,
+			CreatedAt:          task.CreatedAt,
+			UpdatedAt:          task.UpdatedAt,
+			Subtasks:           subtasks,
+			Dependencies:       dependencies,
+		})
+	}
+
+	return &RequirementTree{
+		ID:           requirement.ID,
+		Title:        requirement.Title,
+		Content:      requirement.Content,
+		Status:       requirement.Status,
+		Priority:     requirement.Priority,
+		Tags:         requirement.Tags,
+		Assignee:     requirement.Assignee,
+		CreatedAt:    requirement.CreatedAt,
+		UpdatedAt:    requirement.UpdatedAt,
+		Documents:    documents,
+		Tasks:        taskWithSubtasks,
+	}, nil
 }

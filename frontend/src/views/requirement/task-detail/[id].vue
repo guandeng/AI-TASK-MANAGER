@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NTabs, NTabPane, NCollapse, NCollapseItem, NCheckbox, NCode, NDivider } from 'naive-ui';
+import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NTabs, NTabPane, NCollapse, NCollapseItem, NCheckbox, NCode, NDivider, NAlert } from 'naive-ui';
 import type { SelectOption } from 'naive-ui';
 import { VueDraggable } from 'vue-draggable-plus';
 import { MdEditor, MdPreview } from 'md-editor-v3';
@@ -14,6 +14,7 @@ import CommentSection from '@/components/task/CommentSection.vue';
 import AssignmentPanel from '@/components/task/AssignmentPanel.vue';
 import ActivityTimeline from '@/components/task/ActivityTimeline.vue';
 import DependencyGraph from '@/components/task/DependencyGraph.vue';
+import ScoreHistoryDrawer from '@/components/task/ScoreHistoryDrawer.vue';
 import SvgIcon from '@/components/custom/svg-icon.vue';
 
 const route = useRoute();
@@ -72,6 +73,10 @@ const expandLoading = ref(false);
 const clearLoading = ref(false);
 const deleteLoading = ref(false);
 const saveLoading = ref(false);
+const scoreLoading = ref(false);
+
+// 评分历史抽屉
+const showScoreDrawer = ref(false);
 
 // 拆分超时检测
 const EXPAND_TIMEOUT_MS = 5 * 60 * 1000; // 5分钟
@@ -127,6 +132,16 @@ function parseJsonField<T>(field: string | null | undefined): T | null {
   } catch {
     return null;
   }
+}
+
+// 格式化字段名（蛇形/驼峰转中文或带空格的文本）
+function formatFieldName(key: string): string {
+  // 蛇形命名转空格：module归属 -> 模块归属
+  const snakeToSpace = key.replace(/_/g, ' ');
+  // 驼峰命名转空格：estimatedHours -> estimated Hours
+  const camelToSpace = snakeToSpace.replace(/([a-z])([A-Z])/g, '$1 $2');
+  // 首字母大写
+  return camelToSpace.charAt(0).toUpperCase() + camelToSpace.slice(1);
 }
 
 // 切换子任务展开状态
@@ -345,17 +360,38 @@ async function handleExpandTask() {
     if (messageId) {
       window.$message?.success('拆分任务已提交，正在后台处理，完成后会通知您');
       // 不再跳转到消息列表，保持当前页面
-    } else {
-      window.$message?.error('提交拆分任务失败');
-      expandStartTime.value = null; // 失败时重置
+      pollingMessageId.value = messageId;
+      startPolling();
     }
-  } catch (error) {
-    console.error('Failed to expand task async:', error);
+  } catch (err) {
     window.$message?.error('拆分任务失败');
-    expandStartTime.value = null; // 失败时重置
-  } finally {
     expandLoading.value = false;
+    expandStartTime.value = null;
   }
+}
+
+// 质量评分
+async function handleScoreTask() {
+  if (!taskId.value) return;
+
+  scoreLoading.value = true;
+  try {
+    const score = await taskStore.scoreTask(taskId.value);
+    if (score) {
+      window.$message?.success(`评分完成！总分：${score.totalScore}`);
+      // 打开评分历史抽屉
+      showScoreDrawer.value = true;
+    }
+  } catch (err) {
+    window.$message?.error('评分失败');
+  } finally {
+    scoreLoading.value = false;
+  }
+}
+
+// 打开评分历史
+function openScoreHistory() {
+  showScoreDrawer.value = true;
 }
 
 // 开始轮询消息状态
@@ -555,6 +591,13 @@ onUnmounted(() => {
         <NButton type="error" :loading="deleteLoading" @click="handleDeleteTask">
           删除任务
         </NButton>
+        <NDivider vertical />
+        <NButton type="info" :loading="scoreLoading" @click="handleScoreTask">
+          质量评分
+        </NButton>
+        <NButton @click="openScoreHistory">
+          评分历史
+        </NButton>
       </NSpace>
     </div>
 
@@ -596,11 +639,45 @@ onUnmounted(() => {
                   <NTag :type="priorityColorMap[task.priority]">{{ priorityTextMap[task.priority] }}</NTag>
                 </NSpace>
 
-                <NDescriptions bordered :column="1" label-placement="left">
+                <NDescriptions bordered :column="1" label-placement="left" :label-style="{ width: '15%' }">
                   <NDescriptionsItem label="ID">{{ task.id }}</NDescriptionsItem>
                   <NDescriptionsItem label="描述">{{ task.descriptionTrans || task.description || '-' }}</NDescriptionsItem>
                   <NDescriptionsItem label="依赖">
-                    {{ task.dependencies?.length ? task.dependencies.join(', ') : '-' }}
+                    {{ task.dependencies?.length ? task.dependencies.map((d: any) => d.dependsOnTaskId || d).join(', ') : '-' }}
+                  </NDescriptionsItem>
+                  <NDescriptionsItem label="模块归属">
+                    <NTag v-if="task.module" type="info">{{ task.module }}</NTag>
+                    <span v-else class="text-gray-400">-</span>
+                  </NDescriptionsItem>
+                  <NDescriptionsItem label="输入依赖">
+                    {{ task.input || '-' }}
+                  </NDescriptionsItem>
+                  <NDescriptionsItem label="输出交付物">
+                    {{ task.output || '-' }}
+                  </NDescriptionsItem>
+                  <NDescriptionsItem label="风险点">
+                    <NAlert v-if="task.risk" type="warning" style="margin-top: 8px;">
+                      {{ task.risk }}
+                    </NAlert>
+                    <span v-else class="text-gray-400">-</span>
+                  </NDescriptionsItem>
+                  <NDescriptionsItem label="验收标准">
+                    <div v-if="task.acceptanceCriteria">
+                      <NCollapse>
+                        <NCollapseItem
+                          v-for="(item, index) in parseJsonField(task.acceptanceCriteria)"
+                          :key="index"
+                          :title="`验收点 ${index + 1}: ${item?.description || item || '-'}`"
+                          :name="index"
+                        >
+                          {{ item?.description || item || '-' }}
+                        </NCollapseItem>
+                      </NCollapse>
+                    </div>
+                    <span v-else class="text-gray-400">-</span>
+                  </NDescriptionsItem>
+                  <NDescriptionsItem label="预估工时">
+                    {{ task.estimatedHours ? `${task.estimatedHours} 小时` : '-' }}
                   </NDescriptionsItem>
                   <NDescriptionsItem label="实现细节">
                     <div class="markdown-field">
@@ -653,6 +730,37 @@ onUnmounted(() => {
                         />
                         <span v-else class="text-gray-400">点击编辑测试策略</span>
                         <NButton text type="primary" size="small" class="edit-btn">编辑</NButton>
+                      </div>
+                    </div>
+                  </NDescriptionsItem>
+                  <NDescriptionsItem label="自定义字段" v-if="task.customFields">
+                    <div v-if="parseJsonField<Record<string, any>>(task.customFields)" class="custom-fields">
+                      <div
+                        v-for="(value, key) in parseJsonField<Record<string, any>>(task.customFields)"
+                        :key="key"
+                        class="custom-field-row"
+                      >
+                        <span class="custom-field-label">{{ formatFieldName(key) }}:</span>
+                        <span class="custom-field-value">
+                          <template v-if="typeof value === 'object' && value !== null">
+                            <NCode :code="JSON.stringify(value, null, 2)" language="json" />
+                          </template>
+                          <template v-else-if="Array.isArray(value)">
+                            <NSpace>
+                              <NTag
+                                v-for="(item, idx) in value"
+                                :key="idx"
+                                type="info"
+                                size="small"
+                              >
+                                {{ typeof item === 'object' ? JSON.stringify(item) : item }}
+                              </NTag>
+                            </NSpace>
+                          </template>
+                          <template v-else>
+                            {{ value }}
+                          </template>
+                        </span>
                       </div>
                     </div>
                   </NDescriptionsItem>
@@ -925,6 +1033,45 @@ onUnmounted(() => {
                           </div>
                           <div v-else class="detail-content text-gray-400">点击编辑代码提示</div>
                         </div>
+
+                        <!-- 自定义字段（来自项目模板） -->
+                        <div class="detail-section">
+                          <div class="detail-header">
+                            <div class="detail-label">自定义字段</div>
+                          </div>
+                          <div v-if="subtask.customFields" class="detail-content custom-fields">
+                            <template v-if="parseJsonField<Record<string, any>>(subtask.customFields)">
+                              <div
+                                v-for="(value, key) in parseJsonField<Record<string, any>>(subtask.customFields)"
+                                :key="key"
+                                class="custom-field-row"
+                              >
+                                <span class="custom-field-label">{{ formatFieldName(key) }}:</span>
+                                <span class="custom-field-value">
+                                  <template v-if="typeof value === 'object' && value !== null">
+                                    <NCode :code="JSON.stringify(value, null, 2)" language="json" />
+                                  </template>
+                                  <template v-else-if="Array.isArray(value)">
+                                    <NSpace>
+                                      <NTag
+                                        v-for="(item, idx) in value"
+                                        :key="idx"
+                                        type="info"
+                                        size="small"
+                                      >
+                                        {{ typeof item === 'object' ? JSON.stringify(item) : item }}
+                                      </NTag>
+                                    </NSpace>
+                                  </template>
+                                  <template v-else>
+                                    {{ value }}
+                                  </template>
+                                </span>
+                              </div>
+                            </template>
+                          </div>
+                          <div v-else class="detail-content text-gray-400">无自定义字段</div>
+                        </div>
                       </div>
 
                       <!-- 子任务底部操作栏 -->
@@ -1025,6 +1172,9 @@ onUnmounted(() => {
           />
         </NSpace>
       </NModal>
+
+      <!-- 评分历史抽屉 -->
+      <ScoreHistoryDrawer :task-id="taskId" :show="showScoreDrawer" @update:show="showScoreDrawer = $event" />
     </div>
   </div>
 </template>
@@ -1368,6 +1518,41 @@ onUnmounted(() => {
   padding: 8px 12px;
   font-size: 13px;
   color: #8c6b00;
+}
+
+// 自定义字段样式
+.custom-fields {
+  .custom-field-row {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background-color: #f5f5f5;
+    border-radius: 6px;
+    border-left: 3px solid #722ed1;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    .custom-field-label {
+      font-weight: 600;
+      font-size: 13px;
+      color: #722ed1;
+      margin-right: 8px;
+      min-width: 100px;
+      display: inline-block;
+    }
+
+    .custom-field-value {
+      color: #333;
+      font-size: 13px;
+
+      :deep(.n-code) {
+        background-color: #fff;
+        border-radius: 4px;
+        margin-top: 4px;
+      }
+    }
+  }
 }
 
 .subtask-header {

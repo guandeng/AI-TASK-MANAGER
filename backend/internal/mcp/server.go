@@ -180,21 +180,20 @@ func (s *Server) handleListTasks(ctx context.Context, request mcp.CallToolReques
 	}
 
 	// 构建结构化结果
-	result := make([]map[string]interface{}, len(tasks))
+	result := make([]map[string]any, len(tasks))
 	for i, task := range tasks {
-		item := map[string]interface{}{
+		var reqID any = nil
+		if task.RequirementID != nil {
+			reqID = *task.RequirementID
+		}
+		result[i] = map[string]any{
 			"id":          task.ID,
 			"title":       task.Title,
 			"status":      task.Status,
 			"priority":    task.Priority,
 			"description": task.Description,
+			"requirementId": reqID,
 		}
-		if task.RequirementID != nil {
-			item["requirementId"] = *task.RequirementID
-		} else {
-			item["requirementId"] = nil
-		}
-		result[i] = item
 	}
 
 	// 返回 JSON 格式
@@ -531,23 +530,62 @@ func (s *Server) handleGetRequirementTasks(ctx context.Context, request mcp.Call
 		return mcp.NewToolResultText(fmt.Sprintf("需求 [ID: %d] 不存在或已删除", requirementID)), nil
 	}
 
-	// 获取该需求下的所有任务
+	// 获取该需求下的所有任务，预加载子任务
 	var tasks []models.Task
-	if err := s.db.Where("requirement_id = ?", requirementID).Order("created_at DESC").Find(&tasks).Error; err != nil {
+	if err := s.db.Where("requirement_id = ?", requirementID).
+		Preload("Subtasks").
+		Order("created_at DESC").
+		Find(&tasks).Error; err != nil {
 		return nil, err
 	}
 
-	result := fmt.Sprintf("需求: %s [ID: %d]\n状态: %s\n任务列表 (%d):\n",
-		requirement.Title, requirement.ID, requirement.Status, len(tasks))
-
-	if len(tasks) == 0 {
-		result += "  暂无任务\n"
-	} else {
-		for _, task := range tasks {
-			result += fmt.Sprintf("  - [ID: %d] %s (状态: %s, 优先级: %s)\n",
-				task.ID, task.Title, task.Status, task.Priority)
+	// 构建结构化结果
+	result := make([]map[string]any, 0, len(tasks))
+	for _, task := range tasks {
+		taskData := map[string]any{
+			"id":          task.ID,
+			"title":       task.Title,
+			"status":      task.Status,
+			"priority":    task.Priority,
+			"category":    task.Category,
+			"description": task.Description,
+			"details":     task.Details,
+			"acceptanceCriteria": task.AcceptanceCriteria,
+			"input":       task.Input,
+			"output":      task.Output,
+			"risk":        task.Risk,
+			"module":      task.Module,
+			"testStrategy": task.TestStrategy,
 		}
+
+		// 添加子任务列表
+		if len(task.Subtasks) > 0 {
+			subtasks := make([]map[string]any, 0, len(task.Subtasks))
+			for _, subtask := range task.Subtasks {
+				subtaskData := map[string]any{
+					"id":               subtask.ID,
+					"title":            subtask.Title,
+					"status":           subtask.Status,
+					"priority":         subtask.Priority,
+					"description":      subtask.Description,
+					"details":          subtask.Details,
+					"codeInterface":    subtask.CodeInterface,
+					"acceptanceCriteria": subtask.AcceptanceCriteria,
+					"relatedFiles":     subtask.RelatedFiles,
+					"codeHints":        subtask.CodeHints,
+				}
+				subtasks = append(subtasks, subtaskData)
+			}
+			taskData["subtasks"] = subtasks
+		}
+
+		result = append(result, taskData)
 	}
 
-	return mcp.NewToolResultText(result), nil
+	// 返回 JSON 格式
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	return mcp.NewToolResultText(string(jsonData)), nil
 }

@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NTabs, NTabPane, NCollapse, NCollapseItem, NCheckbox, NCode, NDivider, NAlert } from 'naive-ui';
-import type { SelectOption } from 'naive-ui';
+import { NButton, NCard, NDescriptions, NDescriptionsItem, NEmpty, NInput, NSpace, NSpin, NTag, NModal, NSelect, NIcon, NTabs, NTabPane, NCollapse, NCollapseItem, NCheckbox, NCode, NDivider, NAlert, NDropdown } from 'naive-ui';
+import type { SelectOption, DropdownOption } from 'naive-ui';
 import { VueDraggable } from 'vue-draggable-plus';
 import { MdEditor, MdPreview } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { useTaskStore } from '@/store/modules/task';
+import { useRequirementStore } from '@/store/modules/requirement';
 import { useMemberStore } from '@/store/modules/member';
 import { useMessageStore } from '@/store/modules/message';
-import type { TaskStatus, Subtask } from '@/typings/api/task';
+import { fetchTaskList } from '@/service/api/task';
+import type { TaskStatus, Subtask, Task } from '@/typings/api/task';
 import CommentSection from '@/components/task/CommentSection.vue';
 import AssignmentPanel from '@/components/task/AssignmentPanel.vue';
 import ActivityTimeline from '@/components/task/ActivityTimeline.vue';
@@ -20,6 +22,7 @@ import SvgIcon from '@/components/custom/svg-icon.vue';
 const route = useRoute();
 const router = useRouter();
 const taskStore = useTaskStore();
+const requirementStore = useRequirementStore();
 const memberStore = useMemberStore();
 const messageStore = useMessageStore();
 
@@ -70,6 +73,34 @@ function getSubtaskStatusClass(status: TaskStatus): string {
 
 const taskId = computed(() => Number(route.params.id));
 const task = computed(() => taskStore.currentTask);
+
+// 需求列表下拉框相关
+const requirementTaskList = ref<Task[]>([]);
+const requirementTaskLoading = ref(false);
+const showTaskDropdown = ref(false);
+const currentTaskIndex = computed(() => {
+  if (!task.value || requirementTaskList.value.length === 0) return -1;
+  return requirementTaskList.value.findIndex(t => t.id === task.value?.id);
+});
+
+// 当前任务在列表中的显示名称
+const currentTaskLabel = computed(() => {
+  if (!task.value) return '任务详情';
+  const index = currentTaskIndex.value;
+  if (index >= 0 && requirementTaskList.value.length > 0) {
+    return `${index + 1} / ${requirementTaskList.value.length} - ${task.value.title?.slice(0, 20) || '任务'}`;
+  }
+  return task.value.title?.slice(0, 20) || '任务详情';
+});
+
+// 下拉选项
+const taskDropdownOptions = computed<DropdownOption[]>(() => {
+  return requirementTaskList.value.map((t, index) => ({
+    label: `${index + 1}. ${t.title || '无标题'}`,
+    key: t.id,
+    disabled: t.id === task.value?.id
+  }));
+});
 
 // 独立的 loading 状态
 const expandLoading = ref(false);
@@ -551,6 +582,46 @@ async function handleDragEnd() {
   await taskStore.reorderSubtasks(taskId.value, subtaskIds);
 }
 
+// 加载需求下的所有任务
+async function loadRequirementTasks() {
+  if (!task.value?.requirementId) {
+    requirementTaskList.value = [];
+    return;
+  }
+
+  requirementTaskLoading.value = true;
+  try {
+    const { data } = await fetchTaskList({ requirementId: Number(task.value.requirementId) });
+    if (data) {
+      const responseData = data.data || data;
+      if (responseData && Array.isArray(responseData.list || responseData)) {
+        requirementTaskList.value = responseData.list || responseData;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load requirement tasks:', error);
+  } finally {
+    requirementTaskLoading.value = false;
+  }
+}
+
+// 监听任务变化，加载对应的需求任务列表
+watch(
+  () => task.value?.requirementId,
+  (newRequirementId) => {
+    if (newRequirementId) {
+      loadRequirementTasks();
+    } else {
+      requirementTaskList.value = [];
+    }
+  }
+);
+
+// 处理下拉选择
+function handleTaskSelect(key: string | number) {
+  router.push(`/requirement/task-detail/${key}`);
+}
+
 onMounted(async () => {
   if (taskId.value) {
     await taskStore.loadTaskDetail(taskId.value);
@@ -603,6 +674,25 @@ onUnmounted(() => {
           评分历史
         </NButton>
       </NSpace>
+      <!-- 右侧：需求任务列表下拉框 -->
+      <div v-if="requirementTaskList.length > 0" class="task-dropdown-wrapper">
+        <NDropdown
+          :options="taskDropdownOptions"
+          :show="showTaskDropdown"
+          :selected-keys="[task?.id]"
+          placement="bottom-end"
+          @select="handleTaskSelect"
+          @update:show="showTaskDropdown = $event"
+        >
+          <NButton class="task-dropdown-btn">
+            <template #icon>
+              <SvgIcon icon="mdi:list-box-outline" :size="18" />
+            </template>
+            <span class="task-dropdown-label">{{ currentTaskLabel }}</span>
+            <SvgIcon icon="mdi:chevron-down" :size="16" class="arrow-icon" />
+          </NButton>
+        </NDropdown>
+      </div>
     </div>
 
     <!-- 主体内容区域：左右分栏布局 -->
@@ -1209,6 +1299,45 @@ onUnmounted(() => {
 .task-toolbar {
   margin-bottom: 16px;
   flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.task-dropdown-wrapper {
+  margin-left: auto;
+}
+
+.task-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #e5e7eb;
+  background-color: #fff;
+  border-radius: 6px;
+  font-size: 13px;
+  max-width: 300px;
+
+  &:hover {
+    background-color: #f9fafb;
+    border-color: #d1d5db;
+  }
+
+  .task-dropdown-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #374151;
+  }
+
+  .arrow-icon {
+    color: #9ca3af;
+    transition: transform 0.2s;
+  }
 }
 
 .task-content-wrapper {

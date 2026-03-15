@@ -162,7 +162,7 @@ func (s *Service) chatOpenAICompat(provider string, prompt string) (string, erro
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := &http.Client{Timeout: 300 * time.Second} // 5 分钟超时，适应大模型响应慢的场景
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -233,7 +233,7 @@ func (s *Service) chatGemini(prompt string) (string, error) {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := &http.Client{Timeout: 300 * time.Second} // 5 分钟超时，适应大模型响应慢的场景
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -521,28 +521,30 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
 需求内容：
 %s
 
-请以 JSON 数组格式返回任务列表，每个任务必须包含以下 11 个字段：
+请以 JSON 数组格式返回任务列表，每个任务必须包含以下字段：
+
+**必填字段（10 个）：**
 - title: 任务名称（清晰、可搜索）
 - module: 模块归属（MCP 接入/AI 能力/数据处理/接口封装）
 - input: 输入（依赖什么：结构、接口、权限、环境）
 - output: 输出（交付物：代码、文档、接口、Demo）
-- acceptanceCriteria: 验收标准（可测、可看、可验证的数组）
-- risk: 风险点（可能的技术风险、依赖风险等）
+- acceptanceCriteria: 验收标准（可测、可看、可验证的数组，至少包含 2 项）
+- risk: 风险点（可能的技术风险、依赖风险等，必填不能为空）
 - priority: 优先级（high/medium/low）
 - estimatedHours: 预估工时（小时数）
-- details: 实现细节（具体的实现步骤、关键技术点、注意事项，必填）
-- testStrategy: 测试策略（测试方法、测试用例、验收标准，必填）
-- dependencies: 依赖的任务索引数组（无依赖填空数组）
+- details: 实现细节（具体的实现步骤、关键技术点、注意事项）
+- description: 任务描述（简要说明任务目的和内容）
 
-可选字段：
-- description: 任务描述
+**可选字段：**
+- testStrategy: 测试策略
+- dependencies: 依赖的任务索引数组
 
 拆分原则：
 1. 按照功能模块拆分，每个任务专注于一个功能点
 2. 优先级设置：基础架构和高优先级功能设为 high，核心功能设为 medium，辅助功能设为 low
 3. 合理设置依赖关系，确保任务可以按顺序执行
 4. 每个任务应该足够独立，可以单独开发和测试
-5. details 和 testStrategy 是必填字段，必须为每个任务填写完整的实现细节和测试策略
+5. details、testStrategy、risk、acceptanceCriteria、description 是必填字段，必须为每个任务填写完整
 6. 预估工时应基于实现复杂度合理评估
 
 示例格式：
@@ -561,6 +563,7 @@ func (s *Service) buildSplitRequirementPrompt(requirement *models.Requirement, t
     "priority": "high",
     "estimatedHours": 4,
     "details": "1. 创建 User 模型，包含用户名、密码哈希等字段\n2. 实现密码加密函数，使用 bcrypt 算法\n3. 创建登录处理函数，验证用户名密码\n4. 密码正确时生成 JWT token 并返回\n5. 密码错误时返回 401 错误\n6. 添加输入参数验证中间件",
+    "description": "实现用户登录认证功能，包括密码验证和 JWT token 生成",
     "testStrategy": "1. 单元测试：测试密码加密/验证函数\n2. 接口测试：使用 Postman 测试登录接口\n3. 边界测试：空参数、错误密码、正确密码\n4. 性能测试：并发登录请求压测",
     "dependencies": []
   }
@@ -712,11 +715,12 @@ func (s *Service) buildSplitRequirementPromptWithTemplate(requirement *models.Re
 - module: 模块归属（MCP 接入/AI 能力/数据处理/接口封装）
 - input: 输入（依赖什么：结构、接口、权限、环境）
 - output: 输出（交付物：代码、文档、接口、Demo）
-- acceptanceCriteria: 验收标准（可测、可看、可验证的数组）
-- risk: 风险点（可能的技术风险、依赖风险等）
+- acceptanceCriteria: 验收标准（可测、可看、可验证的数组，必填）
+- risk: 风险点（可能的技术风险、依赖风险等，必填）
 - priority: 优先级（high/medium/low）
 - estimatedHours: 预估工时（小时数）
-- details: 实现细节（具体的实现步骤、关键技术点、注意事项）`
+- details: 实现细节（具体的实现步骤、关键技术点、注意事项，必填）
+- description: 任务描述（简要说明任务目的和内容，必填）`
 	}
 
 	return fmt.Sprintf(`你是一个 AI 助手，帮助将产品需求文档（PRD）拆分为开发任务。
@@ -732,8 +736,7 @@ func (s *Service) buildSplitRequirementPromptWithTemplate(requirement *models.Re
 %s
 %s
 
-可选字段：
-- description: 任务描述
+**可选字段：**
 - testStrategy: 测试策略
 - dependencies: 依赖的任务索引数组
 
@@ -742,7 +745,7 @@ func (s *Service) buildSplitRequirementPromptWithTemplate(requirement *models.Re
 2. 优先级设置：基础架构和高优先级功能设为 high，核心功能设为 medium，辅助功能设为 low
 3. 合理设置依赖关系，确保任务可以按顺序执行
 4. 每个任务应该足够独立，可以单独开发和测试
-5. 为每个任务提供明确的测试策略，说明如何验证功能正确性
+5. details、risk、acceptanceCriteria、description 是必填字段，必须为每个任务填写完整
 6. 预估工时应基于实现复杂度合理评估
 
 示例格式：
@@ -761,6 +764,7 @@ func (s *Service) buildSplitRequirementPromptWithTemplate(requirement *models.Re
     "priority": "high",
     "estimatedHours": 4,
     "details": "1. 创建 User 模型，包含用户名、密码哈希等字段\n2. 实现密码加密函数，使用 bcrypt 算法\n3. 创建登录处理函数，验证用户名密码\n4. 密码正确时生成 JWT token 并返回\n5. 密码错误时返回 401 错误\n6. 添加输入参数验证中间件",
+    "description": "实现用户登录认证功能，包括密码验证和 JWT token 生成",
     "testStrategy": "1. 单元测试：测试密码加密/验证函数\n2. 接口测试：使用 Postman 测试登录接口\n3. 边界测试：空参数、错误密码、正确密码\n4. 性能测试：并发登录请求压测",
     "dependencies": []
   }
@@ -842,28 +846,30 @@ func (s *Service) buildSplitRequirementPromptWithLanguage(requirement *models.Re
 需求内容：
 %s
 
-请以 JSON 数组格式返回任务列表，每个任务必须包含以下 11 个字段：
+请以 JSON 数组格式返回任务列表，每个任务必须包含以下字段：
+
+**必填字段（10 个）：**
 - title: 任务名称（清晰、可搜索）
 - module: 模块归属（MCP 接入/AI 能力/数据处理/接口封装）
 - input: 输入（依赖什么：结构、接口、权限、环境）
 - output: 输出（交付物：代码、文档、接口、Demo）
-- acceptanceCriteria: 验收标准（可测、可看、可验证的数组）
-- risk: 风险点（可能的技术风险、依赖风险等）
+- acceptanceCriteria: 验收标准（可测、可看、可验证的数组，至少包含 2 项）
+- risk: 风险点（可能的技术风险、依赖风险等，必填不能为空）
 - priority: 优先级（high/medium/low）
 - estimatedHours: 预估工时（小时数）
-- details: 实现细节（具体的实现步骤、关键技术点、注意事项，必填）
-- testStrategy: 测试策略（测试方法、测试用例、验收标准，必填）
-- dependencies: 依赖的任务索引数组（无依赖填空数组）
+- details: 实现细节（具体的实现步骤、关键技术点、注意事项）
+- description: 任务描述（简要说明任务目的和内容）
 
-可选字段：
-- description: 任务描述
+**可选字段：**
+- testStrategy: 测试策略
+- dependencies: 依赖的任务索引数组
 
 拆分原则：
 1. 按照功能模块拆分，每个任务专注于一个功能点
 2. 优先级设置：基础架构和高优先级功能设为 high，核心功能设为 medium，辅助功能设为 low
 3. 合理设置依赖关系，确保任务可以按顺序执行
 4. 每个任务应该足够独立，可以单独开发和测试
-5. details 和 testStrategy 是必填字段，必须为每个任务填写完整的实现细节和测试策略
+5. details、testStrategy、risk、acceptanceCriteria、description 是必填字段，必须为每个任务填写完整
 6. 预估工时应基于实现复杂度合理评估
 
 示例格式：
@@ -882,6 +888,7 @@ func (s *Service) buildSplitRequirementPromptWithLanguage(requirement *models.Re
     "priority": "high",
     "estimatedHours": 4,
     "details": "1. 创建 User 模型，包含用户名、密码哈希等字段\n2. 实现密码加密函数，使用 bcrypt 算法\n3. 创建登录处理函数，验证用户名密码\n4. 密码正确时生成 JWT token 并返回\n5. 密码错误时返回 401 错误\n6. 添加输入参数验证中间件",
+    "description": "实现用户登录认证功能，包括密码验证和 JWT token 生成",
     "testStrategy": "1. 单元测试：测试密码加密/验证函数\n2. 接口测试：使用 Postman 测试登录接口\n3. 边界测试：空参数、错误密码、正确密码\n4. 性能测试：并发登录请求压测",
     "dependencies": []
   }

@@ -186,6 +186,7 @@ const routeMap: RouteMap = {
   "team_workload": "/team/workload",
   "templates": "/templates",
   "templates_projects": "/templates/projects",
+  "templates_projects_detail": "/templates/projects/:id",
   "templates_tasks": "/templates/tasks"
 };
 

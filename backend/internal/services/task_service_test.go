@@ -403,3 +403,33 @@ func TestTaskService_RegenerateSubtask_NoAI(t *testing.T) {
 		t.Errorf("重新生成子任务失败: %v", err)
 	}
 }
+
+func TestTaskService_List(t *testing.T) {
+	service, mock := setupTaskServiceTest(t)
+
+	// Mock count query
+	mock.ExpectQuery("SELECT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+
+	// Mock select query
+	rows := sqlmock.NewRows([]string{
+		"id", "requirement_id", "requirement_title", "title", "description",
+		"status", "priority", "assignee", "subtask_count", "subtask_done_count",
+	}).AddRow(1, 1, "需求 1", "任务 1", "描述 1", "pending", "high", "user1", 2, 1).
+		AddRow(2, 1, "需求 1", "任务 2", "描述 2", "done", "low", "user2", 1, 1)
+
+	mock.ExpectQuery("SELECT").WillReturnRows(rows)
+
+	filters := map[string]interface{}{
+		"status": "pending",
+	}
+	tasks, total, err := service.List(filters, 1, 10)
+	if err != nil {
+		t.Errorf("获取任务列表失败：%v", err)
+	}
+	if total != 2 {
+		t.Errorf("期望总数 2, 实际 %d", total)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("期望 2 条记录，实际 %d", len(tasks))
+	}
+}

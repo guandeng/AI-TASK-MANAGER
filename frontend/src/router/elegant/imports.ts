@@ -33,5 +33,6 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   team_members: () => import("@/views/team/members/index.vue"),
   team_workload: () => import("@/views/team/workload/index.vue"),
   templates_projects: () => import("@/views/templates/projects/index.vue"),
+  templates_projects_detail: () => import("@/views/templates/projects/detail.vue"),
   templates_tasks: () => import("@/views/templates/tasks/index.vue"),
 };

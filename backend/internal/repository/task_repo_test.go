@@ -358,3 +358,31 @@ func TestTaskRepository_List_WithFilters(t *testing.T) {
 		t.Errorf("期望 1 条记录, 实际 %d", len(tasks))
 	}
 }
+
+func TestTaskRepository_UpdateWithMap(t *testing.T) {
+	repo, mock := setupTaskRepoTest(t)
+
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE `task_task`").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	updates := map[string]interface{}{
+		"title":       "新标题",
+		"description": "新描述",
+	}
+	err := repo.UpdateWithMap(1, updates)
+	if err != nil {
+		t.Errorf("更新任务失败：%v", err)
+	}
+}
+
+func TestTaskRepository_UpdateWithMap_Empty(t *testing.T) {
+	repo, _ := setupTaskRepoTest(t)
+
+	// 空 map 应该直接返回，不执行任何数据库操作
+	err := repo.UpdateWithMap(1, map[string]interface{}{})
+	if err != nil {
+		t.Errorf("更新任务失败：%v", err)
+	}
+}

@@ -255,6 +255,17 @@ export const generatedRoutes: GeneratedRoute[] = [
         }
       },
       {
+        name: 'templates_projects_detail',
+        path: '/templates/projects/:id',
+        component: 'view.templates_projects_detail',
+        props: true,
+        meta: {
+          title: 'templates_projects_detail',
+          i18nKey: 'route.templates_projects_detail',
+          hideInMenu: true
+        }
+      },
+      {
         name: 'templates_tasks',
         path: '/templates/tasks',
         component: 'view.templates_tasks',

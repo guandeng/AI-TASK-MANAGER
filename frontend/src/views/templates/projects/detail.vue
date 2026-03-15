@@ -24,7 +24,10 @@ import SvgIcon from '@/components/custom/svg-icon.vue';
 const router = useRouter();
 const message = useMessage();
 
-const routeParams = ref<any>({});
+const props = defineProps<{
+  id: string
+}>();
+
 const loading = ref(false);
 const template = ref<ProjectTemplate | null>(null);
 const scoreLoading = ref(false);
@@ -34,7 +37,7 @@ const scoreLevel = ref('');
 
 // 获取模板 ID
 const templateId = computed(() => {
-  return routeParams.value?.id || '';
+  return props.id || '';
 });
 
 // 加载模板详情
@@ -64,7 +67,7 @@ async function loadTemplate() {
 async function handleScore() {
   scoreLoading.value = true;
   try {
-    const { data, error } = await scoreProjectTemplate(parseInt(templateId.value));
+    const { data, error } = await scoreProjectTemplate({ id: parseInt(templateId.value) });
     if (!error && data) {
       const result = data.data || data;
       scoreResult.value = result.score;
@@ -131,10 +134,7 @@ function goBack() {
 }
 
 onMounted(() => {
-  // 从路由参数获取 ID
-  const id = window.location.pathname.split('/').pop();
-  routeParams.value = { id };
-  if (id) {
+  if (props.id) {
     loadTemplate();
   }
 });
@@ -169,9 +169,12 @@ onMounted(() => {
               </NSpace>
             </div>
             <NSpace class="template-actions">
-              <NButton @click="openScoreDrawer">
+              <NButton @click="handleScore" :loading="scoreLoading">
                 <SvgIcon icon="heroicons:star" class="mr-4" />
                 {{ scoreResult ? '重新评分' : '评分' }}
+              </NButton>
+              <NButton v-if="scoreResult" @click="openScoreDrawer">
+                查看评分结果
               </NButton>
               <NButton type="primary" @click="handleInstantiate">
                 <SvgIcon icon="heroicons:folder-plus" class="mr-4" />

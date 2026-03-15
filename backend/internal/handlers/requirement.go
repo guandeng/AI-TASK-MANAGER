@@ -100,11 +100,11 @@ func (h *RequirementHandler) Statistics(c *gin.Context) {
 		Completed int64 `json:"completed"`
 	}{}
 
-	db.Model(&models.Requirement{}).Count(&stats.Total)
-	db.Model(&models.Requirement{}).Where("status = ?", "draft").Count(&stats.Draft)
-	db.Model(&models.Requirement{}).Where("status = ?", "reviewing").Count(&stats.Reviewing)
-	db.Model(&models.Requirement{}).Where("status = ?", "approved").Count(&stats.Approved)
-	db.Model(&models.Requirement{}).Where("status = ?", "completed").Count(&stats.Completed)
+	db.Model(&models.Requirement{}).Where("deleted_at IS NULL").Count(&stats.Total)
+	db.Model(&models.Requirement{}).Where("status = ? AND deleted_at IS NULL", "draft").Count(&stats.Draft)
+	db.Model(&models.Requirement{}).Where("status = ? AND deleted_at IS NULL", "reviewing").Count(&stats.Reviewing)
+	db.Model(&models.Requirement{}).Where("status = ? AND deleted_at IS NULL", "approved").Count(&stats.Approved)
+	db.Model(&models.Requirement{}).Where("status = ? AND deleted_at IS NULL", "completed").Count(&stats.Completed)
 
 	response.Success(c, stats)
 }

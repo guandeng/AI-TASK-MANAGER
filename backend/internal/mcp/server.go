@@ -550,7 +550,7 @@ func (s *Server) handleGetRequirementTasks(ctx context.Context, request mcp.Call
 	// 获取该需求下的所有任务，预加载子任务
 	var tasks []models.Task
 	if err := s.db.Where("requirement_id = ? AND deleted_at IS NULL", requirementID).
-		Preload("Subtasks").
+		Preload("Subtasks", "deleted_at IS NULL").
 		Order("created_at DESC").
 		Find(&tasks).Error; err != nil {
 		return nil, err

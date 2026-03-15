@@ -46,11 +46,9 @@ sleep 1
 echo -e "${YELLOW}[2/4] 启动 Go 后端...${NC}"
 cd "$BACKEND_ROOT"
 
-# 检查是否需要编译
-if [ ! -f "bin/server" ]; then
-    echo -e "  ${BLUE}编译 Go 后端...${NC}"
-    go build -o bin/server ./cmd/server
-fi
+# 重新编译 Go 后端
+echo -e "  ${BLUE}编译 Go 后端...${NC}"
+go build -o bin/server ./cmd/server
 
 # 后台启动 Go 后端
 nohup ./bin/server > "$BACKEND_LOG_DIR/backend.log" 2>&1 &

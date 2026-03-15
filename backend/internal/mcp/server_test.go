@@ -62,7 +62,7 @@ func TestHandleGetRequirementTasks_JSON(t *testing.T) {
 			AddRow(1, 1, "任务 1", "pending", "high", "backend", "描述 1", "详情 1", nil, nil, nil, nil, nil, ""))
 
 	// 模拟子任务查询
-	mock.ExpectQuery("SELECT \\* FROM `task_subtask` WHERE `task_subtask`.`task_id` = \\?").
+	mock.ExpectQuery("SELECT \\* FROM `task_subtask` WHERE `task_subtask`.`task_id` = \\? AND deleted_at IS NULL").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "task_id", "title", "status", "priority", "description", "details", "code_interface", "acceptance_criteria", "related_files", "code_hints"}).
 			AddRow(1, 1, "子任务 1", "pending", "medium", "子描述", "子详情", nil, nil, nil, nil))
 
@@ -115,7 +115,7 @@ func TestHandleGetRequirementTasks_Markdown(t *testing.T) {
 			AddRow(1, 1, "任务 1", "pending", "high", "backend", "描述 1", "详情 1", nil, nil, nil, nil, nil, ""))
 
 	// 模拟子任务查询
-	mock.ExpectQuery("SELECT \\* FROM `task_subtask` WHERE `task_subtask`.`task_id` = \\?").
+	mock.ExpectQuery("SELECT \\* FROM `task_subtask` WHERE `task_subtask`.`task_id` = \\? AND deleted_at IS NULL").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "task_id", "title", "status", "priority", "description", "details", "code_interface", "acceptance_criteria", "related_files", "code_hints"}).
 			AddRow(1, 1, "子任务 1", "pending", "medium", "子描述", "子详情", nil, nil, nil, nil))
 
